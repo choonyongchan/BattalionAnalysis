@@ -6,22 +6,26 @@
  * one parade — the timeline and the tile row describe that single day and ignore the
  * range entirely, because "today's strength" should never sit under a span a reader has
  * to remember is active. `dateFrom`/`dateTo` bound every trend and the Sankey; null on
- * both means "all data", the long-standing default.
+ * both means "all data", the long-standing default. `company` narrows every panel on the
+ * page to one company, or `ALL` for the whole battalion — applied once, upstream, by
+ * `scopeDataset`, so each rate is still a company's own numerator over its own
+ * denominator.
  */
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { dataset, dateFrom, dateTo, selectedDate } from '../app/state.js';
+import { company, dataset, dateFrom, dateTo, selectedDate } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { Segmented, SCOPE_OPTIONS } from '../components/Segmented.jsx';
-import { DateRangePicker, PresetBar } from '../components/DateRangePicker.jsx';
+import { PageControls } from '../components/PageControls.jsx';
 import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../format.js';
 import { ChartCard, Line, Sankey, Timeline } from '../charts/index.js';
 import { COMPANIES } from '../model/domain.js';
 import { DUTY_CLASS } from '../model/classify.js';
+import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../model/calendarMarks.js';
 import { datesPresent, battalionStrength, dutyCountsOn } from '../model/metrics.js';
-import { eachDay, isoToday, resolvePreset } from '../model/dateRange.js';
+import { eachDay } from '../model/dateRange.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions, submissionTrend } from '../model/formsg.js';
 import { filingsOn, toFilings } from '../model/submissions.js';
@@ -68,33 +72,50 @@ function countOf(duty, dutyClass) {
 /**
  * A trend card: a Line chart plus its Battalion/Companies toggle, sharing one layout so
  * all five trend cards on this page read as the same kind of thing.
+ *
+ * When a single company is selected in the page bar the toggle is meaningless — there is
+ * no Battalion-vs-Companies distinction with one company — so it is hidden and the chart
+ * draws that company's one line, kept in its own colour slot so it matches every other
+ * page.
  * @param {{title: string, trendFn: function(string): !Object, coverage: string,
  *     unit?: string}} props The card title, a function from scope name to a trend result,
  *     the coverage line, and the axis unit.
  * @returns {!preact.VNode} The card.
  */
 function TrendCard({ title, trendFn, coverage, unit }) {
+  const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
   const [scope, setScope] = useState('battalion');
-  const trend = trendFn(scope);
+  const effectiveScope = scopedCompany ? 'battalion' : scope;
+  const trend = trendFn(effectiveScope);
 
   return (
     <Card title={title}>
-      <div class="controlrow">
-        <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
-      </div>
+      {scopedCompany ? null : (
+        <div class="controlrow">
+          <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
+        </div>
+      )}
       <ChartCard title="" coverage={coverage}>
         <Line
           categories={trend.dates}
           series={trend.series.map((series) => ({
             ...series,
-            slot: scope === 'companies' ? COMPANIES.indexOf(series.name) : undefined,
-            neutral: scope === 'battalion',
+            name: scopedCompany || series.name,
+            slot: scopedCompany
+              ? COMPANIES.indexOf(scopedCompany)
+              : effectiveScope === 'companies'
+                ? COMPANIES.indexOf(series.name)
+                : undefined,
+            neutral: !scopedCompany && effectiveScope === 'battalion',
           }))}
           weekends={trend.weekends}
           holidays={trend.holidays}
           valueName={unit}
         />
       </ChartCard>
+      {!scopedCompany && effectiveScope === 'companies' ? (
+        <p class="chart-hint">Tap on the company to hide</p>
+      ) : null}
     </Card>
   );
 }
@@ -104,13 +125,20 @@ function TrendCard({ title, trendFn, coverage, unit }) {
  * @returns {!preact.VNode} The page.
  */
 export function Overview() {
-  const data = dataset.value;
+  const full = dataset.value;
+  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
+  const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
 
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
-  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const submissions = useMemo(
+    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
+    [data.formSg, company.value]
+  );
   const filings = useMemo(() => toFilings(data.submissions), [data.submissions]);
   const holidays = useMemo(() => toHolidays(data.holidays), [data.holidays]);
-  const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);
+  // The selectable dates and the trend axis come from the full, unscoped strength so they
+  // do not shrink when a company that filed on fewer days is picked.
+  const paradeDates = useMemo(() => datesPresent(full.strength), [full.strength]);
 
   useEffect(() => {
     if (!selectedDate.value && paradeDates.length > 0) {
@@ -139,7 +167,7 @@ export function Overview() {
     return (
       <div class="page">
         <header class="pagehead">
-          <h1 class="pagehead__title">Battalion overview</h1>
+          <h1 class="pagehead__title">Battalion Overview</h1>
         </header>
         <EmptyState>No parade state has been read yet.</EmptyState>
       </div>
@@ -149,14 +177,18 @@ export function Overview() {
   const strength = battalionStrength(data.strength, today, SESSION);
   const duty = dutyCountsOn(data.personnel, today, SESSION);
   const reportedSickToday = submissions.filter((submission) => submission.date === today).length;
-  const filingEntries = filingsOn(filings, today, SESSION);
+  const filingEntries = scopeFilings(filingsOn(filings, today, SESSION), company.value);
 
-  const coverageLine =
-    'Accurate to the parade states filed for ' +
-    fmtDate(today) +
-    ' — ' +
-    fmtFraction(strength.companiesReporting.length, COMPANIES.length) +
-    ' companies.';
+  const coverageLine = scopedCompany
+    ? scopedCompany +
+      ' only — parade state for ' +
+      fmtDate(today) +
+      (strength.companiesReporting.length > 0 ? ' filed.' : ' not filed.')
+    : 'Accurate to the parade states filed for ' +
+      fmtDate(today) +
+      ' — ' +
+      fmtFraction(strength.companiesReporting.length, COMPANIES.length) +
+      ' companies.';
 
   const trendCoverage =
     'Battalion strength observed on ' +
@@ -167,12 +199,14 @@ export function Overview() {
     <div class="page">
       <header class="pagehead">
         <div>
-          <h1 class="pagehead__title">Battalion overview</h1>
+          <h1 class="pagehead__title">Battalion Overview</h1>
           <p class="pagehead__sub">{fmtDate(today)}</p>
         </div>
       </header>
 
-      <Card title="Today's first parade state" note="One dot per company, at its filing time">
+      <PageControls min={paradeDates[0] || today} max={paradeDates[paradeDates.length - 1] || today} />
+
+      <Card title="Today's First Parade State" note="One dot per company, at its filing time">
         <Timeline
           entries={filingEntries}
           deadline={{ minutes: 8 * 60, label: '08:00' }}
@@ -197,28 +231,6 @@ export function Overview() {
         <h2 class="pagehead__title" style="font-size:21px">
           Trends
         </h2>
-        <div class="controlrow">
-          <DateRangePicker
-            min={paradeDates[0] || today}
-            max={paradeDates[paradeDates.length - 1] || today}
-            from={dateFrom.value}
-            to={dateTo.value}
-            onChange={({ from, to }) => {
-              dateFrom.value = from;
-              dateTo.value = to;
-            }}
-          />
-          <PresetBar
-            from={dateFrom.value}
-            to={dateTo.value}
-            today={isoToday()}
-            onSelect={(preset) => {
-              const resolved = resolvePreset(preset, isoToday());
-              dateFrom.value = resolved.from;
-              dateTo.value = resolved.to;
-            }}
-          />
-        </div>
       </div>
 
       <TrendCard
@@ -232,7 +244,7 @@ export function Overview() {
       />
 
       <TrendCard
-        title="Reporting sick (parade state)"
+        title="Reporting Sick (Parade State)"
         coverage={trendCoverage}
         unit="per 100"
         trendFn={(scope) => {
@@ -245,7 +257,7 @@ export function Overview() {
       />
 
       <TrendCard
-        title="Reported sick (FormSG)"
+        title="Reported Sick (FormSG)"
         coverage={
           'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.'
         }
@@ -288,8 +300,8 @@ export function Overview() {
       />
 
       <Card
-        title="Report-sick flow"
-        note="Parade state and FormSG matched by 4D, else name, within a day; MC/Status matched 0–2 days after."
+        title="Report-Sick Flow"
+        note="Reconciled per company by 4D, else name; type and outcome are per FormSG submission."
       >
         <SankeyCard
           personnel={data.personnel}
@@ -314,6 +326,7 @@ function SankeyCard({ personnel, episodes, submissions, from, to }) {
     () => reportSickFlow({ personnel, episodes, submissions, from, to }),
     [personnel, episodes, submissions, from, to]
   );
+  const c = flow.coverage;
 
   return (
     <>
@@ -321,13 +334,16 @@ function SankeyCard({ personnel, episodes, submissions, from, to }) {
         <Sankey nodes={flow.nodes} links={flow.links} />
       </ChartCard>
       <Coverage>
-        {fmtInt(flow.coverage.totalEvents)} report-sick events in range — {fmtInt(flow.coverage.sourceCounts.paradeOnly)}{' '}
-        parade-state only, {fmtInt(flow.coverage.sourceCounts.both)} in both,{' '}
-        {fmtInt(flow.coverage.sourceCounts.formsgOnly)} FormSG only.
-        {flow.coverage.companiesWithNoFormSg.length > 0
-          ? ' No FormSG channel recorded for ' + flow.coverage.companiesWithNoFormSg.join(', ') + '.'
+        {fmtInt(c.reportingSick)} reporting sick on the parade state, {fmtInt(c.reportedSick)} reported
+        sick on FormSG — {fmtInt(c.matched)} both, {fmtInt(c.paradeOnly)} filed no form,{' '}
+        {fmtInt(c.unaccounted)} unaccounted (FormSG with no parade-state line).
+        {c.companiesWithNoFormSg && c.companiesWithNoFormSg.length > 0
+          ? ' No FormSG channel recorded for ' + c.companiesWithNoFormSg.join(', ') + '.'
           : ''}
-        {flow.coverage.statusMultiLabelled
+        {c.submissionFanout
+          ? ' A soldier who filed more than one form is one person on the left and several submissions on the right, so the FormSG branch is wider than the soldier count.'
+          : ''}
+        {c.statusMultiLabelled
           ? ' A status outcome naming several restrictions is counted under each — the Status branch\'s outflow can exceed its inflow.'
           : ''}
       </Coverage>

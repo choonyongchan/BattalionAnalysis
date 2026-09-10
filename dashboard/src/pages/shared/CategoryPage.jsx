@@ -13,21 +13,22 @@
  */
 
 import { useMemo, useState } from 'preact/hooks';
-import { dateFrom, dateTo } from '../../app/state.js';
+import { company, dateFrom, dateTo } from '../../app/state.js';
 import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { Tile, TileRow } from '../../components/Tile.jsx';
 import { Segmented, SCOPE_OPTIONS } from '../../components/Segmented.jsx';
-import { DateRangePicker, PresetBar } from '../../components/DateRangePicker.jsx';
+import { PageControls } from '../../components/PageControls.jsx';
 import { SoldierSearch } from '../../components/SoldierSearch.jsx';
 import { Leaderboard } from '../../components/Leaderboard.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../../format.js';
 import { Bar, ChartCard, GroupedBar, Heatmap, Histogram, Line, WordCloud } from '../../charts/index.js';
 import { COMPANIES, PLATOONS, UNASSIGNED } from '../../model/domain.js';
+import { ALL_COMPANIES } from '../../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
 import { GRANULARITIES } from '../../model/buckets.js';
 import { toRotations } from '../../model/rotations.js';
 import { datesPresent, episodeCounts, longMcRoster, longMcTrend } from '../../model/metrics.js';
-import { eachDay, isoToday, resolvePreset, withinRange } from '../../model/dateRange.js';
+import { eachDay, isoToday, withinRange } from '../../model/dateRange.js';
 import { dutyTrend } from '../../model/strength.js';
 import { topByCount, topByDays, topByStatusCount, rankUnits } from '../../model/leaderboards.js';
 import { topLabelsOverTime } from '../../model/reasonTrend.js';
@@ -38,38 +39,6 @@ import { toText } from '../../model/values.js';
 const LONG_MC_MIN_DAYS = 13;
 
 /**
- * The date-range control band every category page opens with.
- * @param {{min: string, max: string}} props The selectable bounds.
- * @returns {!preact.VNode} The control row.
- */
-function RangeControls({ min, max }) {
-  return (
-    <div class="controlrow">
-      <DateRangePicker
-        min={min}
-        max={max}
-        from={dateFrom.value}
-        to={dateTo.value}
-        onChange={({ from, to }) => {
-          dateFrom.value = from;
-          dateTo.value = to;
-        }}
-      />
-      <PresetBar
-        from={dateFrom.value}
-        to={dateTo.value}
-        today={isoToday()}
-        onSelect={(preset) => {
-          const resolved = resolvePreset(preset, isoToday());
-          dateFrom.value = resolved.from;
-          dateTo.value = resolved.to;
-        }}
-      />
-    </div>
-  );
-}
-
-/**
  * One trend card: a Battalion/Companies toggle over a Line chart. Used for both the
  * category's own duty-class trend and, where a page needs one, a second trend from a
  * different source (Report Sick's FormSG submissions, which `dutyTrend` cannot read).
@@ -77,6 +46,10 @@ function RangeControls({ min, max }) {
  * A real component, not a helper called as a plain function, specifically so its
  * `useState` for the scope toggle is safe — a second trend card built by calling a
  * function during another component's render would share no hook slot of its own.
+ *
+ * With a single company selected in the page bar the Battalion/Companies toggle has
+ * nothing to switch between, so it is hidden and the chart draws that company's one line
+ * in its own colour slot.
  * @param {{title: string, coverage: string, trendFn: function(string, string[]): !Object,
  *     dates: string[], weekends: Array<!Object>, holidays: Array<!Object>}} props The
  *     card's title and coverage line; `trendFn(scope, dates)` returns `{dates, series}`;
@@ -84,27 +57,39 @@ function RangeControls({ min, max }) {
  * @returns {!preact.VNode} The card.
  */
 function TrendSection({ title, coverage, trendFn, dates, weekends, holidays }) {
+  const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
   const [scope, setScope] = useState('battalion');
-  const trend = trendFn(scope, dates);
+  const effectiveScope = scopedCompany ? 'battalion' : scope;
+  const trend = trendFn(effectiveScope, dates);
 
   return (
     <Card title={title}>
-      <div class="controlrow">
-        <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
-      </div>
+      {scopedCompany ? null : (
+        <div class="controlrow">
+          <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
+        </div>
+      )}
       <ChartCard title="" coverage={coverage}>
         <Line
           categories={trend.dates}
           series={trend.series.map((series) => ({
             ...series,
-            slot: scope === 'companies' ? COMPANIES.indexOf(series.name) : undefined,
-            neutral: scope === 'battalion',
+            name: scopedCompany || series.name,
+            slot: scopedCompany
+              ? COMPANIES.indexOf(scopedCompany)
+              : effectiveScope === 'companies'
+                ? COMPANIES.indexOf(series.name)
+                : undefined,
+            neutral: !scopedCompany && effectiveScope === 'battalion',
           }))}
           weekends={weekends}
           holidays={holidays}
           valueName="per 100"
         />
       </ChartCard>
+      {!scopedCompany && effectiveScope === 'companies' ? (
+        <p class="chart-hint">Tap on the company to hide</p>
+      ) : null}
     </Card>
   );
 }
@@ -129,7 +114,7 @@ function PlatoonHeatmap({ episodes, dutyClass }) {
 
   return (
     <ChartCard
-      title="By company and platoon"
+      title="By Company and Platoon"
       coverage="Count of episodes; a bare platoon axis, not a rate — see the table for totals."
       empty="No episodes in range to place on the grid."
     >
@@ -152,7 +137,7 @@ function ReasonsOverTime({ items, rotations }) {
   );
 
   return (
-    <Card title="Top reasons over time">
+    <Card title="Top Reasons Over Time">
       <div class="controlrow">
         <Segmented
           options={GRANULARITIES}
@@ -184,14 +169,14 @@ function LocationsCard({ personnel }) {
   return (
     <div class="grid-2">
       <ChartCard
-        title="Top MC clinics"
+        title="Top MC Clinics"
         coverage={'Location stated on ' + fmtFraction(mc.withLocation, mc.total) + ' of Att C rows.'}
         empty="No location recorded on any Att C row in range."
       >
         <Bar categories={mcCounts.map((c) => c.location)} values={mcCounts.map((c) => c.count)} valueName="visits" />
       </ChartCard>
       <ChartCard
-        title="Top MA clinics"
+        title="Top MA Clinics"
         coverage={'Location stated on ' + fmtFraction(ma.withLocation, ma.total) + ' of MA rows.'}
         empty="No location recorded on any MA row in range."
       >
@@ -213,7 +198,7 @@ function LongMcCard({ episodes, from, to }) {
   const peak = trend.reduce((max, day) => Math.max(max, day.count), 0);
 
   return (
-    <Card title={'Long-term MC (≥' + (LONG_MC_MIN_DAYS + 1) + ' days)'} note={fmtInt(peak) + ' soldiers at the peak'}>
+    <Card title={'Long-Term MC (≥' + (LONG_MC_MIN_DAYS + 1) + ' days)'} note={fmtInt(peak) + ' soldiers at the peak'}>
       {roster.length === 0 ? (
         <EmptyState>No MC in range runs longer than {LONG_MC_MIN_DAYS + 1} days.</EmptyState>
       ) : (
@@ -260,7 +245,7 @@ function UnitRankings({ personnel, strength, dutyClass }) {
 
   return (
     <div class="grid-2">
-      <Card title="Companies, by rate">
+      <Card title="Companies, by Rate">
         {companies.length === 0 ? (
           <EmptyState>No data in range.</EmptyState>
         ) : (
@@ -286,7 +271,7 @@ function UnitRankings({ personnel, strength, dutyClass }) {
           </div>
         )}
       </Card>
-      <Card title="Platoons, by rate">
+      <Card title="Platoons, by Rate">
         {platoons.length === 0 ? (
           <EmptyState>No data in range.</EmptyState>
         ) : (
@@ -331,7 +316,7 @@ function SoldierEvents({ episodes, dutyClass, soldierKey }) {
     .sort((a, b) => toText(b.startDate).localeCompare(toText(a.startDate)));
 
   return (
-    <Card title="This soldier's history">
+    <Card title="This Soldier's History">
       {rows.length === 0 ? (
         <EmptyState>No episodes of this kind on record for this soldier.</EmptyState>
       ) : (
@@ -372,6 +357,7 @@ export function CategoryPage(spec) {
   const {
     title,
     dataset,
+    calendarDates,
     dutyClass,
     leaderboardMetric,
     reasonSource,
@@ -388,7 +374,13 @@ export function CategoryPage(spec) {
     afterLeaderboardBuilder,
   } = spec;
 
-  const paradeDates = useMemo(() => datesPresent(dataset.strength), [dataset.strength]);
+  // The selectable range and the trend x-axis come from the full, unscoped parade dates
+  // (`calendarDates`, passed by each page) so they do not contract when a company that
+  // filed on fewer days is picked in the page bar.
+  const paradeDates = useMemo(
+    () => calendarDates || datesPresent(dataset.strength),
+    [calendarDates, dataset.strength]
+  );
   const holidays = useMemo(() => toHolidays(dataset.holidays), [dataset.holidays]);
   const rotations = useMemo(() => toRotations(dataset.rotations), [dataset.rotations]);
 
@@ -452,7 +444,7 @@ export function CategoryPage(spec) {
         </div>
       </header>
 
-      <RangeControls min={paradeDates[0] || isoToday()} max={paradeDates[paradeDates.length - 1] || isoToday()} />
+      <PageControls min={paradeDates[0] || isoToday()} max={paradeDates[paradeDates.length - 1] || isoToday()} />
 
       <TileRow>
         <Tile label="Episodes" value={fmtInt(counts.total.episodes)} />
@@ -462,7 +454,7 @@ export function CategoryPage(spec) {
       </TileRow>
 
       <TrendSection
-        title={title + ' trend'}
+        title={title + ' Trend'}
         coverage="Rate per 100 accountable; a company not filing that day is a gap."
         trendFn={(scope, dates) => dutyTrend(dataset.personnel, dataset.strength, dutyClass, dates, { scope, session: 'FPS' })}
         dates={trendDates}
@@ -486,13 +478,13 @@ export function CategoryPage(spec) {
       {reasonItems ? <ReasonsOverTime items={reasonItems} rotations={rotations} /> : null}
 
       {showWordCloud ? (
-        <ChartCard title="Free-text reasons" empty="No free-text reasons recorded in range.">
+        <ChartCard title="Free-Text Reasons" empty="No free-text reasons recorded in range.">
           <WordCloud words={wordCloudWords || []} />
         </ChartCard>
       ) : null}
 
       {showHistogram ? (
-        <ChartCard title="Time of day" empty="No timestamped submissions in range.">
+        <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
           <Histogram bins={histogramBins || []} />
         </ChartCard>
       ) : null}
@@ -501,7 +493,7 @@ export function CategoryPage(spec) {
 
       {showLongMc ? <LongMcCard episodes={spec.episodes} from={effectiveFrom} to={effectiveTo} /> : null}
 
-      <Card title={'Top 10 by ' + (leaderboardMetric === 'days' ? 'days lost' : leaderboardMetric === 'status' ? 'statuses held' : 'episode count')}>
+      <Card title={'Top 10 by ' + (leaderboardMetric === 'days' ? 'Days Lost' : leaderboardMetric === 'status' ? 'Statuses Held' : 'Episode Count')}>
         <Leaderboard rows={leaderboard} metric={leaderboardMetric === 'status' ? 'status' : leaderboardMetric === 'days' ? 'days' : 'count'} />
       </Card>
 
@@ -509,7 +501,7 @@ export function CategoryPage(spec) {
 
       {afterLeaderboardBuilder ? afterLeaderboardBuilder(effectiveFrom, effectiveTo) : null}
 
-      <Card title="Soldier search">
+      <Card title="Soldier Search">
         <SoldierSearch index={soldierIndex} onSelect={(soldier) => setSoldierKey(soldier.key)} />
       </Card>
       <SoldierEvents episodes={spec.episodes} dutyClass={dutyClass} soldierKey={soldierKey} />

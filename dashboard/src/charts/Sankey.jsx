@@ -21,10 +21,10 @@ import { tooltipLines } from './tooltip.js';
 import { baseOption, seriesColor } from './theme.js';
 
 /** @type {string[]} `sankey.js`'s stages, in flow order; the index is the colour slot. */
-const STAGES = ['source', 'type', 'outcome', 'status'];
+const STAGES = ['reporting', 'reported', 'type', 'outcome', 'status'];
 
 /** @type {!RegExp} Node names that mean "nothing was recorded" rather than a category. */
-const NEUTRAL_NAME = /\b(not recorded|none recorded|unstated|unknown|unmatched)\b/i;
+const NEUTRAL_NAME = /\b(not recorded|none recorded|unstated|unknown|unmatched|unaccounted|no formsg submission|not submitted)\b/i;
 
 /**
  * The label shown beside a node.

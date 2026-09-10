@@ -1,42 +1,53 @@
 /**
- * The report-sick flow: source, type, outcome, and — for a Status outcome — which
- * restriction it became.
+ * The report-sick flow: parade state to FormSG, then type, then outcome, and — for a
+ * Status outcome — which restriction it became.
  *
- * Four stages, five node columns:
+ * Five stages, columns:
  *
- *   Source (parade state only / both / FormSG only)
- *     -> Type (RSI / RSO / Medical Review / FFI / not recorded)
+ *   Reporting sick / Unaccounted                 (parade state, aggregate)
+ *     -> Reported sick / No FormSG submission     (FormSG, aggregate)
+ *     -> Type (RSI / RSO / FFI / Medical Review / not recorded)
  *     -> Outcome (MC / Status / none recorded)
  *     -> Status bucket, for the Status outcome only
  *
- * This is event-level matching, and it is deliberately a different join from
- * `reconcile.js`'s `reconcileReportSick`, which counts distinct people per company for a
- * company-level cross-check. Here each report-sick episode and each unmatched FormSG
- * submission is one flow, matched to the other source within ±1 day on identity, and then
- * forward to whatever MC or Status followed within the next two days.
+ * **The left join is aggregate, not event-level.** It hands the in-range report-sick
+ * episodes and the in-range FormSG submissions to `reconcile.js`'s `reconcileReportSick`,
+ * which lines the two sources up *per company* — distinct soldiers on the parade state
+ * against distinct soldiers on the form, matched by 4D where both carry it and otherwise
+ * by a token-set name — and this diagram sums those per-company rows. So
+ * `Reporting sick -> Reported sick` is the soldiers seen in both sources,
+ * `Reporting sick -> No FormSG submission` the parade-state-only remainder, and
+ * `Unaccounted -> Reported sick` the soldiers who filed a form with no parade-state line
+ * behind it. These three numbers are distinct soldiers, not events.
  *
- * **Nothing is dropped to make the diagram tidy.** An unmatched event gets its own
- * branch rather than being discarded. Scorpion files zero FormSG submissions in the whole
- * dataset, so every Scorpion event is 'Parade state only' — a fact about a missing form
- * channel, not about Scorpion's health, and `coverage.companiesWithNoFormSg` says so
- * explicitly. A Status row naming several restrictions fans out to several bucket links,
- * so the Status stage's outflow can exceed the Status node's inflow; `coverage.
- * statusMultiLabelled` flags exactly that rather than letting the diagram imply the parts
- * sum to the whole.
+ * **The right side stays event-level and hangs off the FormSG side only.** Every in-range
+ * submission is one flow: through its `Report Sick Type` answer, then forward to whatever
+ * MC or Status followed it within two days (`outcomeFor_`, which needs only the soldier's
+ * own personnel rows in that window, not the parade<->FormSG match). Because one soldier
+ * can file several submissions, the FormSG branch's throughput can exceed the
+ * `Reported sick` node's inflow; `coverage.submissionFanout` flags exactly that. The
+ * parade-only branch terminates at `No FormSG submission` — no form, so no type and no
+ * outcome.
+ *
+ * **Nothing is dropped to make the diagram tidy.** An unmatched soldier or submission
+ * gets its own branch rather than being discarded. A company that files zero FormSG
+ * submissions is named in `coverage.companiesWithNoFormSg` — a fact about a missing form
+ * channel, not about that company's health. A Status row naming several restrictions fans
+ * out to several bucket links, so the Status stage's outflow can exceed its inflow;
+ * `coverage.statusMultiLabelled` flags that rather than letting the diagram imply the
+ * parts sum to the whole.
  *
  * Every function here is pure.
  */
 
 import { classify, DUTY_CLASS } from './classify.js';
 import { COMPANIES } from './domain.js';
-import { addDays, isoToUtcMs, MS_PER_DAY } from './dates.js';
+import { addDays } from './dates.js';
 import { withinRange } from './dateRange.js';
 import { identityOf } from './identity.js';
 import { bucketsFor } from './statusBuckets.js';
 import { toIsoDate, toText } from './values.js';
-
-/** @type {number} How many days apart a parade-state event and a FormSG one may be and still count as the same event. */
-export const SOURCE_MATCH_WINDOW_DAYS = 1;
+import { reconcileReportSick } from './reconcile.js';
 
 /** @type {number} Earliest an outcome may start after the report-sick event, inclusive. */
 export const OUTCOME_MATCH_MIN_DAYS = 0;
@@ -44,16 +55,7 @@ export const OUTCOME_MATCH_MIN_DAYS = 0;
 /** @type {number} Latest an outcome may start after the report-sick event, inclusive. */
 export const OUTCOME_MATCH_MAX_DAYS = 2;
 
-/** @type {string} The stage-1 label for an event seen only on the parade state. */
-const SOURCE_PARADE_ONLY = 'Parade state only';
-
-/** @type {string} The stage-1 label for an event seen in both sources. */
-const SOURCE_BOTH = 'Both';
-
-/** @type {string} The stage-1 label for an event seen only on FormSG. */
-const SOURCE_FORMSG_ONLY = 'FormSG only';
-
-/** @type {string} The stage-2 label for an event with no recorded type. */
+/** @type {string} The type-stage label for a submission with no recorded type. */
 const TYPE_NOT_RECORDED = 'Type not recorded';
 
 /** @type {!Object<string, string>} FormSG's verbatim type answers, shortened. */
@@ -64,24 +66,26 @@ const TYPE_LABELS = {
   FFI: 'FFI',
 };
 
-/** @type {string} The stage-3 label for an MC outcome. */
+/** @type {string} The outcome-stage label for an MC outcome. */
 const OUTCOME_MC = 'MC';
 
-/** @type {string} The stage-3 label for a Status outcome. */
+/** @type {string} The outcome-stage label for a Status outcome. */
 const OUTCOME_STATUS = 'Status';
 
-/** @type {string} The stage-3 label when nothing followed. */
+/** @type {string} The outcome-stage label when nothing followed. */
 const OUTCOME_NONE = 'None recorded';
 
-/**
- * The number of whole days from one ISO date to another; may be negative.
- * @param {string} fromIso ISO 'yyyy-MM-dd'.
- * @param {string} toIso ISO 'yyyy-MM-dd'.
- * @returns {number} Whole days from `fromIso` to `toIso`.
- */
-function daysBetween_(fromIso, toIso) {
-  return Math.round((isoToUtcMs(toIso) - isoToUtcMs(fromIso)) / MS_PER_DAY);
-}
+/** @type {string} The reporting-stage node for soldiers on the parade state. */
+const NODE_REPORTING = 'Reporting sick';
+
+/** @type {string} The reporting-stage node for form-only soldiers. */
+const NODE_UNACCOUNTED = 'Unaccounted';
+
+/** @type {string} The reported-stage node for soldiers on the form. */
+const NODE_REPORTED = 'Reported sick';
+
+/** @type {string} The reported-stage node for the parade-state-only remainder. */
+const NODE_NO_FORMSG = 'No FormSG submission';
 
 /**
  * The date a report-sick episode's flow is measured from.
@@ -99,47 +103,6 @@ function episodeEventDate_(episode) {
  */
 function shortType_(reportSickType) {
   return TYPE_LABELS[toText(reportSickType)] || TYPE_NOT_RECORDED;
-}
-
-/**
- * Matches report-sick episodes to FormSG submissions by identity, within the source
- * window, greedily claiming the closest unclaimed submission per episode.
- * @param {Array<!Object>} episodes Report-sick episodes, date-known, in range.
- * @param {Array<!Object>} submissions FormSG submissions, in range.
- * @returns {{matches: Array<{episode: !Object, submission: ?Object}>,
- *     formsgOnly: Array<!Object>}} Every episode paired with a submission or null, and
- *     the submissions no episode claimed.
- */
-function matchSources_(episodes, submissions) {
-  const byKey = new Map();
-  submissions.forEach((submission, index) => {
-    const bucket = byKey.get(submission.key) || [];
-    bucket.push(index);
-    byKey.set(submission.key, bucket);
-  });
-
-  const claimed = new Set();
-  const matches = episodes.map((episode) => {
-    const eventDate = episodeEventDate_(episode);
-    const candidates = (byKey.get(episode.key) || []).filter((index) => !claimed.has(index));
-    let best = null;
-    let bestDiff = Infinity;
-    candidates.forEach((index) => {
-      const diff = Math.abs(daysBetween_(eventDate, submissions[index].date));
-      if (diff <= SOURCE_MATCH_WINDOW_DAYS && diff < bestDiff) {
-        best = index;
-        bestDiff = diff;
-      }
-    });
-    if (best !== null) {
-      claimed.add(best);
-      return { episode, submission: submissions[best] };
-    }
-    return { episode, submission: null };
-  });
-
-  const formsgOnly = submissions.filter((_, index) => !claimed.has(index));
-  return { matches, formsgOnly };
 }
 
 /**
@@ -206,7 +169,7 @@ function addLink_(links, source, target, amount) {
  *     target: string, value: number}>, coverage: !Object}} The diagram and its coverage.
  */
 export function reportSickFlow({ personnel, episodes, submissions, from, to }) {
-  const reportSickEpisodes = episodes.filter((episode) => {
+  const reportSickEpisodes = (episodes || []).filter((episode) => {
     if (episode.dutyClass !== DUTY_CLASS.REPORT_SICK) {
       return false;
     }
@@ -217,67 +180,59 @@ export function reportSickFlow({ personnel, episodes, submissions, from, to }) {
     (submission) => submission.date && withinRange(submission.date, from, to)
   );
 
-  const { matches, formsgOnly } = matchSources_(reportSickEpisodes, subsInRange);
+  // Left side: aggregate per-company reconcile, summed to battalion totals.
+  const perCompanyRows = reconcileReportSick(reportSickEpisodes, subsInRange);
+  const paradeCount = perCompanyRows.reduce((sum, row) => sum + row.paradeCount, 0);
+  const formsgCount = perCompanyRows.reduce((sum, row) => sum + row.formsgCount, 0);
+  const matched = perCompanyRows.reduce((sum, row) => sum + row.matched, 0);
+  const paradeOnly = paradeCount - matched;
+  const unaccounted = formsgCount - matched;
 
   const links = new Map();
   const nodeStage = new Map();
-  const registerNode = (name, stage) => nodeStage.set(name, stage);
-
-  let paradeOnlyCount = 0;
-  let bothCount = 0;
-  const statusBucketTotal = { sum: 0 };
-  let statusOutcomeTotal = 0;
 
   /**
-   * Routes one event (an episode/submission pair, or a FormSG-only submission) through
-   * the four stages and adds its links.
-   * @param {string} sourceLabel One of the SOURCE_* constants.
-   * @param {string} key The event's identity key.
-   * @param {string} eventDate The event's ISO date.
-   * @param {string} reportSickType Raw FormSG type answer, or '' when there is none.
+   * Registers a node/link only when the flow carries something, so empty inputs yield an
+   * empty diagram.
+   * @param {string} source Source node name.
+   * @param {string} sourceStage Source node's stage.
+   * @param {string} target Target node name.
+   * @param {string} targetStage Target node's stage.
+   * @param {number} value Flow value.
    * @returns {void}
    */
-  function route(sourceLabel, key, eventDate, reportSickType) {
-    const sourceNode = 'Source: ' + sourceLabel;
-    const typeNode = 'Type: ' + shortType_(reportSickType);
-    registerNode(sourceNode, 'source');
-    registerNode(typeNode, 'type');
-    addLink_(links, sourceNode, typeNode, 1);
+  function addFlow(source, sourceStage, target, targetStage, value) {
+    if (value > 0) {
+      nodeStage.set(source, sourceStage);
+      nodeStage.set(target, targetStage);
+      addLink_(links, source, target, value);
+    }
+  }
 
-    const { outcome, buckets } = outcomeFor_(key, eventDate, personnel);
+  addFlow(NODE_REPORTING, 'reporting', NODE_REPORTED, 'reported', matched);
+  addFlow(NODE_REPORTING, 'reporting', NODE_NO_FORMSG, 'reported', paradeOnly);
+  addFlow(NODE_UNACCOUNTED, 'reporting', NODE_REPORTED, 'reported', unaccounted);
+
+  // Right side: event-level, one flow per in-range submission.
+  let statusOutcomeTotal = 0;
+  let statusBucketTotal = 0;
+
+  subsInRange.forEach((submission) => {
+    const typeNode = 'Type: ' + shortType_(submission.reportSickType);
+    addFlow(NODE_REPORTED, 'reported', typeNode, 'type', 1);
+
+    const { outcome, buckets } = outcomeFor_(submission.key, submission.date, personnel);
     const outcomeNode = 'Outcome: ' + outcome;
-    registerNode(outcomeNode, 'outcome');
-    addLink_(links, typeNode, outcomeNode, 1);
+    addFlow(typeNode, 'type', outcomeNode, 'outcome', 1);
 
     if (outcome === OUTCOME_STATUS) {
       statusOutcomeTotal += 1;
       buckets.forEach((bucket) => {
-        const bucketNode = 'Status: ' + bucket;
-        registerNode(bucketNode, 'status');
-        addLink_(links, outcomeNode, bucketNode, 1);
-        statusBucketTotal.sum += 1;
+        addFlow(outcomeNode, 'outcome', 'Status: ' + bucket, 'status', 1);
+        statusBucketTotal += 1;
       });
     }
-  }
-
-  matches.forEach(({ episode, submission }) => {
-    const eventDate = episodeEventDate_(episode);
-    if (submission) {
-      bothCount += 1;
-      route(SOURCE_BOTH, episode.key, eventDate, submission.reportSickType);
-    } else {
-      paradeOnlyCount += 1;
-      route(SOURCE_PARADE_ONLY, episode.key, eventDate, '');
-    }
   });
-
-  formsgOnly.forEach((submission) => {
-    route(SOURCE_FORMSG_ONLY, submission.key, submission.date, submission.reportSickType);
-  });
-
-  const companiesWithNoFormSg = COMPANIES.filter(
-    (company) => subsInRange.filter((submission) => submission.company === company).length === 0
-  );
 
   const nodes = Array.from(nodeStage.entries()).map(([name, stage]) => ({ name, stage }));
   const linkList = Array.from(links.entries()).map(([key, value]) => {
@@ -289,18 +244,22 @@ export function reportSickFlow({ personnel, episodes, submissions, from, to }) {
     nodes,
     links: linkList,
     coverage: {
-      totalEvents: paradeOnlyCount + bothCount + formsgOnly.length,
-      sourceCounts: { paradeOnly: paradeOnlyCount, both: bothCount, formsgOnly: formsgOnly.length },
+      reportingSick: paradeCount,
+      reportedSick: formsgCount,
+      matched,
+      paradeOnly,
+      unaccounted,
+      submissions: subsInRange.length,
+      submissionFanout: subsInRange.length > formsgCount,
+      byCompany: perCompanyRows,
+      companiesWithNoFormSg: COMPANIES.filter((company) =>
+        subsInRange.every((submission) => submission.company !== company)
+      ),
+      statusMultiLabelled: statusBucketTotal > statusOutcomeTotal,
       matchRule:
-        'Matched by 4D, else by name, within ' +
-        SOURCE_MATCH_WINDOW_DAYS +
-        ' day of the report-sick event; an outcome is an MC or Status starting ' +
-        OUTCOME_MATCH_MIN_DAYS +
-        '–' +
-        OUTCOME_MATCH_MAX_DAYS +
-        ' days after it.',
-      companiesWithNoFormSg,
-      statusMultiLabelled: statusBucketTotal.sum > statusOutcomeTotal,
+        'Reconciled per company by 4D else token-set name; left-side counts are distinct ' +
+        'soldiers, not events. Type and outcome are per FormSG submission, so that branch ' +
+        'can be wider. Outcomes cover the FormSG branch only.',
     },
   };
 }

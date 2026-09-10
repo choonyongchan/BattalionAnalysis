@@ -51,13 +51,13 @@ function HolidaysPanel({ rows }) {
   const holidays = toHolidays(rows);
   if (holidays.length === 0) {
     return (
-      <Card title="Public holidays">
+      <Card title="Public Holidays">
         <EmptyState>No public holidays loaded for the range this dashboard has read.</EmptyState>
       </Card>
     );
   }
   return (
-    <Card title="Public holidays" note={fmtInt(holidays.length) + ' loaded'}>
+    <Card title="Public Holidays" note={fmtInt(holidays.length) + ' loaded'}>
       <DataTable
         columns={[
           { key: 'date', label: 'Date' },
@@ -157,7 +157,7 @@ function DataQualityPanel({ quality }) {
   ];
 
   return (
-    <Card title="Data quality">
+    <Card title="Data Quality">
       <div class="tablewrap">
         <table>
           <tbody>

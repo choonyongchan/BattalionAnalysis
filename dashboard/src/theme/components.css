@@ -53,6 +53,14 @@
   letter-spacing: -0.12px;
 }
 
+/* A one-line instruction under a chart legend, e.g. how to hide a company series. */
+.chart-hint {
+  margin-top: var(--space-xs);
+  color: var(--ink-faint);
+  font-size: 12px;
+  letter-spacing: -0.12px;
+}
+
 /* ------------------------------------------------------------------ tiles */
 
 .tilerow {

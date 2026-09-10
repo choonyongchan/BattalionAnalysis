@@ -32,9 +32,21 @@ describe('toHolidays', () => {
     expect(toHolidays([{ date: 'not a date', name: 'Mystery Day' }])).toEqual([]);
   });
 
-  test('a blank name becomes a fallback label, not an empty one', () => {
+  test('a blank name on a known Singapore holiday resolves to its official name', () => {
     expect(toHolidays([{ date: '2026-08-09', name: '' }])).toEqual([
-      { date: '2026-08-09', name: 'Public holiday' },
+      { date: '2026-08-09', name: 'National Day' },
+    ]);
+  });
+
+  test('a blank name on a date not in the Singapore map falls back to the generic label', () => {
+    expect(toHolidays([{ date: '2026-08-11', name: '' }])).toEqual([
+      { date: '2026-08-11', name: 'Public holiday' },
+    ]);
+  });
+
+  test('a non-blank sheet name wins over the Singapore map for the same date', () => {
+    expect(toHolidays([{ date: '2026-08-09', name: 'Battalion stand-down' }])).toEqual([
+      { date: '2026-08-09', name: 'Battalion stand-down' },
     ]);
   });
 

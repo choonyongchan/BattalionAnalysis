@@ -20,10 +20,56 @@ import { eachDay, withinRange } from './dateRange.js';
 import { toIsoDate, toText } from './values.js';
 
 /**
+ * Official Singapore public-holiday names, keyed by ISO 'yyyy-MM-dd' date.
+ *
+ * The "Public Holidays" tab is optional and its `name` column is optional too — a
+ * battalion may paste only the dates. This map is the fallback: when a row gives a date
+ * but no name, `toHolidays` looks the date up here so the chart line still reads
+ * "National Day" rather than the generic "Public holiday". A non-blank name in the sheet
+ * always wins over this map.
+ *
+ * Dates are the gazetted Singapore MOM public holidays for calendar years 2025 and 2026,
+ * including the in-lieu Monday where a 2026 holiday falls on a Sunday, since a battalion
+ * may enter either the actual or the observed date. Extend this map as new years are
+ * gazetted; an unknown date simply falls back to the generic label.
+ */
+const SG_PUBLIC_HOLIDAYS = {
+  // 2025
+  '2025-01-01': "New Year's Day",
+  '2025-01-29': 'Chinese New Year',
+  '2025-01-30': 'Chinese New Year',
+  '2025-03-31': 'Hari Raya Puasa',
+  '2025-04-18': 'Good Friday',
+  '2025-05-01': 'Labour Day',
+  '2025-05-12': 'Vesak Day',
+  '2025-06-07': 'Hari Raya Haji',
+  '2025-08-09': 'National Day',
+  '2025-10-20': 'Deepavali',
+  '2025-12-25': 'Christmas Day',
+  // 2026
+  '2026-01-01': "New Year's Day",
+  '2026-02-17': 'Chinese New Year',
+  '2026-02-18': 'Chinese New Year',
+  '2026-03-20': 'Hari Raya Puasa',
+  '2026-04-03': 'Good Friday',
+  '2026-05-01': 'Labour Day',
+  '2026-05-27': 'Hari Raya Haji',
+  '2026-05-31': 'Vesak Day',
+  '2026-06-01': 'Vesak Day', // in lieu — Vesak Day falls on a Sunday
+  '2026-08-09': 'National Day',
+  '2026-08-10': 'National Day', // in lieu — National Day falls on a Sunday
+  '2026-11-08': 'Deepavali',
+  '2026-11-09': 'Deepavali', // in lieu — Deepavali falls on a Sunday
+  '2026-12-25': 'Christmas Day',
+};
+
+/**
  * Parses raw "Public Holidays" rows into sorted date/name pairs.
  *
  * A row with an unparseable date is dropped rather than charted at a wrong or missing
- * position; a blank name becomes a fallback label rather than an empty one on an axis.
+ * position. A blank name is resolved from `SG_PUBLIC_HOLIDAYS` by date, and only falls
+ * back to a generic label when that date is not a known Singapore holiday; a non-blank
+ * name in the sheet always wins.
  * @param {Array<!Object>} rows Raw records with `date` and `name` cells; may be `[]` or
  *     missing when the tab does not exist.
  * @returns {Array<{date: string, name: string}>} Holidays sorted by date.
@@ -36,7 +82,10 @@ export function toHolidays(rows) {
         return null;
       }
       const name = toText(row.name);
-      return { date, name: name === '' ? 'Public holiday' : name };
+      if (name !== '') {
+        return { date, name };
+      }
+      return { date, name: SG_PUBLIC_HOLIDAYS[date] || 'Public holiday' };
     })
     .filter((holiday) => holiday !== null)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

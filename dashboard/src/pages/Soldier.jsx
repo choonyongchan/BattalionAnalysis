@@ -8,14 +8,16 @@
  */
 
 import { useMemo, useState } from 'preact/hooks';
-import { dataset } from '../app/state.js';
+import { company, dataset } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { SoldierSearch } from '../components/SoldierSearch.jsx';
+import { PageControls } from '../components/PageControls.jsx';
 import { fmtDate, fmtInt } from '../format.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions } from '../model/formsg.js';
+import { scopeDataset, scopeSubmissions } from '../model/scope.js';
 import { soldierIndex, soldierReport } from '../model/soldier.js';
 
 /**
@@ -48,10 +50,14 @@ function ReasonTable({ title, rows }) {
  * @returns {!preact.VNode} The page.
  */
 export function Soldier() {
-  const data = dataset.value;
+  const full = dataset.value;
+  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
   const [selectedKey, setSelectedKey] = useState(null);
 
-  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const submissions = useMemo(
+    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
+    [data.formSg, company.value]
+  );
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
 
@@ -67,6 +73,8 @@ export function Soldier() {
           <p class="pagehead__sub">Type 4D or name to search for soldier.</p>
         </div>
       </header>
+
+      <PageControls showRange={false} />
 
       <SoldierSearch index={index} onSelect={(soldier) => setSelectedKey(soldier.key)} />
 
@@ -89,7 +97,7 @@ export function Soldier() {
             </Coverage>
           ) : null}
 
-          <Card title="MC and Off/Leave history" note="Most recent first">
+          <Card title="MC and Off/Leave History" note="Most recent first">
             {report.absences.length === 0 ? (
               <EmptyState>No MC or Off/Leave recorded.</EmptyState>
             ) : (
@@ -114,12 +122,12 @@ export function Soldier() {
           </Card>
 
           <div class="grid-2">
-            <ReasonTable title="Common MC reasons" rows={report.reasonTables.mc} />
-            <ReasonTable title="Common report-sick reasons" rows={report.reasonTables.reportSick} />
+            <ReasonTable title="Common MC Reasons" rows={report.reasonTables.mc} />
+            <ReasonTable title="Common Report-Sick Reasons" rows={report.reasonTables.reportSick} />
           </div>
-          <ReasonTable title="Common status reasons" rows={report.reasonTables.status} />
+          <ReasonTable title="Common Status Reasons" rows={report.reasonTables.status} />
 
-          <Card title="FormSG submissions">
+          <Card title="FormSG Submissions">
             {report.formSg.length === 0 ? (
               <EmptyState>No FormSG report-sick submissions on record for this soldier.</EmptyState>
             ) : (
@@ -139,7 +147,7 @@ export function Soldier() {
             )}
           </Card>
 
-          <Card title="Other entries" note="Oldest first">
+          <Card title="Other Entries" note="Oldest first">
             {report.others.length === 0 ? (
               <EmptyState>No "Others" entries recorded for this soldier.</EmptyState>
             ) : (

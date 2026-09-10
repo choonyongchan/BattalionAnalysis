@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'preact/hooks';
-import { dataset } from '../app/state.js';
+import { company, dataset } from '../app/state.js';
 import { Card, Coverage } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile } from '../components/Tile.jsx';
@@ -16,6 +16,8 @@ import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { submissionRateByCompany, submissionTrend, toSubmissions, topSubmitters } from '../model/formsg.js';
+import { datesPresent } from '../model/metrics.js';
+import { scopeDataset, scopeSubmissions } from '../model/scope.js';
 import { soldierIndex } from '../model/soldier.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { isWeekend } from '../model/dates.js';
@@ -39,7 +41,7 @@ function ReportedSickRankings({ submissions, strength, from, to }) {
 
   return (
     <>
-      <Card title="Top 10 by reported sick (FormSG)">
+      <Card title="Top 10 by Reported Sick (FormSG)">
         <DataTable
           columns={[
             { key: 'rank', label: '#', numeric: true },
@@ -52,7 +54,7 @@ function ReportedSickRankings({ submissions, strength, from, to }) {
           rowKey={(row) => row.key}
         />
       </Card>
-      <Card title="Companies, by reported-sick rate">
+      <Card title="Companies, by Reported-Sick Rate">
         <DataTable
           columns={[
             { key: 'company', label: 'Company' },
@@ -110,9 +112,14 @@ function hourBins(submissions) {
  * @returns {!preact.VNode} The page.
  */
 export function ReportSick() {
-  const data = dataset.value;
+  const full = dataset.value;
+  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
+  const calendarDates = useMemo(() => datesPresent(full.strength), [full.strength]);
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
-  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const submissions = useMemo(
+    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
+    [data.formSg, company.value]
+  );
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
 
   const reasonSource = useMemo(
@@ -134,15 +141,16 @@ export function ReportSick() {
     />
   );
   const extraTrend = {
-    title: 'Reported sick (FormSG) trend',
+    title: 'Reported Sick (FormSG) Trend',
     coverage: 'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.',
     trendFn: (scope, dates) => submissionTrend(submissions, data.strength, dates, { scope, session: 'FPS' }),
   };
 
   return (
     <CategoryPage
-      title="Report sick"
+      title="Report Sick"
       dataset={data}
+      calendarDates={calendarDates}
       episodes={episodes}
       dutyClass={DUTY_CLASS.REPORT_SICK}
       leaderboardMetric="count"

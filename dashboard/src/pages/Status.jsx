@@ -6,10 +6,12 @@
  */
 
 import { useMemo } from 'preact/hooks';
-import { dataset } from '../app/state.js';
+import { company, dataset } from '../app/state.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions } from '../model/formsg.js';
+import { datesPresent } from '../model/metrics.js';
+import { scopeDataset, scopeSubmissions } from '../model/scope.js';
 import { soldierIndex } from '../model/soldier.js';
 import { bucketsFor } from '../model/statusBuckets.js';
 import { CategoryPage } from './shared/CategoryPage.jsx';
@@ -19,9 +21,14 @@ import { CategoryPage } from './shared/CategoryPage.jsx';
  * @returns {!preact.VNode} The page.
  */
 export function Status() {
-  const data = dataset.value;
+  const full = dataset.value;
+  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
+  const calendarDates = useMemo(() => datesPresent(full.strength), [full.strength]);
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
-  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const submissions = useMemo(
+    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
+    [data.formSg, company.value]
+  );
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
 
   const statusEpisodes = useMemo(() => episodes.filter((e) => e.dutyClass === DUTY_CLASS.STATUS), [episodes]);
@@ -34,6 +41,7 @@ export function Status() {
     <CategoryPage
       title="Status"
       dataset={data}
+      calendarDates={calendarDates}
       episodes={episodes}
       dutyClass={DUTY_CLASS.STATUS}
       leaderboardMetric="status"

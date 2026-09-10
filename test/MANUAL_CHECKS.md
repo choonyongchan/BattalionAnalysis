@@ -40,7 +40,11 @@ draws no holiday lines and offers no rotational grouping.
 - [ ] Create a tab named **Public Holidays** with exactly this header row:
       `date | name`
       One row per Singapore public holiday, `date` as `yyyy-MM-dd`. Trend charts draw a
-      light red line on each one, so a wrong date is visible rather than silent.
+      light red line on each one, so a wrong date is visible rather than silent. The
+      `name` column is optional: `calendarMarks.js` carries a fallback map of gazetted
+      Singapore holidays for 2025 and 2026, so a blank `name` on one of those dates is
+      filled with the official name (e.g. "National Day"); only an unknown date shows the
+      generic "Public holiday".
 - [ ] Create a tab named **Rotations** with exactly this header row:
       `name | start_date | end_date`
       One row per rotation — TRADES, Rot 1, Rot 2, Rot 3, Rot 4 — with dates as
