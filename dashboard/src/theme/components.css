@@ -151,6 +151,21 @@ th.num {
   text-align: right;
 }
 
+/* A sortable header: click to reorder, arrow shows the active column and direction. */
+th.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.th-sortable:hover {
+  color: var(--ink);
+}
+
+.th-sort-indicator {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
 tbody tr:last-child td {
   border-bottom: 0;
 }

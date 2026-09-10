@@ -96,11 +96,38 @@ function TrendSection({ title, coverage, trendFn, dates, weekends, holidays }) {
 
 /**
  * The Company x Platoon heatmap of a duty class's rate.
- * @param {{personnel: Array<!Object>, episodes: Array<!Object>, dutyClass: string}} props
- *     Personnel rows (for the coverage note) and episodes to count.
+ * @param {{episodes: Array<!Object>, dutyClass: string, cells?: Array<!Object>,
+ *     title?: string, coverage?: string, valueName?: string}} props Episodes to count and
+ *     the duty class to keep — unless `cells` is given, in which case they are drawn
+ *     as-is (the page built them from another source, e.g. FormSG submissions) and
+ *     `episodes`/`dutyClass` are ignored.
  * @returns {!preact.VNode} The card.
  */
-function PlatoonHeatmap({ episodes, dutyClass }) {
+function PlatoonHeatmap({
+  episodes,
+  dutyClass,
+  cells,
+  title = 'By Company and Platoon',
+  coverage = 'Count of episodes; a bare platoon axis, not a rate — see the table for totals.',
+  valueName = 'episodes',
+  empty = 'No episodes in range to place on the grid.',
+}) {
+  const drawnCells = cells || episodesToCells_(episodes, dutyClass);
+
+  return (
+    <ChartCard title={title} coverage={coverage} empty={empty}>
+      <Heatmap rows={COMPANIES} columns={PLATOONS} cells={drawnCells} valueName={valueName} />
+    </ChartCard>
+  );
+}
+
+/**
+ * Counts episodes of one duty class per company x platoon for the heatmap grid.
+ * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
+ * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @returns {Array<{row: string, column: string, value: number}>} Non-empty cells only.
+ */
+function episodesToCells_(episodes, dutyClass) {
   const scoped = episodes.filter((episode) => episode.dutyClass === dutyClass);
   const cells = [];
   COMPANIES.forEach((company) => {
@@ -111,16 +138,7 @@ function PlatoonHeatmap({ episodes, dutyClass }) {
       }
     });
   });
-
-  return (
-    <ChartCard
-      title="By Company and Platoon"
-      coverage="Count of episodes; a bare platoon axis, not a rate — see the table for totals."
-      empty="No episodes in range to place on the grid."
-    >
-      <Heatmap rows={COMPANIES} columns={PLATOONS} cells={cells} valueName="episodes" />
-    </ChartCard>
-  );
+  return cells;
 }
 
 /**
@@ -129,7 +147,7 @@ function PlatoonHeatmap({ episodes, dutyClass }) {
  *     props Dated, labelled rows, and the rotation schedule.
  * @returns {!preact.VNode} The card.
  */
-function ReasonsOverTime({ items, rotations }) {
+function ReasonsOverTime({ items, rotations, title = 'Top Reasons Over Time' }) {
   const [granularity, setGranularity] = useState('daily');
   const trend = useMemo(
     () => topLabelsOverTime(items, granularity, rotations, 5),
@@ -137,7 +155,7 @@ function ReasonsOverTime({ items, rotations }) {
   );
 
   return (
-    <Card title="Top Reasons Over Time">
+    <Card title={title}>
       <div class="controlrow">
         <Segmented
           options={GRANULARITIES}
@@ -361,15 +379,26 @@ export function CategoryPage(spec) {
     dutyClass,
     leaderboardMetric,
     reasonSource,
+    reasonsTitle,
     showHeatmap,
+    heatmapBuilder,
+    heatmapTitle,
+    heatmapCoverage,
+    heatmapValueName,
+    heatmapEmpty,
     showLocations,
     showLongMc,
     showWordCloud,
     wordCloudBuilder,
+    wordCloudTitle = 'Free-Text Reasons',
     showHistogram,
     histogramBuilder,
     soldierIndex,
-    extraTiles,
+    tileLabels = {},
+    secondTileRow,
+    trendTitle,
+    showLeaderboard = true,
+    showUnitRankings = true,
     extraTrend,
     afterLeaderboardBuilder,
   } = spec;
@@ -425,6 +454,13 @@ export function CategoryPage(spec) {
     () => (histogramBuilder ? histogramBuilder(effectiveFrom, effectiveTo) : []),
     [histogramBuilder, effectiveFrom, effectiveTo]
   );
+  // A page that supplies `heatmapBuilder` draws the grid from its own source (Report
+  // Sick's FormSG submissions) rather than the parade-state episodes; built here so it
+  // tracks the range control like every other panel.
+  const heatmapCells = useMemo(
+    () => (heatmapBuilder ? heatmapBuilder(effectiveFrom, effectiveTo) : null),
+    [heatmapBuilder, effectiveFrom, effectiveTo]
+  );
 
   const counts = episodeCounts(rangedEpisodes, dutyClass);
 
@@ -447,14 +483,15 @@ export function CategoryPage(spec) {
       <PageControls min={paradeDates[0] || isoToday()} max={paradeDates[paradeDates.length - 1] || isoToday()} />
 
       <TileRow>
-        <Tile label="Episodes" value={fmtInt(counts.total.episodes)} />
-        <Tile label="Soldiers" value={fmtInt(counts.total.soldiers)} />
-        <Tile label="Episodes per soldier" value={counts.total.perSoldier === null ? '—' : counts.total.perSoldier.toFixed(1)} />
-        {extraTiles ? extraTiles(effectiveFrom, effectiveTo) : null}
+        <Tile label={tileLabels.episodes || 'Episodes'} value={fmtInt(counts.total.episodes)} />
+        <Tile label={tileLabels.soldiers || 'Soldiers'} value={fmtInt(counts.total.soldiers)} />
+        <Tile label={tileLabels.perSoldier || 'Episodes per soldier'} value={counts.total.perSoldier === null ? '—' : counts.total.perSoldier.toFixed(1)} />
       </TileRow>
 
+      {secondTileRow ? <TileRow>{secondTileRow(effectiveFrom, effectiveTo)}</TileRow> : null}
+
       <TrendSection
-        title={title + ' Trend'}
+        title={trendTitle || title + ' Trend'}
         coverage="Rate per 100 accountable; a company not filing that day is a gap."
         trendFn={(scope, dates) => dutyTrend(dataset.personnel, dataset.strength, dutyClass, dates, { scope, session: 'FPS' })}
         dates={trendDates}
@@ -473,12 +510,24 @@ export function CategoryPage(spec) {
         />
       ) : null}
 
-      {showHeatmap ? <PlatoonHeatmap episodes={rangedEpisodes} dutyClass={dutyClass} /> : null}
+      {showHeatmap ? (
+        <PlatoonHeatmap
+          episodes={rangedEpisodes}
+          dutyClass={dutyClass}
+          cells={heatmapCells}
+          title={heatmapTitle}
+          coverage={heatmapCoverage}
+          valueName={heatmapValueName}
+          empty={heatmapEmpty}
+        />
+      ) : null}
 
-      {reasonItems ? <ReasonsOverTime items={reasonItems} rotations={rotations} /> : null}
+      {reasonItems ? (
+        <ReasonsOverTime items={reasonItems} rotations={rotations} title={reasonsTitle} />
+      ) : null}
 
       {showWordCloud ? (
-        <ChartCard title="Free-Text Reasons" empty="No free-text reasons recorded in range.">
+        <ChartCard title={wordCloudTitle} empty="No free-text reasons recorded in range.">
           <WordCloud words={wordCloudWords || []} />
         </ChartCard>
       ) : null}
@@ -493,11 +542,15 @@ export function CategoryPage(spec) {
 
       {showLongMc ? <LongMcCard episodes={spec.episodes} from={effectiveFrom} to={effectiveTo} /> : null}
 
-      <Card title={'Top 10 by ' + (leaderboardMetric === 'days' ? 'Days Lost' : leaderboardMetric === 'status' ? 'Statuses Held' : 'Episode Count')}>
-        <Leaderboard rows={leaderboard} metric={leaderboardMetric === 'status' ? 'status' : leaderboardMetric === 'days' ? 'days' : 'count'} />
-      </Card>
+      {showLeaderboard ? (
+        <Card title={'Top 10 by ' + (leaderboardMetric === 'days' ? 'Days Lost' : leaderboardMetric === 'status' ? 'Statuses Held' : 'Episode Count')}>
+          <Leaderboard rows={leaderboard} metric={leaderboardMetric === 'status' ? 'status' : leaderboardMetric === 'days' ? 'days' : 'count'} />
+        </Card>
+      ) : null}
 
-      <UnitRankings personnel={dataset.personnel} strength={dataset.strength} dutyClass={dutyClass} />
+      {showUnitRankings ? (
+        <UnitRankings personnel={dataset.personnel} strength={dataset.strength} dutyClass={dutyClass} />
+      ) : null}
 
       {afterLeaderboardBuilder ? afterLeaderboardBuilder(effectiveFrom, effectiveTo) : null}
 

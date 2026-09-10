@@ -15,8 +15,16 @@ import { Tile } from '../components/Tile.jsx';
 import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import { buildEpisodes } from '../model/episodes.js';
-import { submissionRateByCompany, submissionTrend, toSubmissions, topSubmitters } from '../model/formsg.js';
-import { datesPresent } from '../model/metrics.js';
+import {
+  submissionCounts,
+  submissionHeatmapCells,
+  submissionRateByCompany,
+  submissionRateByPlatoon,
+  submissionTrend,
+  toSubmissions,
+  topSubmitters,
+} from '../model/formsg.js';
+import { datesPresent, episodeCounts } from '../model/metrics.js';
 import { scopeDataset, scopeSubmissions } from '../model/scope.js';
 import { soldierIndex } from '../model/soldier.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
@@ -26,18 +34,36 @@ import { toTimeOfDay } from '../model/values.js';
 import { CategoryPage } from './shared/CategoryPage.jsx';
 
 /**
- * The FormSG-side leaderboard and company ranking: who, and which company, reports sick
- * most through the form, as distinct from the parade-state leaderboard above it.
+ * Formats a rate-per-100 cell, keeping the em dash the rate functions use for "no
+ * strength on record".
+ * @param {?number} per100 The rate, or null.
+ * @returns {string} The cell text.
+ */
+function fmtRate_(per100) {
+  return per100 === null ? '—' : fmtInt(per100);
+}
+
+/**
+ * The FormSG-side rankings: who reports sick most through the form, and how the reported-
+ * sick rate falls across companies and platoons. These replace the parade-state
+ * "Top 10 by Episode Count" and "Companies/Platoons, by Rate" — on this page the form is
+ * the primary source, and the parade-state versions sit one section up as tiles and a
+ * trend instead.
+ *
+ * Platoon is not something FormSG states; it is inferred from the submitter's 4D through
+ * the same rule `model/platoon.js` applies elsewhere, and a submission with no usable 4D
+ * is placed under HQ. The coverage note on the platoon table says so.
  * @param {{submissions: Array<!Object>, strength: Array<!Object>, from: string,
  *     to: string}} props FormSG submissions and Strength Data, unfiltered, plus the
  *     range to restrict them to.
- * @returns {!preact.VNode} The two cards.
+ * @returns {!preact.VNode} The three cards.
  */
 function ReportedSickRankings({ submissions, strength, from, to }) {
   const ranged = submissions.filter((s) => withinRange(s.date, from, to));
   const strengthRanged = strength.filter((row) => withinRange(row.date, from, to));
   const top = topSubmitters(ranged, 10);
   const companies = submissionRateByCompany(ranged, strengthRanged);
+  const platoons = submissionRateByPlatoon(ranged, strengthRanged);
 
   return (
     <>
@@ -54,25 +80,49 @@ function ReportedSickRankings({ submissions, strength, from, to }) {
           rowKey={(row) => row.key}
         />
       </Card>
-      <Card title="Companies, by Reported-Sick Rate">
-        <DataTable
-          columns={[
-            { key: 'company', label: 'Company' },
-            { key: 'per100', label: 'Rate per 100', numeric: true },
-            { key: 'count', label: 'Count', numeric: true },
-          ]}
-          rows={companies.map((row) => ({
-            company: row.company,
-            per100: row.per100 === null ? '—' : fmtInt(row.per100),
-            count: fmtInt(row.count),
-          }))}
-          rowKey={(row) => row.company}
-        />
-        <Coverage>
-          Company only. FormSG's "Unit &amp; Coy" answer names no platoon, so a
-          platoon-level reported-sick ranking is not data this dashboard has.
-        </Coverage>
-      </Card>
+      <div class="grid-2">
+        <Card title="Companies, by Rate">
+          <DataTable
+            columns={[
+              { key: 'company', label: 'Company' },
+              { key: 'per100', label: 'Reported Sick %', numeric: true, sortable: true, sortValue: (r) => r.per100Raw },
+              { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
+            ]}
+            rows={companies.map((row) => ({
+              company: row.company,
+              per100: fmtRate_(row.per100),
+              per100Raw: row.per100,
+              count: fmtInt(row.count),
+              countRaw: row.count,
+            }))}
+            rowKey={(row) => row.company}
+          />
+        </Card>
+        <Card title="Platoons, by Rate">
+          <DataTable
+            columns={[
+              { key: 'company', label: 'Company' },
+              { key: 'platoon', label: 'Platoon' },
+              { key: 'per100', label: 'Reported Sick %', numeric: true, sortable: true, sortValue: (r) => r.per100Raw },
+              { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
+            ]}
+            rows={platoons.map((row) => ({
+              company: row.company,
+              platoon: row.platoon,
+              per100: fmtRate_(row.per100),
+              per100Raw: row.per100,
+              count: fmtInt(row.count),
+              countRaw: row.count,
+            }))}
+            rowKey={(row) => row.company + ' ' + row.platoon}
+          />
+          <Coverage>
+            Platoon is inferred from the submitter's 4D; a submission with no 4D is placed
+            under HQ. The rate divides by the same platoon strength the parade-state
+            rankings use.
+          </Coverage>
+        </Card>
+      </div>
     </>
   );
 }
@@ -126,20 +176,35 @@ export function ReportSick() {
     () => ({ rows: submissions, dateOf: (s) => s.date, labelsOf: (s) => [clinicalBucketOf(s.symptomAnswer)] }),
     [submissions]
   );
-  const wordCloudBuilder = (from, to) =>
-    reasonKeywords(submissions.filter((s) => withinRange(s.date, from, to)), 60);
-  const histogramBuilder = (from, to) =>
-    hourBins(submissions.filter((s) => withinRange(s.date, from, to)));
+  const rangedSubmissions = (from, to) => submissions.filter((s) => withinRange(s.date, from, to));
 
-  // Requirement 3.1/3.2: the FormSG side gets its own tile and trend, not only the
-  // parade-state "reporting sick" CategoryPage already draws — the two are independent
-  // sources of the same event and a reader comparing them needs both on screen at once.
-  const extraTiles = (from, to) => (
-    <Tile
-      label="Reported sick (FormSG)"
-      value={fmtInt(submissions.filter((s) => withinRange(s.date, from, to)).length)}
-    />
-  );
+  const wordCloudBuilder = (from, to) => reasonKeywords(rangedSubmissions(from, to), 60);
+  const histogramBuilder = (from, to) => hourBins(rangedSubmissions(from, to));
+  const heatmapBuilder = (from, to) => submissionHeatmapCells(rangedSubmissions(from, to));
+
+  // The top row carries both sources of the same event side by side: three parade-state
+  // "Reporting Sick" tiles from CategoryPage, then these four FormSG "Reported Sick" ones,
+  // ending with the absolute gap between the two counts. A reader comparing the channels
+  // needs the pair on screen at once.
+  const secondTileRow = (from, to) => {
+    const ranged = rangedSubmissions(from, to);
+    const formSg = submissionCounts(ranged).total;
+    const paradeEpisodes = episodeCounts(
+      episodes.filter((e) => e.startDate && withinRange(e.startDate, from, to)),
+      DUTY_CLASS.REPORT_SICK
+    ).total.episodes;
+    return (
+      <>
+        <Tile label="Reported Sick (FormSG)" value={fmtInt(formSg.submissions)} />
+        <Tile label="Soldiers Reported Sick" value={fmtInt(formSg.soldiers)} />
+        <Tile
+          label="Mean Reported Sick Count per Soldier"
+          value={formSg.perSoldier === null ? '—' : formSg.perSoldier.toFixed(1)}
+        />
+        <Tile label="Δ Report Sick" value={fmtInt(Math.abs(paradeEpisodes - formSg.submissions))} />
+      </>
+    );
+  };
   const extraTrend = {
     title: 'Reported Sick (FormSG) Trend',
     coverage: 'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.',
@@ -155,13 +220,28 @@ export function ReportSick() {
       dutyClass={DUTY_CLASS.REPORT_SICK}
       leaderboardMetric="count"
       reasonSource={reasonSource}
-      extraTiles={extraTiles}
+      reasonsTitle="Top Report Sick Categories over time"
+      tileLabels={{
+        episodes: 'Reporting Sick (Parade State) Count',
+        soldiers: 'Soldiers Reporting Sick',
+        perSoldier: 'Mean Reporting Sick Count per Soldier',
+      }}
+      secondTileRow={secondTileRow}
+      trendTitle="Reporting Sick (Parade State) Trend"
       extraTrend={extraTrend}
       showHeatmap
+      heatmapBuilder={heatmapBuilder}
+      heatmapTitle="Reported Sick (FormSG) — by Company and Platoon"
+      heatmapCoverage="Count of FormSG submissions. Platoon is inferred from the 4D; a submission with no 4D is placed under HQ."
+      heatmapValueName="submissions"
+      heatmapEmpty="No FormSG submissions in range to place on the grid."
       showWordCloud
+      wordCloudTitle="Top Self-Reported Report Sick Reasons"
       wordCloudBuilder={wordCloudBuilder}
       showHistogram
       histogramBuilder={histogramBuilder}
+      showLeaderboard={false}
+      showUnitRankings={false}
       soldierIndex={index}
       afterLeaderboardBuilder={(from, to) => (
         <ReportedSickRankings submissions={submissions} strength={data.strength} from={from} to={to} />

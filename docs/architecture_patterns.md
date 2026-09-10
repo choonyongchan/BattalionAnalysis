@@ -188,7 +188,12 @@ Two consequences of that direction:
   rows, 96% of Cougar's and 39% of Braves', which leaves a platoon heatmap empty for half
   the battalion. The 4D's leading digit says which platoon a soldier is in, so a blank
   cell is filled from it. A stated platoon always wins, an inferred one is marked as
-  inferred wherever it is drawn, and the inference rate is printed on the chart.
+  inferred wherever it is drawn, and the inference rate is printed on the chart. The
+  Report Sick page extends this to the FormSG source: its "Unit & Coy" answer names only a
+  company, so the heatmap and the company/platoon rate tables take the submitter's platoon
+  from their 4D through the same rule, and a submission with no usable 4D is placed under
+  `HQ` rather than a separate unassigned bucket. `model/formsg.js` `submissionPlatoonOf`
+  is the one entry point; the platoon table's coverage note says the value is inferred.
 - **Chart colour is validated, not chosen, and it lives in one file.** Every colour the
   dashboard uses is declared in `src/theme/tokens.css` in both themes, and
   `src/charts/theme.js` reads those custom properties off the document at paint time — so
