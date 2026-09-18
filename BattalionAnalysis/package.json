@@ -21,7 +21,6 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.10.1",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^7.0.2",
     "vite": "^6.2.0"
   }
 }

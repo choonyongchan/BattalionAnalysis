@@ -1,6 +1,6 @@
-# Battalion Personnel Dashboard
+# BattalionAnalysis
 
-A dashboard over the spreadsheet the parade-state and FormSG pipelines write to.
+A dashboard over the parade-state and FormSG data, backed by Neon Postgres on Vercel.
 
 ## What it is for
 
@@ -31,172 +31,16 @@ all six companies, and the two sources cover different spans — parade state fr
 cards. Each panel prints its own coverage as a fraction with both parts, and the Settings
 page collects them all in one place.
 
-## How it reads the sheet
-
-The spreadsheet **stays private**. Nothing is published to the web, no tab is shared by
-link, and no battalion data is committed to this repo or passes through the deploy
-workflow.
-
-Instead the page asks the Apps Script web app this project already runs — the same `/exec`
-URL that receives parade states and report-sick submissions, with a third route:
+## Running it
 
 ```
-browser  --POST { password }-->  /exec?route=dashboard  --reads-->  private spreadsheet
-```
-
-The web app is deployed as *execute as me*, so it opens the sheet as its owner. The
-password is checked **there**, in `src/dashboard/DashboardFeed.js`, before a single row is
-read. That is the part that matters: a wrong password returns `unauthorised` and no data.
-
-A password checked in the browser instead would be decoration. The page's JavaScript is
-public, so anyone could read past the check — and the sheet would have to be published for
-the data to be reachable at all, at which point the URL alone is enough for anybody.
-
-**Anyone who knows the password can see everything.** There is no per-person identity, no
-record of who looked, and no way to revoke one viewer: removing someone means changing the
-password for everyone. That is the trade for having no accounts to manage. If you later
-want per-person access instead, the sheet's own sharing list can do it — that is a
-different design, not a setting.
-
-## One-time setup
-
-Two steps. No Google Cloud project, no OAuth consent screen, no test-user list.
-
-**1. Set the password on the Apps Script side.**
-
-Pick a long random passphrase — this is the only thing standing in front of the data, and
-it is typed rarely and pasted into a chat once, so length costs you nothing:
-
-```bash
-openssl rand -base64 24                       # Git Bash / macOS / Linux
-```
-```powershell
-$b = New-Object byte[] 24
-[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
-[Convert]::ToBase64String($b)                 # PowerShell
-```
-
-Both draw from the OS cryptographic generator. `Get-Random` does not — do not use it
-for this.
-
-In the Apps Script editor: **Project Settings → Script properties → Add script property**,
-name `DASHBOARD_PASSWORD`, value the passphrase. Save.
-
-The check fails closed, so until this property exists the route rejects every request —
-including an empty password. There is no window where the dashboard is open.
-
-**2. Point the dashboard at the web app.**
-
-Redeploy the web app (**Deploy → Manage deployments → edit → Deploy**) so the new route
-goes live; `clasp push` alone is not enough. Keep the same deployment so Plumber and the
-WhatsApp bridge keep working — their URLs do not change.
-
-Copy the `/exec` URL, append `?route=dashboard`, and put it in `FEED_URL` in
-[`src/data/config.js`](src/data/config.js):
-
-```js
-export const FEED_URL = 'https://script.google.com/macros/s/AKfy…/exec?route=dashboard';
-```
-
-That URL is not a secret — the endpoint refuses to answer without the password — so it is
-fine in a public repo. The password is never in this repo, in `config.js`, or in the page.
-
-**3. Optionally, create the two settings tabs.**
-
-`Public Holidays` (headers `date | name`) and `Rotations` (headers `name | start_date |
-end_date`) are read by the dashboard and written by nothing. Create them by hand; until
-you do, the dashboard reports them as missing on its Settings page, draws no holiday
-lines, and offers no rotational grouping. Everything else works without them.
-[`test/MANUAL_CHECKS.md`](../test/MANUAL_CHECKS.md) holds the exact headers.
-
-**Then share the password with the CO, S1 and S3.** Not by anything that keeps a searchable
-copy forever if you can help it.
-
-### Rotating it
-
-Change the script property. Every open dashboard keeps working until its tab is reloaded,
-and no redeploy is needed.
-
-### If someone starts guessing
-
-Ten wrong passwords in fifteen minutes and the route stops answering — including to the
-right password, so the guessing cannot continue and you find out. It clears itself after
-fifteen minutes. This is a speed bump, not a lock: the real defence is the length of the
-passphrase.
-
-## Running it locally
-
-```
-cd dashboard
 bun install
-bun run dev                      # then open the URL it prints
+bun run dev      # the dashboard
+bun test         # the model layer
 ```
 
-```
-bun test ./test/                 # from the repo root: model layer, feed, and router
-```
-
-The feed is reachable from `localhost` without any extra configuration, because the Apps
-Script web app is not origin-restricted — so `bun run dev` gives you the real data as soon
-as you type the password.
-
-### Why there is a build step now
-
-There did not used to be one, and losing that was a real cost. It is here because eight
-pages of legend toggles, granularity radios, a fuzzy combobox and a live light/dark switch
-are more state than an imperative DOM layer carries without turning into a hand-rolled
-framework — and because the chart palette is read from CSS custom properties, which a
-runtime theme switch has to be able to re-read. What it bought back: ECharts arrives as an
-npm dependency and is tree-shaken to the series actually used, instead of a 1 MB CDN file
-pinned by a hash that had to be recomputed on every version bump.
-
-## Deploying
-
-Pushing to `main` or `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml),
-which runs the tests, builds the dashboard, and publishes `dashboard/dist` to GitHub Pages.
-Enable Pages once, under **Settings → Pages → Source → GitHub Actions**.
-
-An Actions workflow rather than deploy-from-a-branch because Pages only offers `/` or
-`/docs` as a source folder, and `docs/` already holds the architecture reference.
-
-`vite.config.js` sets `base: './'`, because Pages serves this from a repository sub-path
-and absolute asset URLs would resolve against the wrong root — which shows up as a blank
-page with no error worth reading.
-
-## How it is put together
-
-Five layers, and the dependency direction runs strictly downward through them.
-
-```
-index.html            the mount point, and a theme-boot script that runs before first paint
-src/
-  main.jsx            stylesheet order, then mount
-  app/                the frame: Shell, Sidebar, Router, routes, Logo, icons
-    state.js          every signal the pages read
-    auth.js           the password's whole life, from typed to forgotten
-  theme/              tokens.css (both themes) · base · controls · shell · components
-    useTheme.js       light / dark / system, persisted, and the charts' re-tint trigger
-  data/               config.js (feed URL) · feed.js (the one POST)
-    tabs.js           what the dashboard asks each tab for
-    records.js        raw values -> typed records, resolved by header name
-  model/              every number and every rule. Pure, no DOM, no network, all tested
-  charts/             ECharts wrappers; theme.js reads the tokens off the document
-  components/         tiles, cards, tables, the date picker, the toggles, the search box
-  pages/              one file per page; pages/shared/ for what the medical pages share
-```
-
-`model/` is the layer that matters. It is the only one under test, the only one a wrong
-number can come from, and the reason a page can be rewritten without re-deriving a single
-metric. A page that computes something itself instead of asking `model/` for it is the
-defect that layering exists to prevent.
-
-The server half is [`src/dashboard/DashboardFeed.js`](../src/dashboard/DashboardFeed.js),
-routed from [`src/WebApp.js`](../src/WebApp.js).
-
-Browser tests are in [`test/dashboard/`](../test/dashboard), outside this directory because
-everything in `dashboard/` is published. The feed's tests are
-[`test/dashboard.feed.test.js`](../test/dashboard.feed.test.js), alongside the other Apps
-Script tests.
+Layout, data flow and the roadmap live in [`docs/architecture_patterns.md`](docs/architecture_patterns.md).
+Until `api/dashboard.ts` lands, `src/data/feed.js` still reads the legacy Apps Script feed.
 
 ## Three things worth knowing before reading the numbers
 
@@ -218,8 +62,7 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
 
 - **No NRIC.** `SingPass Validated NRIC` and `Masked NRIC` are never requested from the
   FormSG tab.
-- **No writes.** The feed only reads; nothing the dashboard does can change the sheet, and
-  a test asserts the read path leaves every cell untouched.
+- **No writes.** The feed only reads; nothing the dashboard does can change the data.
 - **No stored password.** It is held in the page's memory for the life of the tab — not in
   `localStorage`, not in `sessionStorage`, not in a cookie — so a reload asks again and
   closing the tab ends the session.
