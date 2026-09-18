@@ -1,0 +1,303 @@
+/*
+ * The frame: sidebar on the left, one scrolling column of content on the right, and the
+ * login screen that stands in front of both until a password gets through.
+ *
+ * The sidebar is a fixed rail rather than a page-scrolling column because a commander
+ * moves between Report Sick, MC and Status while comparing them, and a nav that scrolls
+ * away turns each of those moves into a scroll back to the top first.
+ *
+ * Below 834px the rail becomes a slide-over, per DESIGN.md's collapsing strategy.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-sm);
+  background: var(--sidebar);
+  border-right: 1px solid var(--hairline-soft);
+  overflow-y: auto;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  color: var(--ink);
+}
+
+.sidebar__brand:hover {
+  text-decoration: none;
+}
+
+.sidebar__wordmark {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.374px;
+  line-height: 1.2;
+}
+
+.sidebar__unit {
+  display: block;
+  font-size: 12px;
+  letter-spacing: -0.12px;
+  color: var(--ink-muted);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  flex: 1;
+}
+
+.navgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navgroup__label {
+  padding: 0 var(--space-sm) var(--space-xxs);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.navlink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 15px;
+  letter-spacing: -0.24px;
+  min-height: 38px;
+}
+
+.navlink:hover {
+  background: var(--hairline-soft);
+  text-decoration: none;
+}
+
+.navlink[aria-current='page'] {
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.navlink__icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.sidebar__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--hairline-soft);
+}
+
+/* ---------------------------------------------------------------- content */
+
+.content {
+  min-width: 0;
+  padding: var(--space-xl) var(--space-xl) var(--space-xxl);
+  background: var(--canvas-sunken);
+}
+
+.content__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.pagehead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.pagehead__title {
+  font-size: 34px;
+  line-height: 1.14;
+  letter-spacing: -0.374px;
+}
+
+.pagehead__sub {
+  margin-top: var(--space-xxs);
+  color: var(--ink-muted);
+  font-size: 17px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxl);
+}
+
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ------------------------------------------------------------------ login */
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-xl);
+  background: var(--canvas);
+}
+
+.login__panel {
+  width: 100%;
+  max-width: 42rem;
+  text-align: center;
+}
+
+.login__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-xl);
+  color: var(--ink);
+}
+
+.login__title {
+  margin-bottom: var(--space-xxl);
+  text-wrap: balance;
+}
+
+.login__form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.login__input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--space-lg);
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  text-align: center;
+}
+
+.login__input::placeholder {
+  color: var(--ink-faint);
+}
+
+.login__error {
+  margin-top: var(--space-md);
+  color: var(--critical);
+  font-size: 14px;
+}
+
+.login__note {
+  margin: var(--space-xxl) auto 0;
+  max-width: 26rem;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+.sidebar__toggle {
+  display: none;
+}
+
+.topbar {
+  display: none;
+}
+
+@media (max-width: 833px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: color-mix(in srgb, var(--sidebar) 88%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline-soft);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 30;
+    width: min(var(--sidebar-width), 84vw);
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+    box-shadow: var(--shadow-float);
+  }
+
+  .sidebar[data-open='true'] {
+    transform: translateX(0);
+  }
+
+  .sidebar__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: var(--overlay);
+    border: 0;
+  }
+
+  .sidebar__toggle {
+    display: inline-flex;
+  }
+
+  .content {
+    padding: var(--space-lg) var(--space-md) var(--space-xxl);
+  }
+
+  .content__inner,
+  .page {
+    gap: var(--space-xl);
+  }
+}
+
+@media (max-width: 640px) {
+  .pagehead__title {
+    font-size: 28px;
+  }
+}
