@@ -10,6 +10,16 @@ whatsapp/data/
 
 # Captured group listings hold real group names and JIDs.
 whatsapp/output.txt
+
+# Real personnel data. None of this may ever enter git history, which is not
+# erasable in practice. The FormSG export holds NRICs and full names; the parade
+# state samples and the format template hold full names, 4D numbers and diagnoses.
 parade-state-example/*
+parade-state-example.txt
+parade_state_template_new.md
+formsg.csv
+*.csv
+archive/
+!archive/README.md
 # Bundled dashboard output from a stray `> nul` redirect on Windows.
 nul
