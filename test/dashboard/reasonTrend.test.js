@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { OTHER_LABEL, topLabelsOverTime } from '../../dashboard/src/model/reasonTrend.js';
+import { OTHER_LABEL, topLabelsOverTime } from '../../src/model/reasonTrend.js';
 
 describe('topLabelsOverTime', () => {
   test('ranks labels by total count and tracks only the top N', () => {

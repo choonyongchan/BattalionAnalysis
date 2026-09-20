@@ -13,12 +13,12 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { buildEpisodes } from '../../dashboard/src/model/episodes.js';
-import { toSubmissions } from '../../dashboard/src/model/formsg.js';
-import { reconcileReportSick } from '../../dashboard/src/model/reconcile.js';
-import { reportSickFlow } from '../../dashboard/src/model/sankey.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS } from '../../src/data/tabs.js';
+import { buildEpisodes } from '../../src/model/episodes.js';
+import { toSubmissions } from '../../src/model/formsg.js';
+import { reconcileReportSick } from '../../src/model/reconcile.js';
+import { reportSickFlow } from '../../src/model/sankey.js';
 
 /**
  * Builds Personnel Data records from column-keyed row specs.

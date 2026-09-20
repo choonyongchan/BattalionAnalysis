@@ -1,8 +1,16 @@
 node_modules/
 .clasp.json
 
-# The dashboard's Vite build. CI rebuilds it; a committed copy only goes stale.
-dashboard/dist/
+# The Vite build. Vercel rebuilds it; a committed copy only goes stale.
+dist/
+
+# Secrets. .env.example is the committed template.
+.env
+.env.*
+!.env.example
+
+# Vercel CLI local state.
+.vercel
 whatsapp/node_modules/
 whatsapp/.env
 whatsapp/auth/

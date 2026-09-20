@@ -14,7 +14,7 @@ import {
   rotationOf,
   rotationSpan,
   toRotations,
-} from '../../dashboard/src/model/rotations.js';
+} from '../../src/model/rotations.js';
 
 describe('toRotations', () => {
   test('parses raw rows into sorted start/end triples', () => {

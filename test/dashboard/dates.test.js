@@ -12,7 +12,7 @@ import {
   inclusiveDaySpan,
   isWeekend,
   weekdayOf,
-} from '../../dashboard/src/model/dates.js';
+} from '../../src/model/dates.js';
 
 describe('day arithmetic', () => {
   test('a one-day absence spans one day, not zero', () => {

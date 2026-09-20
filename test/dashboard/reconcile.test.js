@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { namesMatch, nameTokens, reconcileReportSick } from '../../dashboard/src/model/reconcile.js';
+import { namesMatch, nameTokens, reconcileReportSick } from '../../src/model/reconcile.js';
 
 describe('name tokens', () => {
   test('drops the rank, punctuation and one-letter tokens', () => {

@@ -30,16 +30,16 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 
 /** Directory holding the FormSG Apps Script sources under test. @type {string} */
-const SOURCE_DIR = join(import.meta.dir, '..', 'src', 'formsg');
+const SOURCE_DIR = join(import.meta.dir, '..', 'legacy', 'formsg');
 
 /** Directory holding the parade-state parser sources under test. @type {string} */
-const PARSER_DIR = join(import.meta.dir, '..', 'src', 'parser');
+const PARSER_DIR = join(import.meta.dir, '..', 'legacy', 'parser');
 
 /** Directory holding the dashboard feed sources under test. @type {string} */
-const DASHBOARD_DIR = join(import.meta.dir, '..', 'src', 'dashboard');
+const DASHBOARD_DIR = join(import.meta.dir, '..', 'legacy', 'dashboard');
 
 /** The web-app router, loaded alongside the FormSG and dashboard sources. @type {string} */
-const WEB_APP_SOURCE = join(import.meta.dir, '..', 'src', 'WebApp.js');
+const WEB_APP_SOURCE = join(import.meta.dir, '..', 'legacy', 'WebApp.js');
 
 /** Intrinsics shared into every vm context, so `instanceof` holds across the boundary. */
 const SHARED_INTRINSICS = { Date, JSON, Object, Array, String, Number, Boolean, RegExp, Error, isNaN, Math };

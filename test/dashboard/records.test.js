@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { indexHeaders, toRecords } from '../../dashboard/src/data/records.js';
+import { indexHeaders, toRecords } from '../../src/data/records.js';
 
 describe('header resolution', () => {
   test('resolves columns by name, not position', () => {

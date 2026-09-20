@@ -14,7 +14,7 @@ import {
   CLINICAL_BUCKETS,
   reasonKeywords,
   shortLabel,
-} from '../../dashboard/src/model/symptoms.js';
+} from '../../src/model/symptoms.js';
 
 const URTI = 'Upper Respiratory Tract Infection (Fever/Flu etc.)';
 const FEVER_HEADACHE = 'Fever / Headache (High Temp, Severe Migraine etc.)';

@@ -161,7 +161,7 @@ function readOptional(tabs, spec, notes) {
 export function loadAll(password) {
   if (!isConfigured()) {
     return Promise.reject(
-      new Error('No feed URL is set. Add one to dashboard/src/data/config.js — see dashboard/README.md.')
+      new Error('No feed URL is set. Add one to src/data/config.js — see README.md.')
     );
   }
 

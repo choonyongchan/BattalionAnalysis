@@ -9,11 +9,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { buildEpisodes } from '../../dashboard/src/model/episodes.js';
-import { identityOf } from '../../dashboard/src/model/identity.js';
-import { DUTY_CLASS } from '../../dashboard/src/model/classify.js';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS, TABS } from '../../dashboard/src/data/tabs.js';
+import { buildEpisodes } from '../../src/model/episodes.js';
+import { identityOf } from '../../src/model/identity.js';
+import { DUTY_CLASS } from '../../src/model/classify.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS, TABS } from '../../src/data/tabs.js';
 import { personnelValues } from './fixtures.js';
 
 /**

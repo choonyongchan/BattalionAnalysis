@@ -15,8 +15,8 @@ import {
   bucketsFor,
   isPermanentStatus,
   STATUS_BUCKETS,
-} from '../../dashboard/src/model/statusBuckets.js';
-import { PERM_STATUS_NUM_DAYS } from '../../dashboard/src/model/domain.js';
+} from '../../src/model/statusBuckets.js';
+import { PERM_STATUS_NUM_DAYS } from '../../src/model/domain.js';
 
 describe('STATUS_BUCKETS', () => {
   test('lists exactly the ten buckets in the documented order', () => {

@@ -14,10 +14,10 @@ import {
   scopeDataset,
   scopeFilings,
   scopeSubmissions,
-} from '../../dashboard/src/model/scope.js';
-import { battalionStrength } from '../../dashboard/src/model/metrics.js';
-import { presentTrend, dutyTrend } from '../../dashboard/src/model/strength.js';
-import { DUTY_CLASS } from '../../dashboard/src/model/classify.js';
+} from '../../src/model/scope.js';
+import { battalionStrength } from '../../src/model/metrics.js';
+import { presentTrend, dutyTrend } from '../../src/model/strength.js';
+import { DUTY_CLASS } from '../../src/model/classify.js';
 
 /**
  * A minimal dataset: two companies, one parade day, one report-sick soldier each.

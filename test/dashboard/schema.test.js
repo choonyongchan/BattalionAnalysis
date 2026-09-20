@@ -21,7 +21,7 @@ import {
   PLATOONS,
   SESSIONS,
   UNIT_TYPE_COMPANY,
-} from '../../dashboard/src/model/domain.js';
+} from '../../src/model/domain.js';
 import {
   FORBIDDEN_HEADERS,
   FORBIDDEN_SUBMISSION_HEADERS,
@@ -30,7 +30,7 @@ import {
   ROSTER_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
-} from '../../dashboard/src/data/tabs.js';
+} from '../../src/data/tabs.js';
 
 /** @type {!Object} Apps Script globals for the parade-state pipeline. */
 const parser = parserGlobals();

@@ -17,7 +17,7 @@ import {
   overlapsRange,
   resolvePreset,
   withinRange,
-} from '../../dashboard/src/model/dateRange.js';
+} from '../../src/model/dateRange.js';
 
 describe('withinRange', () => {
   test('is inclusive of both ends', () => {

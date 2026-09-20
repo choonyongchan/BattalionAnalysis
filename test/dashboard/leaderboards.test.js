@@ -8,16 +8,16 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { buildEpisodes } from '../../dashboard/src/model/episodes.js';
-import { DUTY_CLASS } from '../../dashboard/src/model/classify.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
+import { buildEpisodes } from '../../src/model/episodes.js';
+import { DUTY_CLASS } from '../../src/model/classify.js';
 import {
   rankUnits,
   topByCount,
   topByDays,
   topByStatusCount,
-} from '../../dashboard/src/model/leaderboards.js';
+} from '../../src/model/leaderboards.js';
 
 /**
  * Builds Personnel Data records from column-keyed row specs.

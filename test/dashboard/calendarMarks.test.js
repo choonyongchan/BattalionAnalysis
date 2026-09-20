@@ -13,7 +13,7 @@ import {
   holidaysIn,
   toHolidays,
   weekendBands,
-} from '../../dashboard/src/model/calendarMarks.js';
+} from '../../src/model/calendarMarks.js';
 
 describe('toHolidays', () => {
   test('parses raw rows into sorted date/name pairs', () => {

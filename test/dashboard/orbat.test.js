@@ -7,9 +7,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { ROSTER_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { orbatCoverage, orbatTree, rosterOn } from '../../dashboard/src/model/orbat.js';
+import { toRecords } from '../../src/data/records.js';
+import { ROSTER_HEADERS } from '../../src/data/tabs.js';
+import { orbatCoverage, orbatTree, rosterOn } from '../../src/model/orbat.js';
 
 /**
  * Builds Command Roster records from column-keyed row specs.

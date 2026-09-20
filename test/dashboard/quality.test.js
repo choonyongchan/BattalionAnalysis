@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { companyCoverage, dataQuality, paradeDayCoverage } from '../../dashboard/src/model/quality.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
+import { companyCoverage, dataQuality, paradeDayCoverage } from '../../src/model/quality.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.

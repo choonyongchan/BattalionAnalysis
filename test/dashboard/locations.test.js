@@ -12,7 +12,7 @@ import {
   canonicalLocation,
   locationCounts,
   locationCoverage,
-} from '../../dashboard/src/model/locations.js';
+} from '../../src/model/locations.js';
 
 describe('canonicalLocation', () => {
   test('the six CGH forms fold to one canonical name', () => {

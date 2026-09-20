@@ -11,8 +11,8 @@ import {
   GRANULARITIES,
   bucketOf,
   groupDates,
-} from '../../dashboard/src/model/buckets.js';
-import { toRotations } from '../../dashboard/src/model/rotations.js';
+} from '../../src/model/buckets.js';
+import { toRotations } from '../../src/model/rotations.js';
 
 describe('GRANULARITIES', () => {
   test('lists the radio options in display order', () => {

@@ -9,8 +9,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { platoonCoverage, platoonOf } from '../../dashboard/src/model/platoon.js';
-import { UNASSIGNED } from '../../dashboard/src/model/domain.js';
+import { platoonCoverage, platoonOf } from '../../src/model/platoon.js';
+import { UNASSIGNED } from '../../src/model/domain.js';
 
 describe('platoonOf', () => {
   test('a stated platoon wins even when the 4D disagrees', () => {

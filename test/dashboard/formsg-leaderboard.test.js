@@ -8,9 +8,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { submissionRateByCompany, toSubmissions, topSubmitters } from '../../dashboard/src/model/formsg.js';
+import { toRecords } from '../../src/data/records.js';
+import { STRENGTH_HEADERS } from '../../src/data/tabs.js';
+import { submissionRateByCompany, toSubmissions, topSubmitters } from '../../src/model/formsg.js';
 
 /**
  * A FormSG response row, as `toSubmissions` reads it.

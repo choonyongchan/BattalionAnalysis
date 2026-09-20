@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toIsoDate, toNumber, toText, toTimeOfDay } from '../../dashboard/src/model/values.js';
+import { toIsoDate, toNumber, toText, toTimeOfDay } from '../../src/model/values.js';
 
 describe('dates', () => {
   test('an ISO string is read as written', () => {

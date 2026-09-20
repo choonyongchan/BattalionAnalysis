@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { identityKey, identityOf, normaliseName } from '../../dashboard/src/model/identity.js';
+import { identityKey, identityOf, normaliseName } from '../../src/model/identity.js';
 
 describe('normaliseName', () => {
   test('makes one soldier out of two spellings', () => {

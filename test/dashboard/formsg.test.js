@@ -15,9 +15,9 @@ import {
   submissionRateByPlatoon,
   submissionTrend,
   toSubmissions,
-} from '../../dashboard/src/model/formsg.js';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
+} from '../../src/model/formsg.js';
+import { toRecords } from '../../src/data/records.js';
+import { STRENGTH_HEADERS } from '../../src/data/tabs.js';
 
 /**
  * A FormSG response row, as `toSubmissions` reads it: an object keyed by header.

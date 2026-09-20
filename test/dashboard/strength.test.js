@@ -7,10 +7,10 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { DUTY_CLASS } from '../../dashboard/src/model/classify.js';
-import { dutyTrend, presentTrend, rankTiersOn, strengthOn } from '../../dashboard/src/model/strength.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
+import { DUTY_CLASS } from '../../src/model/classify.js';
+import { dutyTrend, presentTrend, rankTiersOn, strengthOn } from '../../src/model/strength.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.

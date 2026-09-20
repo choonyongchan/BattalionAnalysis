@@ -13,8 +13,8 @@ import {
   filingsOn,
   latestFilingPerCompany,
   toFilings,
-} from '../../dashboard/src/model/submissions.js';
-import { COMPANIES } from '../../dashboard/src/model/domain.js';
+} from '../../src/model/submissions.js';
+import { COMPANIES } from '../../src/model/domain.js';
 
 /**
  * A "Parade State Responses" row, as the feed projects it.

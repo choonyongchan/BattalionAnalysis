@@ -7,11 +7,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { toRecords } from '../../dashboard/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../dashboard/src/data/tabs.js';
-import { buildEpisodes } from '../../dashboard/src/model/episodes.js';
-import { toSubmissions } from '../../dashboard/src/model/formsg.js';
-import { findSoldier, soldierIndex, soldierReport } from '../../dashboard/src/model/soldier.js';
+import { toRecords } from '../../src/data/records.js';
+import { PERSONNEL_HEADERS } from '../../src/data/tabs.js';
+import { buildEpisodes } from '../../src/model/episodes.js';
+import { toSubmissions } from '../../src/model/formsg.js';
+import { findSoldier, soldierIndex, soldierReport } from '../../src/model/soldier.js';
 
 /**
  * Builds Personnel Data records from column-keyed row specs.

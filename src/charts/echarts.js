@@ -16,19 +16,17 @@
  * worth naming.
  */
 
-import { use, init, graphic } from 'echarts/core';
+import { use, init } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
 import {
   BarChart,
   CustomChart,
   HeatmapChart,
   LineChart,
-  PieChart,
   SankeyChart,
   TreeChart,
 } from 'echarts/charts';
 import {
-  GraphicComponent,
   GridComponent,
   LegendComponent,
   MarkAreaComponent,
@@ -44,16 +42,14 @@ use([
   SVGRenderer,
 
   // Series types, one per component under this directory.
-  BarChart, // Bar, GroupedBar, StackedBar, Histogram
+  BarChart, // Bar, GroupedBar, Histogram
   CustomChart, // Timeline lanes, Heatmap's inferred-cell hatch
   HeatmapChart, // Heatmap
   LineChart, // Line (and the empty carrier series that holds its annotations)
-  PieChart, // Donut
   SankeyChart, // Sankey
   TreeChart, // Tree
 
   // Components.
-  GraphicComponent, // the total in the Donut's hole
   GridComponent,
   LegendComponent,
   MarkAreaComponent, // weekend bands
@@ -62,4 +58,4 @@ use([
   VisualMapComponent, // the Heatmap's sequential ramp
 ]);
 
-export { init, graphic };
+export { init };

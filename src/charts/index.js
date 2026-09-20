@@ -14,13 +14,11 @@
 export { ChartCard } from './ChartCard.jsx';
 
 export { Bar } from './Bar.jsx';
-export { Donut } from './Donut.jsx';
 export { GroupedBar } from './GroupedBar.jsx';
 export { Heatmap } from './Heatmap.jsx';
 export { Histogram } from './Histogram.jsx';
 export { Line } from './Line.jsx';
 export { Sankey } from './Sankey.jsx';
-export { StackedBar } from './StackedBar.jsx';
 export { Timeline } from './Timeline.jsx';
 export { Tree } from './Tree.jsx';
 export { WordCloud } from './WordCloud.jsx';
