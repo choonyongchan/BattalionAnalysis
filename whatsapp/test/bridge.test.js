@@ -170,6 +170,29 @@ describe('createMessageHandler', () => {
     expect(ingestor.calls[0][0]).toContain('PARADE STATE');
   });
 
+  test('logs "stored parade state" for a fresh message', async () => {
+    const logged = [];
+    const capturingLogger = { ...silentLogger, info: (fields, msg) => logged.push(msg) };
+    const ingestor = fakeIngestor(async () => ({ status: 'stored', id: 1 }));
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
+
+    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
+
+    expect(logged).toContain('stored parade state');
+  });
+
+  test('logs "parade state already known" for a duplicate or already-processed message', async () => {
+    const logged = [];
+    const capturingLogger = { ...silentLogger, info: (fields, msg) => logged.push(msg) };
+    const ingestor = fakeIngestor(async () => ({ status: 'duplicate', id: 1 }));
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
+
+    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
+
+    expect(logged).toContain('parade state already known');
+    expect(logged).not.toContain('stored parade state');
+  });
+
   test('never ingests a rejected message', async () => {
     const ingestor = fakeIngestor();
     const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });

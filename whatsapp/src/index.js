@@ -47,7 +47,10 @@ export function createMessageHandler({ config, logger, ingestor }) {
 
     try {
       const outcome = await ingestor.ingest(text, messageId);
-      logger.info({ ...summary, status: outcome.status, id: outcome.id }, 'stored parade state');
+      // The message, not just the status, since a resend after a crash is expected and
+      // "already known" reads very differently from "stored" at a glance in the log.
+      const message = outcome.status === 'stored' ? 'stored parade state' : 'parade state already known';
+      logger.info({ ...summary, status: outcome.status, id: outcome.id }, message);
     } catch (err) {
       // describeError, not err.message: recordMessage's insert failing wraps in
       // drizzle-orm's DrizzleQueryError, whose message quotes the query params -- here,
