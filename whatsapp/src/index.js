@@ -9,6 +9,7 @@
 import { getDb } from '../../db/index.ts';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
+import { describeError } from './errors.js';
 import { createIngestor } from './ingest.js';
 import { isParadeState } from './signature.js';
 import { startListener } from './listener.js';
@@ -48,7 +49,10 @@ export function createMessageHandler({ config, logger, ingestor }) {
       const outcome = await ingestor.ingest(text, messageId);
       logger.info({ ...summary, status: outcome.status, id: outcome.id }, 'stored parade state');
     } catch (err) {
-      logger.error({ ...summary, err: err.message }, 'store failed; will retry if the message is resent');
+      // describeError, not err.message: recordMessage's insert failing wraps in
+      // drizzle-orm's DrizzleQueryError, whose message quotes the query params -- here,
+      // the parade-state body itself.
+      logger.error({ ...summary, err: describeError(err) }, 'store failed; will retry if the message is resent');
     }
   };
 }

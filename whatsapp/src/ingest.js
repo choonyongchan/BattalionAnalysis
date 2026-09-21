@@ -16,6 +16,7 @@
  * including the one at start-up, picks it up.
  */
 
+import { describeError } from './errors.js';
 import { parseDue, recordMessage } from '../../lib/pipeline.ts';
 
 /**
@@ -77,7 +78,11 @@ export function createIngestor({ db, apiKey, model, logger, record = recordMessa
     } catch (err) {
       // Swallowed deliberately: an unreachable database must not take down the
       // listener. The messages stay unprocessed and the next drain retries them.
-      logger.error({ err: err.message }, 'parse run failed; will retry on the next drain');
+      //
+      // describeError, not err.message: a markFailed insert failing mid-write wraps in
+      // drizzle-orm's DrizzleQueryError, whose message quotes the query params -- here,
+      // the rejection reason, which can quote the parade-state body.
+      logger.error({ err: describeError(err) }, 'parse run failed; will retry on the next drain');
     } finally {
       running = null;
     }

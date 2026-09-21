@@ -7,6 +7,10 @@ import { describe, expect, test } from 'bun:test';
 import { loadConfig } from '../src/config.js';
 import { extractText, isWatchedGroupMessage } from '../src/listener.js';
 import { createMessageHandler } from '../src/index.js';
+import { DrizzleQueryError } from '../../node_modules/drizzle-orm/errors.js';
+
+/** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
+const MARKER = 'NRIC S1234568B BODY';
 
 /** @type {string} JID used as the watched group in the envelope tests. */
 const GROUP_JID = '120363000000000000@g.us';
@@ -189,5 +193,19 @@ describe('createMessageHandler', () => {
     const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
 
     expect(await handle(PARADE_STATE, { key: { id: 'MSG4' } })).toBeUndefined();
+  });
+
+  test('never logs a DrizzleQueryError message or params from a storage failure', async () => {
+    const logged = [];
+    const capturingLogger = { ...silentLogger, error: (fields, msg) => logged.push([fields, msg]) };
+    const ingestor = fakeIngestor(async () => {
+      throw new DrizzleQueryError('insert into raw_messages (body) values ($1)', [MARKER], new Error('fetch failed'));
+    });
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
+
+    await handle(PARADE_STATE, { key: { id: 'MSG5' } });
+
+    expect(logged).toHaveLength(1);
+    expect(JSON.stringify(logged)).not.toContain(MARKER);
   });
 });

@@ -6,6 +6,10 @@
 
 import { describe, expect, test } from 'bun:test';
 import { createIngestor, tallyRun } from '../src/ingest.js';
+import { DrizzleQueryError } from '../../node_modules/drizzle-orm/errors.js';
+
+/** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
+const MARKER = 'NRIC S1234568B BODY';
 
 /** @type {import('pino').Logger} A logger stub that records nothing. */
 const silentLogger = { info: () => {}, debug: () => {}, warn: () => {}, error: () => {} };
@@ -188,6 +192,23 @@ describe('createIngestor.drain', () => {
 
     expect(parseCalls).toBe(2);
     expect(errors).toHaveLength(1);
-    expect(errors[0].err).toBe('neon unreachable');
+    expect(errors[0].err).toEqual({ name: 'Error', message: 'neon unreachable' });
+  });
+
+  test('never logs a DrizzleQueryError message or params from a failed run', async () => {
+    const errors = [];
+    const ingestor = createIngestor({
+      db: 'DB',
+      apiKey: 'k',
+      logger: { ...silentLogger, error: (fields) => errors.push(fields) },
+      parse: async () => {
+        throw new DrizzleQueryError('update raw_messages set error = $1', [MARKER], new Error('fetch failed'));
+      },
+    });
+
+    await ingestor.drain();
+
+    expect(errors).toHaveLength(1);
+    expect(JSON.stringify(errors[0])).not.toContain(MARKER);
   });
 });
