@@ -12,7 +12,7 @@
 -- Run once per database, after the migration.
 --
 -- Usage:
---   psql "$DATABASE_URL" -v reader_password="$(openssl rand -base64 24)" -f db/grants.sql
+--   psql "$DATABASE_URL" -v reader_password="$(openssl rand -hex 24)" -f db/grants.sql
 -- then set DATABASE_URL_READONLY to that role's connection string.
 
 \set ON_ERROR_STOP on

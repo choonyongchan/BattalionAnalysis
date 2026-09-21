@@ -5,7 +5,7 @@
 -- statements that module issues, and no FormSG, dashboard or auth table.
 --
 -- Usage:
---   psql "$DATABASE_URL" -v ingest_password="$(openssl rand -base64 24)" -f db/grants-ingest.sql
+--   psql "$DATABASE_URL" -v ingest_password="$(openssl rand -hex 24)" -f db/grants-ingest.sql
 -- then put that role's connection string in whatsapp/.env as DATABASE_URL.
 
 \set ON_ERROR_STOP on
@@ -36,9 +36,6 @@ GRANT INSERT ON
   command_roster_rows,
   section_counts
 TO parade_ingest;
-
--- Identity columns draw from sequences. Harmless if Postgres does not require it.
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO parade_ingest;
 
 -- Verification, run as parade_ingest:
 --   SELECT count(*) FROM raw_messages;          -- must SUCCEED
