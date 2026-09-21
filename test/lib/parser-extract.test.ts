@@ -159,14 +159,28 @@ describe('failures are classified so the caller knows whether to retry', () => {
     expect((await failure([new Response('', { status: 429 })])).transient).toBe(true);
   });
 
-  test('a 401 is permanent -- a bad key does not fix itself', async () => {
+  test('a 401 is TRANSIENT, because a bad key is not a property of this message', async () => {
+    /*
+     * `transient: false` does not mean "stop retrying"; it means "mark this message
+     * permanently failed", which sets processed_at and guarantees it is never parsed again.
+     *
+     * A wrong OPENAI_API_KEY returns 401 for every message identically, so classifying it
+     * permanent made one drain run write off the entire morning's backlog -- recoverable
+     * only by hand. A live verification run did exactly that before this was corrected.
+     */
     const error = await failure([new Response('bad key', { status: 401 })]);
-    expect(error.transient).toBe(false);
+    expect(error.transient).toBe(true);
     expect(error.message).toContain('401');
   });
 
-  test('a 404 is permanent, which is what a withdrawn model looks like', async () => {
-    expect((await failure([new Response('no model', { status: 404 })])).transient).toBe(false);
+  test('a 404 is transient, since a withdrawn model is a deployment problem', async () => {
+    // Identical for every message, so it says nothing about the message. An operator fixes
+    // the model name and the queue drains; marking the queue failed would lose it.
+    expect((await failure([new Response('no model', { status: 404 })])).transient).toBe(true);
+  });
+
+  test('a 400 is transient too -- the schema is the same for every message', async () => {
+    expect((await failure([new Response('bad schema', { status: 400 })])).transient).toBe(true);
   });
 
   test('content that is not JSON is permanent', async () => {

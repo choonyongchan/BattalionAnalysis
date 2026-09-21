@@ -277,6 +277,49 @@ describe('mapSubmission', () => {
     expect(statuses).toEqual([]);
   });
 
+  test('reports an answer whose option it does not recognise', () => {
+    /*
+     * The day someone edits "Report Sick In-Camp (RSI)" in the FormSG editor, the question
+     * still resolves, the answer still arrives, and the column silently goes null on every
+     * submission from then on. Nothing else in the pipeline would notice, so the mapper says
+     * so and the route logs it.
+     */
+    const { submission: row, unrecognised } = mapSubmission(
+      submission({
+        'Report Sick Type': 'Report Sick In Camp',
+        'Outcome given by the doctor/MO': 'Referred onward',
+      }),
+      SYMPTOM_IDS,
+    );
+
+    expect(row.reportSickType).toBeNull();
+    expect(unrecognised).toEqual([
+      'reportSickType=Report Sick In Camp',
+      'outcome=Referred onward',
+    ]);
+  });
+
+  test('does not report an unanswered optional question as unrecognised', () => {
+    // Most submissions predate the outcome section entirely. A null from a blank answer is
+    // normal, and reporting it would bury the signal from a renamed option.
+    const { unrecognised } = mapSubmission(
+      submission({ Rank: 'REC', 'Report Sick Type': '' }),
+      SYMPTOM_IDS,
+    );
+    expect(unrecognised).toEqual([]);
+  });
+
+  test('reports nothing for a submission whose options all resolve', () => {
+    const { unrecognised } = mapSubmission(
+      submission({
+        'Report Sick Type': 'Report Sick Outside (RSO)',
+        'Outcome given by the doctor/MO': 'Sick Leave / MC',
+      }),
+      SYMPTOM_IDS,
+    );
+    expect(unrecognised).toEqual([]);
+  });
+
   test('handles a checkbox-shaped answer, in case the form is ever switched', () => {
     const decrypted: DecryptedSubmission = {
       submissionId: 'x',

@@ -164,12 +164,29 @@ async function callOnce(doFetch: typeof fetch, apiKey: string, body: string): Pr
 
   if (!response.ok) {
     const detail = (await safeText(response)).slice(0, 500);
-    // 4xx means the request itself is wrong -- a bad key, a model that does not exist, a
-    // schema the API rejects. Retrying an identical request cannot fix any of those.
-    throw new ExtractionError(
-      `Model API returned HTTP ${response.status}: ${detail}`,
-      response.status >= 500 || response.status === 429,
-    );
+    /*
+     * EVERY HTTP STATUS FAILURE IS TRANSIENT, INCLUDING 4xx.
+     *
+     * This reads wrong at first -- a 401 will fail identically forever -- so it is worth
+     * stating why. `transient: false` does not mean "do not retry"; it means "record a
+     * permanent failure against this message", which marks it processed and guarantees it
+     * is never parsed again.
+     *
+     * The status failures all describe the REQUEST CONFIGURATION: the key, the model name,
+     * the schema. Every one of those is identical for every message, so none of them can be
+     * a property of the message being parsed. A wrong OPENAI_API_KEY previously made the
+     * drain mark the entire backlog permanently failed within one run -- every parade state
+     * queued that morning silently written off, recoverable only by hand. A verification run
+     * against the live database did exactly that before this was changed.
+     *
+     * Leaving them unprocessed costs a cheap failing request per tick until an operator
+     * fixes the configuration, and the drain's `failed` count is what makes that visible. A
+     * failure here does not block the queue: `parseDue` continues to the next message.
+     *
+     * Permanent failure is reserved for what a retry genuinely cannot change: content the
+     * model returned that this code cannot use. Those are checked below.
+     */
+    throw new ExtractionError(`Model API returned HTTP ${response.status}: ${detail}`, true);
   }
 
   const payload = (await response.json()) as {

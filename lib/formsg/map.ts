@@ -37,10 +37,26 @@ export interface DecryptedSubmission {
 
 /** The rows one submission produces. */
 export interface MappedSubmission {
-  submission: Record<string, unknown>;
+  /**
+   * The submission row.
+   *
+   * `responseId` is named in the type rather than left to the index signature because callers
+   * key the child rows on it, and `unknown` there would push every one of them into a cast.
+   */
+  submission: { responseId: string } & Record<string, unknown>;
   statuses: Array<Record<string, unknown>>;
   /** Question titles that matched no known column, for logging rather than silence. */
   unmapped: string[];
+  /**
+   * Answers that were given but matched no known option, as `field=value`.
+   *
+   * A different failure from `unmapped`, and a quieter one. An unmapped question means a
+   * column stays null because nobody has mapped it yet. An unrecognised VALUE means the
+   * question was found, was answered, and the answer was thrown away -- which is what
+   * happens the day someone edits `Report Sick In-Camp (RSI)` in the FormSG editor. Nothing
+   * else would report it: the column simply becomes null on every submission from then on.
+   */
+  unrecognised: string[];
 }
 
 /**
@@ -99,6 +115,27 @@ export function mapSubmission(
   const name = single.get('name') ?? '';
   const symptom = splitOtherOption(single.get('symptoms'));
 
+  const unrecognised: string[] = [];
+
+  /**
+   * Applies a vocabulary mapper, noting an answer it could not place.
+   *
+   * Only a non-empty answer counts: an unanswered optional question mapping to null is
+   * normal and must not drown the signal from a renamed option.
+   *
+   * @param field The canonical field name, for the report.
+   * @param map The mapper to apply.
+   * @returns The mapped value, or null.
+   */
+  function mapped<T>(field: string, map: (answer: string | undefined) => T | null): T | null {
+    const answer = single.get(field);
+    const value = map(answer);
+    if (value === null && answer && answer.trim() !== '') {
+      unrecognised.push(`${field}=${answer}`);
+    }
+    return value;
+  }
+
   const submission = {
     responseId: decrypted.submissionId,
     formId: decrypted.formId ?? null,
@@ -111,7 +148,7 @@ export function mapSubmission(
     fourDNormalised: normaliseFourD(single.get('fourD')),
     company: companyFromUnitCoy(single.get('unitCoy')),
 
-    reportSickType: toReportSickType(single.get('reportSickType')),
+    reportSickType: mapped('reportSickType', toReportSickType),
     reportSickTime: toTime(single.get('reportSickTime')),
     reason: single.get('reason') || null,
     symptomCategoryId: symptom.option ? (symptomIdByLabel.get(symptom.option) ?? null) : null,
@@ -122,7 +159,7 @@ export function mapSubmission(
       (symptom.option && !symptomIdByLabel.has(symptom.option) ? symptom.option : null),
     attestedGenuine: toBoolean(single.get('declarationGenuine')),
 
-    outcome: toOutcome(single.get('outcome')),
+    outcome: mapped('outcome', toOutcome),
     mcDays: toSmallInt(single.get('mcDays')),
   };
 
@@ -140,5 +177,5 @@ export function mapSubmission(
       days: toSmallInt(statusDays.get(index)),
     }));
 
-  return { submission, statuses, unmapped };
+  return { submission, statuses, unmapped, unrecognised };
 }

@@ -25,6 +25,29 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema.ts';
 
+/*
+ * BOTH CONNECTIONS ARE BUILT ON FIRST USE, NOT ON IMPORT.
+ *
+ * Eager construction reads `process.env` while the module graph is still loading, which has
+ * two consequences that are easy to mistake for unrelated problems. A route needing only the
+ * read connection would fail to import because the write URL was absent -- the error names
+ * `DATABASE_URL` and says nothing about which route wanted it. And no test could import a
+ * route module at all without real credentials in the environment, which pushes tests
+ * towards mocking the module rather than injecting a handle.
+ *
+ * Memoised, so a warm function still reuses one client per connection.
+ */
+
+/** Cached handles, keyed by the variable they were built from. */
+const handles = new Map<string, ReturnType<typeof drizzle>>();
+
+/**
+ * Reads a required environment variable.
+ *
+ * @param name The variable name.
+ * @returns Its value.
+ * @throws {Error} If it is unset or empty.
+ */
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -33,11 +56,43 @@ function required(name: string): string {
   return value;
 }
 
-/** Read-write connection. Every intake route and the cron drain use this. */
-export const db = drizzle(neon(required('DATABASE_URL')), { schema });
+/**
+ * Builds or returns the cached handle for one connection string.
+ *
+ * @param key The cache key, which is the variable name.
+ * @param url The connection string.
+ * @returns A Drizzle handle bound to the schema.
+ */
+function handle(key: string, url: string): ReturnType<typeof drizzle> {
+  let existing = handles.get(key);
+  if (!existing) {
+    existing = drizzle(neon(url), { schema });
+    handles.set(key, existing);
+  }
+  return existing;
+}
 
-/** Read-only connection, denied `SELECT` on `raw_messages.body` at the database level. */
-export const readDb = drizzle(
-  neon(process.env.DATABASE_URL_READONLY || required('DATABASE_URL')),
-  { schema },
-);
+/**
+ * The read-write connection. Every intake route and the cron drain use this.
+ *
+ * @returns A Drizzle handle.
+ * @throws {Error} If `DATABASE_URL` is unset.
+ */
+export function getDb(): ReturnType<typeof drizzle> {
+  return handle('DATABASE_URL', required('DATABASE_URL'));
+}
+
+/**
+ * The read-only connection, denied `SELECT` on `raw_messages.body` by Postgres itself.
+ *
+ * Falls back to `DATABASE_URL` so local development needs one variable. Production sets both;
+ * the fallback is a convenience, and it is the reason `api/dashboard.ts` must still project
+ * its columns explicitly rather than relying on the grant alone.
+ *
+ * @returns A Drizzle handle.
+ * @throws {Error} If neither variable is set.
+ */
+export function getReadDb(): ReturnType<typeof drizzle> {
+  const url = process.env.DATABASE_URL_READONLY;
+  return url ? handle('DATABASE_URL_READONLY', url) : getDb();
+}

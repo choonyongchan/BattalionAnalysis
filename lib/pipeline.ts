@@ -102,6 +102,24 @@ export interface ParseOptions {
   fetchImpl?: typeof fetch;
   /** Overridden in tests so `today` is deterministic. */
   now?: () => Date;
+  /**
+   * Epoch milliseconds after which no further message is started.
+   *
+   * The caller running under a platform timeout sets this. Stopping early is not a failure:
+   * whatever was not reached is still unprocessed, so the next run picks it up.
+   */
+  deadline?: number;
+  /** Overridden in tests. Defaults to `Date.now`. */
+  clock?: () => number;
+}
+
+/** What a parse run did, and what it left behind. */
+export interface ParseRun {
+  results: ParseResult[];
+  /** Messages that were due but not started, because the deadline or limit was reached. */
+  skipped: number;
+  /** True when the run stopped on its deadline rather than running out of work. */
+  stoppedEarly: boolean;
 }
 
 /**
@@ -114,8 +132,15 @@ export interface ParseOptions {
  * @param options API key, batch limit and test seams.
  * @returns One result per message attempted.
  */
-export async function parseDue(db: Db, options: ParseOptions): Promise<ParseResult[]> {
+export async function parseDue(db: Db, options: ParseOptions): Promise<ParseRun> {
   const limit = options.limit ?? 20;
+  const clock = options.clock ?? Date.now;
+
+  const [backlog] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(rawMessages)
+    .where(isNull(rawMessages.processedAt));
+
   const due = await db
     .select({ id: rawMessages.id, waMessageId: rawMessages.waMessageId, body: rawMessages.body })
     .from(rawMessages)
@@ -124,7 +149,19 @@ export async function parseDue(db: Db, options: ParseOptions): Promise<ParseResu
     .limit(limit);
 
   const results: ParseResult[] = [];
+  let stoppedEarly = false;
+
   for (const message of due) {
+    /*
+     * Checked before starting, never during. A message is either attempted whole or not at
+     * all, because its write is one batch: stopping here leaves the row unprocessed and the
+     * next run repeats it, whereas stopping mid-parse would mean paying for an extraction
+     * whose result is thrown away.
+     */
+    if (options.deadline !== undefined && clock() >= options.deadline) {
+      stoppedEarly = true;
+      break;
+    }
     try {
       results.push(await parseOne(db, message, options));
     } catch (error) {
@@ -136,7 +173,17 @@ export async function parseDue(db: Db, options: ParseOptions): Promise<ParseResu
       results.push({ id: message.id, waMessageId: message.waMessageId, outcome: 'failed', reason });
     }
   }
-  return results;
+
+  /*
+   * A transient failure stays unprocessed by design, so it is still in the backlog after the
+   * run. Counting it as skipped as well would double-count it; subtracting only what was
+   * attempted keeps `skipped` meaning "not looked at".
+   */
+  return {
+    results,
+    skipped: Math.max(0, (backlog?.n ?? 0) - results.length),
+    stoppedEarly,
+  };
 }
 
 /**
