@@ -99,12 +99,32 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 
   const signature = request.headers.get('x-formsg-signature');
   if (!signature) return json(401, { error: 'Missing X-FormSG-Signature.' });
+
+  /*
+   * BOTH FAILURE CHANNELS ARE HANDLED: a throw, and a falsy return.
+   *
+   * In v8.0.2 every failure path throws and the only `return` is `return true`, so the
+   * second check is unreachable today. It is here because the method is TYPED `=> boolean`,
+   * and a check that passes only because the implementation happens to throw is a check
+   * resting on an implementation detail rather than on the declared contract. An SDK upgrade
+   * that returned `false` instead would turn this into a no-op that accepts every forged
+   * webhook, with no error raised anywhere to say so. `authenticate` also arrives through
+   * `deps.sdk`, so anything wrapping it is free to return rather than throw.
+   *
+   * Defaulting `verified` to false is the half that matters: the request is rejected unless
+   * something affirmatively says otherwise.
+   */
+  let verified = false;
   try {
-    deps.sdk.webhooks.authenticate(signature, deps.postUri);
+    verified = deps.sdk.webhooks.authenticate(signature, deps.postUri) === true;
   } catch (error) {
-    // The SDK throws rather than returning false. The reason is logged, not returned: it
-    // distinguishes a stale timestamp from a wrong URI, which helps an attacker calibrate.
+    // The reason is logged, not returned: it distinguishes a stale timestamp from a wrong
+    // URI, which helps an attacker calibrate.
     console.error('[api/formsg] signature rejected:', (error as Error).message);
+    return json(401, { error: 'Invalid signature.' });
+  }
+  if (!verified) {
+    console.error('[api/formsg] signature rejected: authenticate() returned a falsy value.');
     return json(401, { error: 'Invalid signature.' });
   }
 

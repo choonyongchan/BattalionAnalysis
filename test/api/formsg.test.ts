@@ -169,6 +169,25 @@ describe('method, configuration and signature', () => {
     expect(harness.recorder.batches).toEqual([]);
   });
 
+  test('refuses when authenticate returns false instead of throwing', async () => {
+    /*
+     * Unreachable with the SDK as it stands -- every failure path throws. But the method is
+     * typed `=> boolean`, so a check that passes only because the implementation happens to
+     * throw would become a no-op accepting every forged webhook the day an upgrade returned
+     * `false` instead, with nothing raised anywhere to say so.
+     */
+    const harness = deps({ authenticate: () => false });
+    const response = await handle(post(V2_DATA), harness.deps);
+    expect(response.status).toBe(401);
+    expect(harness.recorder.batches).toEqual([]);
+  });
+
+  test('refuses when authenticate returns a non-true truthy value', async () => {
+    // A wrapper returning the parsed header object, say. Only `true` is acceptance.
+    const harness = deps({ authenticate: (() => ({ ok: 1 })) as unknown as () => boolean });
+    expect((await handle(post(V2_DATA), harness.deps)).status).toBe(401);
+  });
+
   test('does not echo the signature failure reason', async () => {
     // It distinguishes a stale timestamp from a wrong URI, which helps an attacker calibrate.
     const harness = deps({
