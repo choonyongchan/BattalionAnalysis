@@ -156,6 +156,27 @@ describe('createIngestor.drain', () => {
     expect(parseCalls).toBe(2);
   });
 
+  test('stops after one pass when a backlog makes no progress', async () => {
+    // extract.ts treats 401/429/outages as transient: the row stays unprocessed and
+    // `skipped` stays > 0 on every pass. Without a progress check this spins forever.
+    const failedResults = Array.from({ length: 20 }, () => ({ outcome: 'failed' }));
+    let parseCalls = 0;
+    const ingestor = createIngestor({
+      db: 'DB',
+      apiKey: 'k',
+      logger: silentLogger,
+      record: async () => ({ status: 'stored', id: 1 }),
+      parse: async () => {
+        parseCalls += 1;
+        return { results: failedResults, skipped: 5, stoppedEarly: false };
+      },
+    });
+
+    await ingestor.drain();
+
+    expect(parseCalls).toBe(1);
+  });
+
   test('passes the API key and model through to parseDue', async () => {
     const seen = [];
     const ingestor = createIngestor({

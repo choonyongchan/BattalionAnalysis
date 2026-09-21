@@ -61,9 +61,18 @@ export function createIngestor({ db, apiKey, model, logger, record = recordMessa
   let again = false;
 
   /**
-   * Runs parse passes until nothing new has arrived and no backlog remains.
+   * Runs parse passes until nothing new has arrived and no pass-over-pass progress
+   * remains to be made on the backlog.
    *
-   * @returns {!Promise<void>} Resolves when the queue is drained or a pass fails.
+   * A backlog (`skipped > 0`) alone is not reason enough to go again: extract.ts treats
+   * a 401, a 429 and an outage as transient, so those rows stay unprocessed and
+   * `skipped` stays positive on every pass. With more than one pass' worth of backlog,
+   * looping on `skipped > 0` alone retries the same rows forever. Requiring that the
+   * pass also parsed or rejected at least one row tells transient backlog (no progress,
+   * stop and let the next drain retry) apart from a real one (progress, keep going).
+   *
+   * @returns {!Promise<void>} Resolves when the queue is drained, the backlog stops
+   *   shrinking, or a pass fails.
    */
   async function loop() {
     try {
@@ -73,7 +82,7 @@ export function createIngestor({ db, apiKey, model, logger, record = recordMessa
         const run = await parse(db, { apiKey, model });
         const tally = tallyRun(run);
         if (run.results.length > 0) logger.info(tally, 'parse run finished');
-        more = again || run.skipped > 0;
+        more = again || (run.skipped > 0 && tally.parsed + tally.rejected > 0);
       }
     } catch (err) {
       // Swallowed deliberately: an unreachable database must not take down the
