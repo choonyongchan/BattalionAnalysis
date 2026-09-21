@@ -119,7 +119,7 @@ the socket keeps running. Nothing in the reconnect logic reacts to it.
 
 ## What gets relayed
 
-Chatter never reaches the spreadsheet, and neither does any session other than the **first** parade. Two gates,
+Chatter never reaches the database, and neither does any session other than the **first** parade. Two gates,
 both cheap:
 
 **Structural gates** — ≥ 8 non-empty lines, ≥ 200 characters, and the anchor phrase `/parade\s*state/i`. The
@@ -144,12 +144,14 @@ Of the five real samples, four carry an explicit marker (`FIRST PARADE STATE`, o
 state has neither a first-parade marker nor a morning timing, so it is rejected.
 
 **There used to be a third stage:** a score over six layout signals, needing three matches to accept. It is
-gone. Deciding whether a message is really a parade state is what `ParserAi` and `ParserRows` do, and they do it
-by reading the message rather than guessing from its shape — so the score was a second, weaker copy of a
-judgement already being made downstream. What it added was a way to drop a genuine parade state whose layout was
-merely unusual, with the rejection recorded nowhere but a debug log. A message that clears the gates but is not a
-parade state now lands on its own *Parade State Responses* row as `ERROR`, with the
-reason beside it, which is visible and reversible.
+gone. Deciding whether a message is really a parade state is what `extract` and `validate` (`lib/parser/`) do,
+and they do it by reading the message rather than guessing from its shape — so the score was a second, weaker
+copy of a judgement already being made downstream. What it added was a way to drop a genuine parade state whose
+layout was merely unusual, with the rejection recorded nowhere but a debug log. A message that clears these two
+gates but is not a parade state is still stored in `raw_messages`; `parseOne` (`lib/pipeline.ts`) calls `validate`
+on what `extract` returned, and a non-empty reason goes into that row's `error` column via `markFailed`, which
+also stamps `processed_at` so the row is not retried. The reason sits beside the message it came from, which is
+visible in the database.
 
 To retune, edit `MIN_LINES` / `MIN_CHARS` / `FIRST_PARADE_CUTOFF_HOUR` at the top of `src/signature.js`, then
 run `bun test`.
