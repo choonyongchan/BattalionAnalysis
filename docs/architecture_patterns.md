@@ -12,12 +12,12 @@ Apps Script web app still serves the dashboard feed until the dashboard moves to
 
 | Path | Runtime | Owns |
 |---|---|---|
-| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`), migrations, roles (`grants.sql` for the dashboard, `grants-ingest.sql` for the runner) |
+| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`), migrations, the runner's role (`grants-ingest.sql`). Only tables something writes; dashboard tables and a read-only role arrive with the dashboard's move to Neon |
 | `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → extract → validate → replace), `parser/`, `formsg/`, `http.ts`, `domain.ts` |
-| `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert |
+| `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
 | `whatsapp/` | Long-running Bun process on the ops laptop | Baileys listener under `supervisor.js`; the only parade-state intake. `ingest.js` stores via `recordMessage` and drains via `parseDue` (see below) |
 | `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | Read-only dashboard. See `docs/dashboard.md` |
-| `scripts/` | Bun | `apply-migrations.ts` |
+| `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql) |
 
 ## How parade states are parsed
 
@@ -37,9 +37,9 @@ runner connects as `parade_ingest`, which can write parade-state tables and noth
 - **`neon-http` has no interactive transactions.** Atomic writes go through `db.batch([...])`,
   so no statement may depend on an earlier `RETURNING`; that is why `parade_response_id` is a
   computable natural key.
-- **NRICs and message bodies never reach the dashboard.** FormSG NRIC answers are dropped in
-  `lib/formsg/map.ts` and have no column; `raw_messages.body` is unreadable by the
-  `dashboard_reader` role (`db/grants.sql`). `test/dashboard/schema.test.js` guards what the
+- **NRICs and message bodies never reach the dashboard.** FormSG NRIC answers resolve to `discard` in
+  `lib/formsg/fields.ts` and have no column in `report_sick_formsg`; `raw_messages.body` must stay
+  unreadable by the future dashboard role. `test/dashboard/schema.test.js` guards what the
   current sheet-backed dashboard requests.
 - **Read what the message says; derive nothing.** The parser records only stated values; the
   one sanctioned exception is the permanent-status `num_days` sentinel. See `lib/parser/rows.ts`.

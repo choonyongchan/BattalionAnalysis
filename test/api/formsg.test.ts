@@ -10,6 +10,7 @@
  * can never succeed must answer 4xx or FormSG will redeliver it until it gives up.
  */
 import { describe, expect, test } from 'bun:test';
+import formsgSdk from '@opengovsg/formsg-sdk';
 import { handle, type Deps } from '../../api/formsg.ts';
 
 const SECRET_KEY = 'a-base64-looking-secret-key';
@@ -34,37 +35,26 @@ const RESPONSES = [
   { _id: 'f10', question: 'Days given for Status', answer: '5', fieldType: 'number' },
 ];
 
-/** Every statement the fake database was handed, so a test can read what would be written. */
+/** Every row the fake database was asked to insert. */
 interface Recorder {
-  batches: unknown[][];
   values: Record<string, unknown>[];
 }
 
 /**
- * Builds a fake Drizzle handle that records rather than writes.
- *
- * It mimics only the shape the route uses: a `select().from()` that resolves to the symptom
- * lookup, and insert/delete builders collected by `batch`.
+ * Builds a fake Drizzle handle that records `insert().values().onConflictDoNothing()`.
  *
  * @param recorder Where to record.
  * @returns The fake handle.
  */
 function fakeDb(recorder: Recorder): any {
   return {
-    select: () => ({
-      from: async () => [{ id: 1, label: 'Fever' }],
-    }),
     insert: () => ({
-      values: (rows: Record<string, unknown> | Record<string, unknown>[]) => {
-        for (const row of Array.isArray(rows) ? rows : [rows]) recorder.values.push(row);
-        const builder = { onConflictDoNothing: () => builder, _kind: 'insert' };
-        return builder;
-      },
+      values: (row: Record<string, unknown>) => ({
+        onConflictDoNothing: async () => {
+          recorder.values.push(row);
+        },
+      }),
     }),
-    delete: () => ({ where: () => ({ _kind: 'delete' }) }),
-    batch: async (statements: unknown[]) => {
-      recorder.batches.push(statements);
-    },
   };
 }
 
@@ -83,7 +73,7 @@ function deps(
     postUri?: string | undefined;
   } = {},
 ): { deps: Deps; recorder: Recorder } {
-  const recorder: Recorder = { batches: [], values: [] };
+  const recorder: Recorder = { values: [] };
   return {
     recorder,
     deps: {
@@ -155,7 +145,7 @@ describe('method, configuration and signature', () => {
     const harness = deps();
     const response = await handle(post(V2_DATA, { signature: null }), harness.deps);
     expect(response.status).toBe(401);
-    expect(harness.recorder.batches).toEqual([]);
+    expect(harness.recorder.values).toEqual([]);
   });
 
   test('refuses a bad signature, and stores nothing', async () => {
@@ -166,7 +156,7 @@ describe('method, configuration and signature', () => {
     });
     const response = await handle(post(V2_DATA), harness.deps);
     expect(response.status).toBe(401);
-    expect(harness.recorder.batches).toEqual([]);
+    expect(harness.recorder.values).toEqual([]);
   });
 
   test('refuses when authenticate returns false instead of throwing', async () => {
@@ -179,7 +169,7 @@ describe('method, configuration and signature', () => {
     const harness = deps({ authenticate: () => false });
     const response = await handle(post(V2_DATA), harness.deps);
     expect(response.status).toBe(401);
-    expect(harness.recorder.batches).toEqual([]);
+    expect(harness.recorder.values).toEqual([]);
   });
 
   test('refuses when authenticate returns a non-true truthy value', async () => {
@@ -222,27 +212,27 @@ describe('payload handling', () => {
     const harness = deps({ decrypted: null });
     const response = await handle(post(V2_DATA), harness.deps);
     expect(response.status).toBe(400);
-    expect(harness.recorder.batches).toEqual([]);
+    expect(harness.recorder.values).toEqual([]);
   });
 
-  test('stores a valid submission and its statuses in one batch', async () => {
+  test('stores a valid submission as one flat row', async () => {
     const harness = deps();
     const response = await handle(post(V2_DATA), harness.deps);
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'stored', statuses: 1 });
-    // One batch: the submission, the status sweep, the status insert.
-    expect(harness.recorder.batches).toHaveLength(1);
-    expect(harness.recorder.batches[0]).toHaveLength(3);
-  });
-
-  test('omits the status insert when there are none, rather than inserting nothing', async () => {
-    // Drizzle rejects an insert with no values, and most submissions give no status.
-    const harness = deps({
-      decrypted: { responses: RESPONSES.filter((r) => !r.question.startsWith('Status')) },
+    expect(await response.json()).toEqual({ status: 'stored' });
+    expect(harness.recorder.values).toHaveLength(1);
+    expect(harness.recorder.values[0]).toMatchObject({
+      responseId: 'sub-1',
+      timestamp: '2026-09-18T08:31:00.000+08:00',
+      rank: 'CPL',
+      unitCoy: '40 SAR / Archer',
+      company: 'Archer',
+      reportSickDate: '2026-09-18',
+      mcDays: 2,
+      status1: 'Excuse RMJ',
+      status1Days: 5,
     });
-    await handle(post(V2_DATA), harness.deps);
-    expect(harness.recorder.batches[0]).toHaveLength(2);
   });
 });
 
@@ -286,7 +276,7 @@ describe('the privacy boundary', () => {
 
     const response = await handle(post(V2_DATA), harness.deps);
     expect(response.status).toBe(422);
-    expect(harness.recorder.batches).toEqual([]);
+    expect(harness.recorder.values).toEqual([]);
   });
 });
 
@@ -332,6 +322,64 @@ describe('crypto version dispatch', () => {
       harness.deps,
     );
 
-    expect(harness.recorder.values[0]!.name).toBeNull();
+    // Absent from the row, so Drizzle inserts NULL.
+    expect(harness.recorder.values[0]!.name).toBeUndefined();
+  });
+});
+
+describe('real FormSG crypto', () => {
+  /*
+   * The SDK's own `test` mode, whose signing secret the SDK publishes for exactly this. It
+   * proves the signature check and decryption work together, not just against stubs.
+   */
+  const TEST_SIGNING_SECRET =
+    '/u+LP57Ib9y5Ytpud56FzuitSC9O6lJ4EOLOFHpsHlYpRjVdPfRqv5et5WOxLXD9zcSkOzagBJsXobd6+9pQkw==';
+
+  /**
+   * Builds a genuinely encrypted and signed webhook request.
+   *
+   * @param uri The URI the signature covers.
+   * @returns The request, the form's secret key, and the SDK to verify with.
+   */
+  function signedRequest(uri: string) {
+    const sdk = formsgSdk({ mode: 'test', webhookSecretKey: TEST_SIGNING_SECRET });
+    const { publicKey, secretKey } = sdk.crypto.generate();
+    const [submissionId, formId, epoch] = ['sub-real', 'form-real', Date.now()];
+    const data = {
+      formId,
+      submissionId,
+      encryptedContent: sdk.crypto.encrypt(RESPONSES, publicKey),
+      version: 1,
+      created: '2026-09-18T23:30:00.000Z',
+    };
+    const signature = sdk.webhooks.generateSignature({ uri, submissionId, formId, epoch });
+    const header = sdk.webhooks.constructHeader({ epoch, submissionId, formId, signature });
+    const request = new Request(POST_URI, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-FormSG-Signature': header },
+      body: JSON.stringify({ data }),
+    });
+    return { request, secretKey, sdk };
+  }
+
+  test('verifies, decrypts and stores a real payload', async () => {
+    const { request, secretKey, sdk } = signedRequest(POST_URI);
+    const recorder: Recorder = { values: [] };
+    const response = await handle(request, { db: fakeDb(recorder), secretKey, postUri: POST_URI, sdk });
+
+    expect(response.status).toBe(200);
+    expect(recorder.values[0]).toMatchObject({ name: 'TAN AH KOW', status1: 'Excuse RMJ' });
+    // 23:30 UTC is 07:30 the next morning in Singapore.
+    expect(recorder.values[0]!.reportSickDate).toBe('2026-09-19');
+    expect(JSON.stringify(recorder.values)).not.toContain('T0000001A');
+  });
+
+  test('rejects a real signature made for a different URI', async () => {
+    const { request, secretKey, sdk } = signedRequest('https://elsewhere.test/api/formsg');
+    const recorder: Recorder = { values: [] };
+    const response = await handle(request, { db: fakeDb(recorder), secretKey, postUri: POST_URI, sdk });
+
+    expect(response.status).toBe(401);
+    expect(recorder.values).toEqual([]);
   });
 });

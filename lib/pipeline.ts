@@ -50,14 +50,13 @@ export type RecordOutcome =
  */
 export async function recordMessage(
   db: Db,
-  message: { waMessageId: string; body: string; source?: 'whatsapp' | 'manual' },
+  message: { waMessageId: string; body: string },
 ): Promise<RecordOutcome> {
   const inserted = await db
     .insert(rawMessages)
     .values({
       waMessageId: message.waMessageId,
       body: cleanText(message.body),
-      source: message.source ?? 'whatsapp',
     })
     .onConflictDoNothing({ target: rawMessages.waMessageId })
     .returning({ id: rawMessages.id });

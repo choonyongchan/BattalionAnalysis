@@ -15,16 +15,12 @@ import {
   toBoolean,
   toOutcome,
   toReportSickType,
+  toSgtDate,
   toSmallInt,
   toTime,
 } from '../../lib/formsg/fields.ts';
 import { mapSubmission } from '../../lib/formsg/map.ts';
 import type { DecryptedSubmission } from '../../lib/formsg/map.ts';
-
-const SYMPTOM_IDS = new Map<string, number>([
-  ['Upper Respiratory Tract Infection (Fever/Flu etc.)', 1],
-  ['Gastrointestinal (Diarrhoea, Vomiting, Nausea)', 4],
-]);
 
 describe('resolveField', () => {
   test('recognises every question title in the live form', () => {
@@ -36,12 +32,12 @@ describe('resolveField', () => {
       ['Report Sick Time', 'reportSickTime'],
       ['Report Sick Type', 'reportSickType'],
       ['Reason for Reporting Sick (Keep Brief)', 'reason'],
-      ['My symptoms are genuine and I have updated my Commander of my condition.', 'declarationGenuine'],
+      ['My symptoms are genuine and I have updated my Commander of my condition.', 'genuine'],
       ['Outcome given by the doctor/MO', 'outcome'],
       ['Days given for Sick Leave / MC', 'mcDays'],
     ];
     for (const [question, field] of titles) {
-      expect(resolveField({ question })?.field).toBe(field as never);
+      expect(resolveField({ question })).toBe(field as never);
     }
   });
 
@@ -50,22 +46,25 @@ describe('resolveField', () => {
     // silently discard every symptom answer, so the count must not be load-bearing.
     for (const underscores of ['_', '_____', '_____________________', '______________________________']) {
       const question = `I am experiencing ${underscores} symptoms.`;
-      expect(resolveField({ question })?.field).toBe('symptoms');
+      expect(resolveField({ question })).toBe('symptoms');
     }
   });
 
-  test('recovers the repetition index from a numbered status question', () => {
-    expect(resolveField({ question: 'Status Given' })).toEqual({ field: 'statusGiven', index: 1 });
-    expect(resolveField({ question: 'Status Given #3' })).toEqual({ field: 'statusGiven', index: 3 });
-    expect(resolveField({ question: 'Days given for Status #5' })).toEqual({
-      field: 'statusDays',
-      index: 5,
-    });
+  test('maps a numbered status question to its flat column', () => {
+    expect(resolveField({ question: 'Status Given' })).toBe('status1');
+    expect(resolveField({ question: 'Status Given #3' })).toBe('status3');
+    expect(resolveField({ question: 'Days given for Status' })).toBe('status1Days');
+    expect(resolveField({ question: 'Days given for Status #5' })).toBe('status5Days');
   });
 
-  test('recognises the NRIC questions so they can be discarded on purpose', () => {
-    expect(resolveField({ question: 'SingPass Validated NRIC' })?.field).toBe('discard');
-    expect(resolveField({ question: 'Masked NRIC' })?.field).toBe('discard');
+  test('does not invent a column past status #5', () => {
+    expect(resolveField({ question: 'Status Given #6' })).toBeNull();
+  });
+
+  test('recognises the NRIC and Download Status questions so they can be discarded', () => {
+    expect(resolveField({ question: 'SingPass Validated NRIC' })).toBe('discard');
+    expect(resolveField({ question: 'Masked NRIC' })).toBe('discard');
+    expect(resolveField({ question: 'Download Status' })).toBe('discard');
   });
 
   test('returns null for a question it has never seen', () => {
@@ -100,7 +99,7 @@ describe('value parsing', () => {
 
   test('splits an Others answer from a canonical option', () => {
     expect(splitOtherOption('Others: persistent cough')).toEqual({
-      option: null,
+      option: 'Others',
       otherText: 'persistent cough',
     });
     expect(splitOtherOption('Chest Pain & Shortness of Breath')).toEqual({
@@ -129,6 +128,11 @@ describe('value parsing', () => {
     expect(toTime('0930')).toBe('09:30');
   });
 
+  test('gives the Singapore-local date, which runs 8 hours ahead of UTC', () => {
+    expect(toSgtDate('2026-09-18T23:30:00.000Z')).toBe('2026-09-19');
+    expect(toSgtDate('2026-09-18T08:31:00.000+08:00')).toBe('2026-09-18');
+  });
+
   test('rejects an impossible time rather than storing it', () => {
     expect(toTime('2599')).toBeNull();
     expect(toTime('7')).toBeNull();
@@ -153,7 +157,7 @@ function submission(answers: Record<string, string>): DecryptedSubmission {
 
 describe('mapSubmission', () => {
   test('maps a complete submission, including the September outcome fields', () => {
-    const { submission: row } = mapSubmission(
+    const { row } = mapSubmission(
       submission({
         Rank: 'REC',
         '[Myinfo] Name': 'TAN AH KOW',
@@ -167,46 +171,43 @@ describe('mapSubmission', () => {
         'My symptoms are genuine and I have updated my Commander of my condition.': 'Yes',
         'Outcome given by the doctor/MO': 'Sick Leave / MC',
         'Days given for Sick Leave / MC': '2',
-      }),
-      SYMPTOM_IDS,
-    );
+      }));
 
     expect(row).toMatchObject({
       responseId: '6800000000000000000000a1',
       rank: 'REC',
       name: 'TAN AH KOW',
       nameKey: 'TAN AH KOW',
+      timestamp: '2026-09-20T10:15:00.000+08:00',
       fourD: 'a1105',
-      fourDNormalised: 'A1105',
-      company: 'Archer',
+      unitCoy: '40 SAR / Archer',
       reportSickType: 'RSO',
       reportSickTime: '14:00',
       reason: 'sore throat',
-      symptomCategoryId: 1,
-      symptomOtherText: null,
-      attestedGenuine: true,
+      symptoms: 'Upper Respiratory Tract Infection (Fever/Flu etc.)',
+      genuine: true,
       outcome: 'MC',
       mcDays: 2,
+      company: 'Archer',
+      reportSickDate: '2026-09-20',
+      symptomCategory: 'Upper Respiratory Tract Infection (Fever/Flu etc.)',
+      symptomOtherText: null,
     });
   });
 
   test('folds battalion HQ into Hercules', () => {
-    const { submission: row } = mapSubmission(
-      submission({ 'Unit & Coy': '40 SAR / Hercules & Bn HQ' }),
-      SYMPTOM_IDS,
-    );
+    const { row } = mapSubmission(
+      submission({ 'Unit & Coy': '40 SAR / Hercules & Bn HQ' }));
     expect(row.company).toBe('Hercules');
   });
 
   test('never carries an NRIC onto the row, however it arrives', () => {
-    const { submission: row } = mapSubmission(
+    const { row } = mapSubmission(
       submission({
         '[Myinfo] Name': 'TAN AH KOW',
         'SingPass Validated NRIC': 'T0000001A',
         'Masked NRIC': '001A',
-      }),
-      SYMPTOM_IDS,
-    );
+      }));
     expect(JSON.stringify(row)).not.toContain('T0000001A');
     expect(JSON.stringify(row)).not.toContain('001A');
     expect(Object.keys(row)).not.toContain('nric');
@@ -214,67 +215,41 @@ describe('mapSubmission', () => {
 
   test('does not warn about the NRIC questions, which are discarded on purpose', () => {
     const { unmapped } = mapSubmission(
-      submission({ 'SingPass Validated NRIC': 'T0000001A', 'Download Status': 'Success' }),
-      SYMPTOM_IDS,
-    );
+      submission({ 'SingPass Validated NRIC': 'T0000001A', 'Download Status': 'Success' }));
     expect(unmapped).toEqual([]);
   });
 
   test('reports a question it does not recognise instead of dropping it silently', () => {
     const { unmapped } = mapSubmission(
-      submission({ 'A question added last week': 'some answer' }),
-      SYMPTOM_IDS,
-    );
+      submission({ 'A question added last week': 'some answer' }));
     expect(unmapped).toEqual(['A question added last week']);
   });
 
-  test('keeps an Others symptom as free text', () => {
-    const { submission: row } = mapSubmission(
+  test('splits an Others symptom into category and free text, keeping the raw answer', () => {
+    const { row } = mapSubmission(
       submission({ 'I am experiencing _____________________ symptoms.': 'Others: back pain' }),
-      SYMPTOM_IDS,
     );
-    expect(row.symptomCategoryId).toBeNull();
+    expect(row.symptoms).toBe('Others: back pain');
+    expect(row.symptomCategory).toBe('Others');
     expect(row.symptomOtherText).toBe('back pain');
   });
 
-  test('keeps a newly added form option as text rather than losing it', () => {
-    // A tenth option added to the form would otherwise map to null and vanish.
-    const { submission: row } = mapSubmission(
-      submission({ 'I am experiencing _____________________ symptoms.': 'Dental (Toothache)' }),
-      SYMPTOM_IDS,
-    );
-    expect(row.symptomCategoryId).toBeNull();
-    expect(row.symptomOtherText).toBe('Dental (Toothache)');
-  });
-
-  test('turns the repeated status questions into child rows', () => {
-    const { statuses } = mapSubmission(
+  test('fills the flat status columns in place', () => {
+    const { row } = mapSubmission(
       submission({
         'Status Given': 'Light Duty',
         'Days given for Status': '2',
-        'Status Given #2': 'Excuse Stay In',
-        'Days given for Status #2': '7',
+        'Status Given #3': 'Excuse RMJ',
+        'Days given for Status #3': '7 days',
       }),
-      SYMPTOM_IDS,
     );
-    expect(statuses).toEqual([
-      { responseId: '6800000000000000000000a1', seq: 1, statusLabel: 'Light Duty', days: 2 },
-      { responseId: '6800000000000000000000a1', seq: 2, statusLabel: 'Excuse Stay In', days: 7 },
-    ]);
-  });
-
-  test('renumbers sequentially when the form skips an index', () => {
-    const { statuses } = mapSubmission(
-      submission({ 'Status Given': 'Light Duty', 'Status Given #3': 'Excuse RMJ' }),
-      SYMPTOM_IDS,
-    );
-    expect(statuses.map((s) => s.seq)).toEqual([1, 2]);
-    expect(statuses.map((s) => s.statusLabel)).toEqual(['Light Duty', 'Excuse RMJ']);
-  });
-
-  test('produces no status rows for the great majority that have none', () => {
-    const { statuses } = mapSubmission(submission({ Rank: 'REC' }), SYMPTOM_IDS);
-    expect(statuses).toEqual([]);
+    expect(row).toMatchObject({
+      status1: 'Light Duty',
+      status1Days: 2,
+      status3: 'Excuse RMJ',
+      status3Days: 7,
+    });
+    expect(row.status2).toBeUndefined();
   });
 
   test('reports an answer whose option it does not recognise', () => {
@@ -284,13 +259,11 @@ describe('mapSubmission', () => {
      * submission from then on. Nothing else in the pipeline would notice, so the mapper says
      * so and the route logs it.
      */
-    const { submission: row, unrecognised } = mapSubmission(
+    const { row, unrecognised } = mapSubmission(
       submission({
         'Report Sick Type': 'Report Sick In Camp',
         'Outcome given by the doctor/MO': 'Referred onward',
-      }),
-      SYMPTOM_IDS,
-    );
+      }));
 
     expect(row.reportSickType).toBeNull();
     expect(unrecognised).toEqual([
@@ -303,9 +276,7 @@ describe('mapSubmission', () => {
     // Most submissions predate the outcome section entirely. A null from a blank answer is
     // normal, and reporting it would bury the signal from a renamed option.
     const { unrecognised } = mapSubmission(
-      submission({ Rank: 'REC', 'Report Sick Type': '' }),
-      SYMPTOM_IDS,
-    );
+      submission({ Rank: 'REC', 'Report Sick Type': '' }));
     expect(unrecognised).toEqual([]);
   });
 
@@ -314,9 +285,7 @@ describe('mapSubmission', () => {
       submission({
         'Report Sick Type': 'Report Sick Outside (RSO)',
         'Outcome given by the doctor/MO': 'Sick Leave / MC',
-      }),
-      SYMPTOM_IDS,
-    );
+      }));
     expect(unrecognised).toEqual([]);
   });
 
@@ -331,8 +300,9 @@ describe('mapSubmission', () => {
         },
       ],
     };
-    const { submission: row } = mapSubmission(decrypted, SYMPTOM_IDS);
+    const { row } = mapSubmission(decrypted);
     // Degrades to a longer string rather than discarding all but one selection.
-    expect(row.symptomOtherText).toContain('Gastrointestinal');
+    expect(row.symptoms).toContain('Gastrointestinal');
+    expect(row.symptoms).toContain('cramps');
   });
 });

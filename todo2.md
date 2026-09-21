@@ -30,7 +30,7 @@ writes to Neon yet.
 - [ ] Redeploy, since env var changes only apply to new deployments.
 - [ ] In FormSG admin → Settings → Webhooks, set the webhook URL to
       `https://40sar.vercel.app/api/formsg`. That replaces Plumber.
-- [ ] Submit a test response. Check it appears in `formsg_submissions` and that the Vercel
+- [ ] Submit a test response. Check it appears in `report_sick_formsg` and that the Vercel
       function log shows a 2xx.
 - [ ] Watch real submissions for a day before turning Plumber off.
 

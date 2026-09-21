@@ -1,35 +1,27 @@
--- The role the local WhatsApp runner connects as.
---
--- The runner stores raw parade states and writes the rows parsed from them, through
--- lib/pipeline.ts and nothing else. It runs on a laptop, so its credential gets exactly the
--- statements that module issues, and no FormSG, dashboard or auth table.
---
--- Usage:
---   psql "$DATABASE_URL" -v ingest_password="$(openssl rand -hex 24)" -f db/grants-ingest.sql
--- then put that role's connection string in whatsapp/.env as DATABASE_URL.
+-- Creates the parade_ingest role the WhatsApp runner connects as, limited to what lib/pipeline.ts issues.
+-- Run once per database (re-run to rotate the password):
+--   bun --env-file=.env.local scripts/apply-grants.ts db/grants-ingest.sql
+-- then put the printed connection string in whatsapp/.env as DATABASE_URL.
 
 \set ON_ERROR_STOP on
 
-SELECT format('CREATE ROLE parade_ingest LOGIN PASSWORD %L', :'ingest_password')
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest')
-\gexec
-
-SELECT format('ALTER ROLE parade_ingest PASSWORD %L', :'ingest_password')
-WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest')
-\gexec
-
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest') THEN
+    CREATE ROLE parade_ingest LOGIN;
+  END IF;
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO parade_ingest', current_database());
 END
 $$;
-
+--> statement-breakpoint
+ALTER ROLE parade_ingest PASSWORD :'password';
+--> statement-breakpoint
 GRANT USAGE ON SCHEMA public TO parade_ingest;
-
+--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE ON raw_messages TO parade_ingest;
-
+--> statement-breakpoint
 GRANT SELECT, INSERT, DELETE ON parade_submissions TO parade_ingest;
-
+--> statement-breakpoint
 GRANT INSERT ON
   strength_rows,
   personnel_rows,
@@ -37,6 +29,3 @@ GRANT INSERT ON
   section_counts
 TO parade_ingest;
 
--- Verification, run as parade_ingest:
---   SELECT count(*) FROM raw_messages;          -- must SUCCEED
---   SELECT count(*) FROM formsg_submissions;    -- must FAIL: permission denied

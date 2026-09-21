@@ -1,25 +1,11 @@
 /**
- * Mapping a FormSG submission's answers onto database columns.
+ * Maps FormSG question titles onto `report_sick_formsg` columns, and parses answer values.
  *
- * A webhook delivers answers as `{_id, question, answer, fieldType}`. There are two ways to
- * find the one you want, and they fail differently:
- *
- *   - by field `_id`: stable across wording changes, but the ids have to be harvested from
- *     a real submission and cannot be derived from anything in this repository;
- *   - by question title: available immediately, but breaks silently the moment someone
- *     edits the question wording in the FormSG editor.
- *
- * So both are supported: ids take precedence when known, titles are the fallback, and an
- * answer matching neither is logged by name rather than dropped quietly.
- *
- * Titles are compared after normalisation, which matters for one question in particular.
- * "I am experiencing _____________________ symptoms." contains a run of underscores whose
- * length nobody can verify by eye, and an off-by-one would silently discard every symptom
- * answer. Runs of underscores are collapsed before comparison so the count cannot matter.
+ * Answers are matched by field `_id` when known, else by normalised question title.
  */
 
-/** A column this pipeline knows how to fill. */
-export type CanonicalField =
+/** Columns filled straight from an answer; `discard` marks titles dropped on purpose. */
+export type Column =
   | 'rank'
   | 'name'
   | 'fourD'
@@ -28,32 +14,27 @@ export type CanonicalField =
   | 'reportSickType'
   | 'reason'
   | 'symptoms'
-  | 'declarationGenuine'
+  | 'genuine'
   | 'outcome'
   | 'mcDays'
-  | 'statusGiven'
-  | 'statusDays'
-  /** Recognised so it can be discarded on purpose rather than by omission. */
+  | `status${1 | 2 | 3 | 4 | 5}`
+  | `status${1 | 2 | 3 | 4 | 5}Days`
   | 'discard';
 
 /**
- * Normalises a question title for comparison.
+ * Normalises a question title or option for comparison.
  *
- * @param title A question title, from a webhook or the CSV export.
- * @returns Lower-cased, with underscore runs and whitespace runs each collapsed to one.
+ * Underscore runs collapse too, so the blank in the symptoms question can be any length.
+ *
+ * @param title A question title or answer option.
+ * @returns Lower-cased, with underscore and whitespace runs each collapsed to one.
  */
 export function normaliseTitle(title: string): string {
   return title.toLowerCase().replace(/_+/g, '_').replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Question titles as they appear in the live form, mapped to columns.
- *
- * Copied from a real export rather than retyped. `Status Given #2`..`#5` and their day
- * counts all map to the same pair of canonical fields; the repetition index is recovered
- * from the title so they become rows in `formsg_statuses` instead of ten flat columns.
- */
-const TITLE_MAP: Record<string, CanonicalField> = Object.fromEntries(
+/** Question titles as they appear in the live form. Status titles carry a `#n` suffix. */
+const TITLE_MAP: Record<string, Column | 'status' | 'statusDays'> = Object.fromEntries(
   (
     [
       ['Rank', 'rank'],
@@ -64,67 +45,54 @@ const TITLE_MAP: Record<string, CanonicalField> = Object.fromEntries(
       ['Report Sick Type', 'reportSickType'],
       ['Reason for Reporting Sick (Keep Brief)', 'reason'],
       ['I am experiencing _ symptoms.', 'symptoms'],
-      ['My symptoms are genuine and I have updated my Commander of my condition.', 'declarationGenuine'],
+      ['My symptoms are genuine and I have updated my Commander of my condition.', 'genuine'],
       ['Outcome given by the doctor/MO', 'outcome'],
       ['Days given for Sick Leave / MC', 'mcDays'],
-      ['Status Given', 'statusGiven'],
+      ['Status Given', 'status'],
       ['Days given for Status', 'statusDays'],
-      // Present in the export, deliberately not stored. Listed so an unexpected-field
-      // warning does not fire for them every single submission.
+      // Known but not stored, so they do not trip the unmapped-question warning.
       ['SingPass Validated NRIC', 'discard'],
       ['Masked NRIC', 'discard'],
       ['Download Status', 'discard'],
-    ] as Array<[string, CanonicalField]>
-  ).map(([title, field]) => [normaliseTitle(title), field]),
+    ] as const
+  ).map(([title, column]) => [normaliseTitle(title), column]),
 );
 
 /**
- * Field ids harvested from a real submission.
+ * Field ids harvested from a real submission, as `'<24-char id>': 'rank'`.
  *
- * Empty until someone captures one -- see the migration plan's open items. Filling this in
- * makes the mapping immune to a wording change in the FormSG editor; until then the title
- * fallback carries it. Add entries as `'<24-char id>': 'rank'`.
+ * Required for v3 (multi-respondent) payloads, which carry no question text.
  */
-export const FIELD_IDS: Record<string, CanonicalField> = {};
+export const FIELD_IDS: Record<string, Column> = {};
 
-/** `Status Given #3` and `Days given for Status #3` both carry repetition index 3. */
-const REPEAT_SUFFIX = /#(\d+)\s*$/;
-
-/** What an answer was recognised as. */
-export interface ResolvedField {
-  field: CanonicalField;
-  /** 1 for the first status pair, 2..5 for the repeats. */
-  index: number;
-}
+/** The `#3` in `Status Given #3`. */
+const REPEAT_SUFFIX = /\s*#(\d+)\s*$/;
 
 /**
  * Identifies which column an answer belongs to.
  *
  * @param answer The `_id` and `question` from a webhook response entry.
- * @returns The column and repetition index, or null when the answer is not recognised.
+ * @returns The column, or null when the answer is not recognised.
  */
-export function resolveField(answer: { _id?: string; question?: string }): ResolvedField | null {
-  if (answer._id && FIELD_IDS[answer._id]) {
-    return { field: FIELD_IDS[answer._id]!, index: 1 };
-  }
+export function resolveField(answer: { _id?: string; question?: string }): Column | null {
+  if (answer._id && FIELD_IDS[answer._id]) return FIELD_IDS[answer._id]!;
   if (!answer.question) return null;
 
   const repeat = REPEAT_SUFFIX.exec(answer.question);
   const index = repeat ? Number(repeat[1]) : 1;
   const base = repeat ? answer.question.slice(0, repeat.index) : answer.question;
+  const column = TITLE_MAP[normaliseTitle(base)];
 
-  const field = TITLE_MAP[normaliseTitle(base)];
-  return field ? { field, index } : null;
+  if (column === 'status' || column === 'statusDays') {
+    if (index < 1 || index > 5) return null;
+    return (column === 'status' ? `status${index}` : `status${index}Days`) as Column;
+  }
+  return column ?? null;
 }
 
 /* ------------------------------------------------------- value vocabularies */
 
-/**
- * The form's report-sick options, mapped onto the shared enum.
- *
- * Both data streams use this vocabulary, which is what lets a FormSG submission and a
- * parade-state entry be compared at all.
- */
+/** The form's report-sick options, mapped onto the shared enum. */
 const REPORT_SICK_TYPES: Record<string, string> = {
   'report sick in-camp (rsi)': 'RSI',
   'report sick outside (rso)': 'RSO',
@@ -132,19 +100,11 @@ const REPORT_SICK_TYPES: Record<string, string> = {
   ffi: 'FFI',
 };
 
-/** The outcome options from the section added on 2026-09-16. */
-const OUTCOMES: Record<string, string> = {
-  'sick leave / mc': 'MC',
-  'status (e.g excuse..., rest in bunk)': 'Status',
-  'both sick leave & status': 'Both',
-  none: 'None',
-};
-
 /**
  * Maps a report-sick answer to the enum value.
  *
  * @param answer The raw answer text.
- * @returns The enum value, or null when unrecognised -- which is reported, never guessed.
+ * @returns The enum value, or null when unrecognised.
  */
 export function toReportSickType(answer: string | null | undefined): string | null {
   if (!answer) return null;
@@ -152,10 +112,7 @@ export function toReportSickType(answer: string | null | undefined): string | nu
 }
 
 /**
- * Maps an outcome answer to the enum value.
- *
- * Matched on a prefix as well as exactly, because the `Status (e.g Excuse...)` option text
- * is long, contains an ellipsis and has already been edited once.
+ * Maps an outcome answer to the enum value, by prefix since the option text gets edited.
  *
  * @param answer The raw answer text.
  * @returns The enum value, or null when unrecognised.
@@ -163,7 +120,6 @@ export function toReportSickType(answer: string | null | undefined): string | nu
 export function toOutcome(answer: string | null | undefined): string | null {
   if (!answer) return null;
   const value = normaliseTitle(answer);
-  if (OUTCOMES[value]) return OUTCOMES[value]!;
   if (value.startsWith('both')) return 'Both';
   if (value.startsWith('status')) return 'Status';
   if (value.startsWith('sick leave')) return 'MC';
@@ -175,11 +131,10 @@ export function toOutcome(answer: string | null | undefined): string | null {
 const OTHERS_PREFIX = /^others:\s*/i;
 
 /**
- * Splits a pick-list answer into a canonical option and free text.
+ * Splits a pick-list answer into its option and any free text.
  *
  * @param answer The raw answer.
- * @returns `option` when the answer is one of the form's choices, or `otherText` when the
- *   respondent typed their own. Both null for a blank answer.
+ * @returns `option` is the chosen option, or `Others`; `otherText` is the typed text.
  */
 export function splitOtherOption(answer: string | null | undefined): {
   option: string | null;
@@ -187,53 +142,58 @@ export function splitOtherOption(answer: string | null | undefined): {
 } {
   if (!answer || !answer.trim()) return { option: null, otherText: null };
   if (OTHERS_PREFIX.test(answer)) {
-    return { option: null, otherText: answer.replace(OTHERS_PREFIX, '').trim() || null };
+    return { option: 'Others', otherText: answer.replace(OTHERS_PREFIX, '').trim() || null };
   }
   return { option: answer.trim(), otherText: null };
 }
 
 /**
- * Parses the `Yes`/`No` attestation.
+ * Parses a `Yes`/`No` answer.
  *
  * @param answer The raw answer.
- * @returns true, false, or null when the question was not answered.
+ * @returns true, false, or null when unanswered or unrecognised.
  */
 export function toBoolean(answer: string | null | undefined): boolean | null {
-  if (!answer) return null;
-  const value = answer.trim().toLowerCase();
+  const value = answer?.trim().toLowerCase();
   if (value === 'yes') return true;
   if (value === 'no') return false;
   return null;
 }
 
 /**
- * Parses a small whole number from a text answer.
- *
- * The day-count questions come through as text, and a respondent may type "3 days".
+ * Parses a whole number from a text answer such as "3 days".
  *
  * @param answer The raw answer.
  * @returns The number, or null when the answer holds none.
  */
 export function toSmallInt(answer: string | null | undefined): number | null {
-  if (!answer) return null;
-  const match = /-?\d+/.exec(answer);
-  if (!match) return null;
-  const value = Number(match[0]);
-  return Number.isFinite(value) ? value : null;
+  const match = answer ? /-?\d+/.exec(answer) : null;
+  return match ? Number(match[0]) : null;
 }
 
 /**
  * Parses an `HHMM` or `HH:MM` time answer.
  *
  * @param answer The raw answer, e.g. "1400".
- * @returns `HH:MM`, or null when the answer is not a time.
+ * @returns `HH:MM`, or null when the answer is not a valid time.
  */
 export function toTime(answer: string | null | undefined): string | null {
-  if (!answer) return null;
-  const digits = answer.replace(/\D/g, '');
+  const digits = answer?.replace(/\D/g, '') ?? '';
   if (digits.length !== 4) return null;
-  const hours = Number(digits.slice(0, 2));
-  const minutes = Number(digits.slice(2));
-  if (hours > 23 || minutes > 59) return null;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  const [hours, minutes] = [digits.slice(0, 2), digits.slice(2)];
+  return Number(hours) <= 23 && Number(minutes) <= 59 ? `${hours}:${minutes}` : null;
+}
+
+/** Singapore is UTC+8 all year. */
+const SGT_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+/**
+ * Gives the Singapore-local calendar date of an instant.
+ *
+ * @param iso An ISO 8601 timestamp with an offset.
+ * @returns `YYYY-MM-DD` in Singapore time.
+ * @throws {RangeError} If `iso` is not a valid timestamp.
+ */
+export function toSgtDate(iso: string): string {
+  return new Date(Date.parse(iso) + SGT_OFFSET_MS).toISOString().slice(0, 10);
 }

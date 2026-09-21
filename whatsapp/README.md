@@ -55,8 +55,8 @@ bun install
 cp .env.example .env
 ```
 
-**1. Point at Neon.** Run `db/grants-ingest.sql` once against the database (see its header comment for the exact
-`psql` invocation) to create the `parade_ingest` role, then put that role's connection string — **not** the
+**1. Point at Neon.** From the repo root, run `bun --env-file=.env.local scripts/apply-grants.ts db/grants-ingest.sql`
+once to create the `parade_ingest` role, then put the connection string it prints — **not** the
 owner's — into `DATABASE_URL` in `whatsapp/.env`. That role can only store raw messages and write parsed rows.
 
 **2. Add the OpenAI key.** Set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to whatever

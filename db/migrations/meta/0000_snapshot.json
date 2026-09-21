@@ -1,62 +1,9 @@
 {
-  "id": "48b2a1fa-f12e-4a2c-8717-54db65ede8d8",
+  "id": "11afe681-19c3-467b-b0cd-519b64675e2e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.auth_failures": {
-      "name": "auth_failures",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "auth_failures_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "at": {
-          "name": "at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "auth_failures_at_idx": {
-          "name": "auth_failures_at_idx",
-          "columns": [
-            {
-              "expression": "at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.command_roster_rows": {
       "name": "command_roster_rows",
       "schema": "",
@@ -161,240 +108,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.formsg_statuses": {
-      "name": "formsg_statuses",
-      "schema": "",
-      "columns": {
-        "response_id": {
-          "name": "response_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "seq": {
-          "name": "seq",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status_label": {
-          "name": "status_label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "days": {
-          "name": "days",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "formsg_statuses_response_id_formsg_submissions_response_id_fk": {
-          "name": "formsg_statuses_response_id_formsg_submissions_response_id_fk",
-          "tableFrom": "formsg_statuses",
-          "tableTo": "formsg_submissions",
-          "columnsFrom": [
-            "response_id"
-          ],
-          "columnsTo": [
-            "response_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "formsg_statuses_pk": {
-          "name": "formsg_statuses_pk",
-          "columns": [
-            "response_id",
-            "seq"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.formsg_submissions": {
-      "name": "formsg_submissions",
-      "schema": "",
-      "columns": {
-        "response_id": {
-          "name": "response_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "form_id": {
-          "name": "form_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "submitted_at": {
-          "name": "submitted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "received_at": {
-          "name": "received_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "rank": {
-          "name": "rank",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name_key": {
-          "name": "name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "four_d": {
-          "name": "four_d",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "four_d_normalised": {
-          "name": "four_d_normalised",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "company": {
-          "name": "company",
-          "type": "company",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "report_sick_type": {
-          "name": "report_sick_type",
-          "type": "report_sick_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "report_sick_time": {
-          "name": "report_sick_time",
-          "type": "time",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "symptom_category_id": {
-          "name": "symptom_category_id",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "symptom_other_text": {
-          "name": "symptom_other_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attested_genuine": {
-          "name": "attested_genuine",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "outcome",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mc_days": {
-          "name": "mc_days",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "formsg_submissions_submitted_at_idx": {
-          "name": "formsg_submissions_submitted_at_idx",
-          "columns": [
-            {
-              "expression": "submitted_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "formsg_submissions_name_key_idx": {
-          "name": "formsg_submissions_name_key_idx",
-          "columns": [
-            {
-              "expression": "name_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "formsg_submissions_symptom_category_id_symptom_categories_id_fk": {
-          "name": "formsg_submissions_symptom_category_id_symptom_categories_id_fk",
-          "tableFrom": "formsg_submissions",
-          "tableTo": "symptom_categories",
-          "columnsFrom": [
-            "symptom_category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "formsg_mc_days_sane": {
-          "name": "formsg_mc_days_sane",
-          "value": "\"formsg_submissions\".\"mc_days\" is null or \"formsg_submissions\".\"mc_days\" between 0 and 180"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.parade_submissions": {
       "name": "parade_submissions",
       "schema": "",
@@ -475,21 +188,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "parade_submissions_date_idx": {
-          "name": "parade_submissions_date_idx",
-          "columns": [
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -670,36 +368,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "personnel_rows_name_key_idx": {
-          "name": "personnel_rows_name_key_idx",
-          "columns": [
-            {
-              "expression": "name_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "personnel_rows_four_d_idx": {
-          "name": "personnel_rows_four_d_idx",
-          "columns": [
-            {
-              "expression": "four_d",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -728,38 +396,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.public_holidays": {
-      "name": "public_holidays",
-      "schema": "",
-      "columns": {
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.raw_messages": {
       "name": "raw_messages",
       "schema": "",
@@ -786,14 +422,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "intake_source",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'whatsapp'"
         },
         "body": {
           "name": "body",
@@ -843,21 +471,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "raw_messages_parade_response_id_idx": {
-          "name": "raw_messages_parade_response_id_idx",
-          "columns": [
-            {
-              "expression": "parade_response_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {},
@@ -875,34 +488,187 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.rotations": {
-      "name": "rotations",
+    "public.report_sick_formsg": {
+      "name": "report_sick_formsg",
       "schema": "",
       "columns": {
-        "name": {
-          "name": "name",
+        "response_id": {
+          "name": "response_id",
           "type": "text",
           "primaryKey": true,
           "notNull": true
         },
-        "start_date": {
-          "name": "start_date",
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "four_d": {
+          "name": "four_d",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_coy": {
+          "name": "unit_coy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_time": {
+          "name": "report_sick_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_type": {
+          "name": "report_sick_type",
+          "type": "report_sick_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symptoms": {
+          "name": "symptoms",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genuine": {
+          "name": "genuine",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "outcome",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mc_days": {
+          "name": "mc_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_1": {
+          "name": "status_1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_1_days": {
+          "name": "status_1_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_2": {
+          "name": "status_2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_2_days": {
+          "name": "status_2_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_3": {
+          "name": "status_3",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_3_days": {
+          "name": "status_3_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_4": {
+          "name": "status_4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_4_days": {
+          "name": "status_4_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_5": {
+          "name": "status_5",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_5_days": {
+          "name": "status_5_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company": {
+          "name": "company",
+          "type": "company",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_date": {
+          "name": "report_sick_date",
           "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
+        "received_at": {
+          "name": "received_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "symptom_category": {
+          "name": "symptom_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symptom_other_text": {
+          "name": "symptom_other_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -911,9 +677,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "rotations_ordered": {
-          "name": "rotations_ordered",
-          "value": "\"rotations\".\"end_date\" is null or \"rotations\".\"end_date\" >= \"rotations\".\"start_date\""
+        "report_sick_formsg_mc_days_sane": {
+          "name": "report_sick_formsg_mc_days_sane",
+          "value": "\"report_sick_formsg\".\"mc_days\" is null or \"report_sick_formsg\".\"mc_days\" between 0 and 180"
         }
       },
       "isRLSEnabled": false
@@ -1110,45 +876,6 @@
         }
       },
       "isRLSEnabled": false
-    },
-    "public.symptom_categories": {
-      "name": "symptom_categories",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "smallint",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "display_order": {
-          "name": "display_order",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "symptom_categories_label_unique": {
-          "name": "symptom_categories_label_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "label"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -1161,14 +888,6 @@
         "Cougar",
         "Stallion",
         "Hercules"
-      ]
-    },
-    "public.intake_source": {
-      "name": "intake_source",
-      "schema": "public",
-      "values": [
-        "whatsapp",
-        "manual"
       ]
     },
     "public.outcome": {
