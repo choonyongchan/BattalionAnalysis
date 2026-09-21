@@ -3,11 +3,5 @@
   "framework": "vite",
   "installCommand": "bun install --frozen-lockfile",
   "buildCommand": "bun run build",
-  "outputDirectory": "dist",
-  "crons": [
-    {
-      "path": "/api/parse-due",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "outputDirectory": "dist"
 }
