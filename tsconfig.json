@@ -19,5 +19,5 @@
     "noEmit": true
   },
   "include": ["api/**/*.ts", "db/**/*.ts", "lib/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules", "dist", "legacy", "src", "whatsapp"]
+  "exclude": ["node_modules", "dist", "src", "whatsapp"]
 }

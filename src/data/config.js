@@ -8,7 +8,7 @@
  * skip the check.
  *
  * Setting FEED_URL is the one edit needed before the dashboard works; see
- * `dashboard/README.md`.
+ * `docs/dashboard.md`.
  */
 
 /**

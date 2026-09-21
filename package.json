@@ -23,7 +23,6 @@
     "wouter-preact": "^3.7.0"
   },
   "devDependencies": {
-    "@google/clasp": "^3.3.0",
     "@preact/preset-vite": "^2.10.1",
     "@types/bun": "^1.4.2",
     "@types/node": "^22.10.0",

@@ -1,18 +1,14 @@
 /**
  * What the dashboard requires of each spreadsheet tab.
  *
- * This is the read-side mirror of `src/parser/ParserSchema.js` and
- * `src/formsg/FormSgColumns.js`, which remain the single source of truth for the sheet's
- * shape. Nothing here defines layout — it names the subset of headers the dashboard
- * actually reads, so a tab it cannot understand fails loudly with the missing header
+ * The Apps Script parser that wrote these tabs is retired (see git history for `legacy/`),
+ * so their layout is frozen. Nothing here defines layout — it names the subset of headers
+ * the dashboard actually reads, so a tab it cannot understand fails loudly with the missing header
  * named rather than silently charting the wrong column.
  *
  * Columns are resolved by header name at read time, so a column added or reordered
  * upstream is harmless. What is not harmless is reading `reason` out of the `location`
  * column, which charts cleanly and is entirely wrong.
- *
- * `test/dashboard/schema.test.js` asserts every header named here still exists in the
- * canonical column arrays.
  */
 
 /**

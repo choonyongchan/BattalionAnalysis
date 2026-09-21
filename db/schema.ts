@@ -122,7 +122,7 @@ export const reportSickTypeEnum = pgEnum('report_sick_type', [
  */
 export const outcomeEnum = pgEnum('outcome', ['MC', 'Status', 'Both', 'None']);
 
-/** How a raw parade state arrived. `manual` marks a deposit made by scripts/reprocess.ts. */
+/** How a raw parade state arrived. `manual` marks a hand-deposited one. */
 export const intakeSourceEnum = pgEnum('intake_source', ['whatsapp', 'manual']);
 
 /* --------------------------------------------------------- raw intake */

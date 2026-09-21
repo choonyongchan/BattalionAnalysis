@@ -7,7 +7,7 @@
  *
  * Bun reads .env out of the working directory on start-up, so there is no
  * dotenv call here. That does mean the bridge must be started from whatsapp/,
- * which is what `bun start` and the startup shortcut both do — see README.md.
+ * which is what `bun start` and the startup shortcut both do — see whatsapp/README.md.
  * Started from anywhere else, the required variables read as missing and
  * `loadConfig` says so by name rather than failing later and vaguely.
  */

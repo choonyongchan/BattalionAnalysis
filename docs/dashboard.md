@@ -107,7 +107,6 @@ fine in a public repo. The password is never in this repo, in `config.js`, or in
 end_date`) are read by the dashboard and written by nothing. Create them by hand; until
 you do, the dashboard reports them as missing on its Settings page, draws no holiday
 lines, and offers no rotational grouping. Everything else works without them.
-[`test/MANUAL_CHECKS.md`](../test/MANUAL_CHECKS.md) holds the exact headers.
 
 **Then share the password with the CO, S1 and S3.** Not by anything that keeps a searchable
 copy forever if you can help it.

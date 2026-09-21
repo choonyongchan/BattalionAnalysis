@@ -123,7 +123,7 @@ function readBody(response) {
       throw new Error(
         'The feed replied with something other than data (HTTP ' + response.status + '). ' +
           'Usually this means the web app needs redeploying, or FEED_URL is missing ' +
-          '"?route=dashboard". See dashboard/README.md.'
+          '"?route=dashboard". See docs/dashboard.md.'
       );
     }
   });
@@ -161,7 +161,7 @@ function readOptional(tabs, spec, notes) {
 export function loadAll(password) {
   if (!isConfigured()) {
     return Promise.reject(
-      new Error('No feed URL is set. Add one to src/data/config.js — see README.md.')
+      new Error('No feed URL is set. Add one to src/data/config.js — see docs/dashboard.md.')
     );
   }
 

@@ -16,8 +16,7 @@ the socket that is still listening for the next message.
 **History: this used to relay through Apps Script, and briefly through a Vercel Function plus a cron drain.**
 Parsing moved onto this long-running process because 74–126 seconds is past the Vercel Hobby plan's 60-second
 function cap, and Hobby also refuses the sub-daily cron that would otherwise have swept a backlog. The Vercel
-webhook and cron drain (`api/whatsapp.ts`, `api/parse-due.ts`) are retired but still exist and are still deployed;
-they are removed only after this runner has been verified live. The Apps Script project and its Google Form
+webhook and cron drain this replaced (`api/whatsapp.ts`, `api/parse-due.ts`) have been deleted. The Apps Script project and its Google Form
 fallback predate both and are fully decommissioned.
 
 ## Why Baileys
