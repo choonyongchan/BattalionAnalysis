@@ -1,24 +1,22 @@
 /**
- * Sheet-shaped test data, built by the code that actually writes the sheet.
+ * Sheet-shaped test data, in the column order the Apps Script parser wrote.
  *
- * `src/parser/ParserRows.js` is what turns an extraction into rows, and the column order
- * here comes straight from its `*_DATA_COLUMNS` constants — so if a column is added,
- * reordered or renamed upstream, these fixtures change with it and the dashboard's tests
- * fail rather than the dashboard quietly charting the wrong column.
- *
- * Apps Script sources need no test-only modification to be used this way: `loadParser()`
- * evaluates `src/parser/*.js` in a `node:vm` context that reproduces Apps Script's single
- * shared global scope.
- *
- * These tests live here rather than under `dashboard/` for the same reason `test/` sits
- * outside `src/`: `dashboard/` is a deployment boundary, and everything inside it is
- * published to GitHub Pages. What ships is only what runs in the browser.
+ * The parser that owned these layouts is retired, so the sheet layout is now frozen; the
+ * columns are copied here from its last `ParserSchema.js` (see git history for `legacy/`).
  */
 
-import { loadParser } from '../harness.js';
+/** Column order of the "Personnel Data" tab. @type {!Array<string>} */
+const PERSONNEL_DATA_COLUMNS = [
+  'parade_response_id', 'date', 'session', 'company', 'platoon', 'four_d', 'name', 'rank',
+  'reason_category', 'start_date', 'end_date', 'num_days', 'reason', 'location', 'in_camp',
+];
 
-/** @type {!Object} Apps Script globals, loaded once; ParserRows holds no state. */
-const { globals } = loadParser();
+/** Column order of the "Strength Data" tab. @type {!Array<string>} */
+const STRENGTH_DATA_COLUMNS = [
+  'parade_response_id', 'date', 'session', 'company', 'platoon', 'unit_type',
+  'total_strength', 'total_present', 'officer_strength', 'officer_present',
+  'wospec_strength', 'wospec_present', 'enlistee_strength', 'enlistee_present',
+];
 
 /**
  * Builds a Personnel Data values array from terse row specs.
@@ -29,7 +27,7 @@ const { globals } = loadParser();
  * @returns {Array<Array<*>>} A values array including the header row.
  */
 export function personnelValues(specs) {
-  const columns = globals.PERSONNEL_DATA_COLUMNS;
+  const columns = PERSONNEL_DATA_COLUMNS;
   const rows = specs.map((spec) => columns.map((column) => (column in spec ? spec[column] : '')));
   return [columns.slice(), ...rows];
 }
@@ -40,16 +38,7 @@ export function personnelValues(specs) {
  * @returns {Array<Array<*>>} A values array including the header row.
  */
 export function strengthValues(specs) {
-  const columns = globals.STRENGTH_DATA_COLUMNS;
+  const columns = STRENGTH_DATA_COLUMNS;
   const rows = specs.map((spec) => columns.map((column) => (column in spec ? spec[column] : '')));
   return [columns.slice(), ...rows];
-}
-
-/**
- * Exposes the Apps Script globals so schema tests can assert against the canonical
- * column arrays rather than a copy of them.
- * @returns {!Object} The loaded Apps Script global scope.
- */
-export function parserGlobals() {
-  return globals;
 }

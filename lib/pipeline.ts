@@ -1,14 +1,14 @@
 /**
  * The one implementation of extract -> validate -> replace.
  *
- * `api/whatsapp.ts` only records a message; `api/parse-due.ts` and `scripts/reprocess.ts`
- * both drain through here, so there is exactly one code path that writes parade-state rows
- * and exactly one place a rule about them can live.
+ * The local WhatsApp runner calls `recordMessage` and `parseDue` in-process (see
+ * `docs/superpowers/plans/2026-09-21-local-parade-state-parser.md`), so there is exactly one
+ * code path that writes parade-state rows and exactly one place a rule about them can live.
  *
  * Intake and parsing are split because the model is slow. A real message took 74 seconds
- * against the flex tier, and the messiest took 126 -- past every Vercel Hobby timeout and
- * most of the Pro one. So `recordMessage` returns the moment the text is safely stored, and
- * the parse happens on a schedule. A slow model then delays a row; it never loses one.
+ * against the flex tier, and the messiest took 126. So `recordMessage` returns the moment
+ * the text is safely stored, and the parse drains afterwards. A slow model then delays a
+ * row; it never loses one.
  */
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import {

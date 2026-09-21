@@ -11,7 +11,7 @@
  * Redirects are followed. An Apps Script web app answers through a 302, and
  * following it re-sends the POST body, so the handler can run twice for one
  * call. That is safe here precisely because the handler dedupes on
- * `messageId` — see DeveloperGuide.md §8.3.
+ * `messageId`.
  */
 
 /** @type {string} The route parameter identifying this intake. */

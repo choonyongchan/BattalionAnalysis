@@ -10,7 +10,7 @@
  * Two connections, not one, because the separation is enforced by Postgres rather than by
  * remembering:
  *
- *   - `db`       writes. Used by the intake routes and the cron drain.
+ *   - `db`       writes. Used by the FormSG route and the local WhatsApp runner.
  *   - `readDb`   reads for the dashboard, as a role with no `SELECT` on `raw_messages.body`.
  *
  * `raw_messages.body` is the parade-state free text: NRICs, full names and diagnoses in one
