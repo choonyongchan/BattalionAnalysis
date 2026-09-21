@@ -152,16 +152,14 @@ pinned by a hash that had to be recomputed on every version bump.
 
 ## Deploying
 
-Pushing to `main` or `master` runs [`.github/workflows/pages.yml`](../.github/workflows/pages.yml),
-which runs the tests, builds the dashboard, and publishes `dashboard/dist` to GitHub Pages.
-Enable Pages once, under **Settings → Pages → Source → GitHub Actions**.
+Vercel builds and serves the app from the repository root. `vercel.json` pins the settings
+the project would otherwise take from its dashboard: the Vite preset, `bun install`,
+`bun run build`, and `dist/` as the output directory. Without it the project fell back to
+the "Other" preset, which serves the root as-is, so a deploy "succeeded" with nothing to
+serve. Pushing a branch gives a preview deployment; merging to `main` deploys production.
 
-An Actions workflow rather than deploy-from-a-branch because Pages only offers `/` or
-`/docs` as a source folder, and `docs/` already holds the architecture reference.
-
-`vite.config.js` sets `base: './'`, because Pages serves this from a repository sub-path
-and absolute asset URLs would resolve against the wrong root — which shows up as a blank
-page with no error worth reading.
+`vite.config.js` sets no `base`: Vercel serves from the domain root, so the default
+absolute asset URLs are correct. Routing uses the URL hash, so no SPA rewrites are needed.
 
 ## How it is put together
 

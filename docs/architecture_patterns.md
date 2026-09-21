@@ -121,9 +121,9 @@ layer is pure and needs no browser.
 
 ## The dashboard is a read-only consumer
 
-`dashboard/` is a Preact application built by Vite and served to GitHub Pages by
-`.github/workflows/pages.yml`, which publishes `dashboard/dist` rather than the directory
-as it sits. It is the spreadsheet's fourth party, and the only one that never writes to it.
+The dashboard (`index.html` and `src/`) is a Preact application built by Vite and
+deployed by Vercel from the repository root, with its build settings pinned in
+`vercel.json`; what is served is `dist/`, not the source as it sits. It is the spreadsheet's fourth party, and the only one that never writes to it.
 
 **It used to have no build step, and losing that was a real cost.** The build is here
 because seven pages of legend toggles, granularity radios, a fuzzy combobox and a live
