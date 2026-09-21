@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Watches a WhatsApp group for Parade State messages and relays them to the Apps Script web app that writes Google Sheets.",
+  "description": "Watches a WhatsApp group for parade-state messages, stores them in Neon and parses them into rows.",
   "scripts": {
     "start": "bun src/supervisor.js",
     "start:bridge": "bun src/index.js",

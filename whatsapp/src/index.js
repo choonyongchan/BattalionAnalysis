@@ -1,33 +1,33 @@
 /**
- * Entry point for the WhatsApp -> Google Sheets parade-state bridge.
+ * Entry point for the WhatsApp parade-state ingestor.
  *
- * Pipeline: WhatsApp group message -> first-parade check -> POST to the Apps
- * Script web app. The handler appends the Parade State Responses row and runs
- * the extraction and validation pipeline in the same execution, so an accepted
- * message reaches Strength Data within seconds.
+ * Pipeline: WhatsApp group message -> first-parade check -> stored in Neon ->
+ * parsed on this machine into parade-state rows. See ingest.js for why parsing
+ * happens here and not on Vercel.
  */
 
+import { getDb } from '../../db/index.ts';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
-import { relayParadeState } from './appsScriptClient.js';
+import { createIngestor } from './ingest.js';
 import { isParadeState } from './signature.js';
 import { startListener } from './listener.js';
 
 /**
  * Builds the handler invoked for every message in the watched group.
  *
- * There is no local record of what has already been sent. Dedup lives
- * server-side, keyed on the Baileys message id, because it has to: the Apps
- * Script 302 can turn one POST into two, which no amount of bookkeeping here
- * would catch. One place to dedupe is better than two, and the sheet is the one
- * that can see both causes.
+ * There is no local record of what has already been stored. Dedup is the
+ * `wa_message_id` unique constraint in Neon, so a resend after a restart is
+ * harmless, and it is how a message whose parse never finished gets retried.
  *
  * @param {Object} deps Handler dependencies.
  * @param {Object} deps.config Resolved configuration from loadConfig().
  * @param {import('pino').Logger} deps.logger Logger for status output.
+ * @param {{ingest: function(string, string): !Promise<Object>}} deps.ingestor
+ *   From createIngestor().
  * @returns {function(string, Object): Promise<void>} The message handler.
  */
-export function createMessageHandler({ config, logger }) {
+export function createMessageHandler({ config, logger, ingestor }) {
   return async function handleMessage(text, envelope) {
     const messageId = envelope.key?.id || '';
     const { accepted, rejectReason } = isParadeState(text);
@@ -40,38 +40,49 @@ export function createMessageHandler({ config, logger }) {
     const summary = { messageId, chars: text.length };
 
     if (config.dryRun) {
-      logger.info(summary, 'DRY_RUN: parade state accepted but not relayed');
+      logger.info(summary, 'DRY_RUN: parade state accepted but not stored');
       return;
     }
 
     try {
-      const { appended, rowIndex } = await relayParadeState(text, messageId, config);
-      logger.info(
-        { ...summary, rowIndex },
-        appended ? 'relayed parade state to Google Sheets' : 'already recorded, server skipped it'
-      );
+      const outcome = await ingestor.ingest(text, messageId);
+      logger.info({ ...summary, status: outcome.status, id: outcome.id }, 'stored parade state');
     } catch (err) {
-      logger.error({ ...summary, err: err.message }, 'relay failed; will retry if the message is resent');
+      logger.error({ ...summary, err: err.message }, 'store failed; will retry if the message is resent');
     }
   };
 }
 
 /**
- * Starts the bridge.
+ * Starts the ingestor.
  *
  * @returns {Promise<void>} Rejects when the WhatsApp session is unrecoverable.
  */
 async function main() {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
+  const ingestor = createIngestor({
+    db: getDb(),
+    apiKey: config.openaiApiKey,
+    model: config.openaiModel,
+    logger,
+  });
 
-  logger.info({ groupId: config.groupId, dryRun: config.dryRun }, 'starting WhatsApp parade-state bridge');
+  logger.info({ groupId: config.groupId, dryRun: config.dryRun }, 'starting WhatsApp parade-state ingestor');
+
+  // Anything stored but left unparsed by a previous crash is picked up now, and
+  // transient failures (a model timeout) are swept on the interval. unref() so
+  // the timer never keeps a dying process alive for the supervisor to wait on.
+  if (!config.dryRun) {
+    ingestor.drain();
+    setInterval(() => ingestor.drain(), config.parseIntervalMs).unref();
+  }
 
   await startListener({
     authDir: config.authDir,
     groupId: config.groupId,
     logger,
-    onMessage: createMessageHandler({ config, logger }),
+    onMessage: createMessageHandler({ config, logger, ingestor }),
   });
 }
 

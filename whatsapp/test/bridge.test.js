@@ -1,25 +1,15 @@
 /**
- * Tests for the non-network parts of the bridge: config validation, the Apps
- * Script client's URL/payload helpers and its response handling, the Baileys
- * envelope filters, and the end-to-end message handler.
- *
- * The relay itself is covered here with a stubbed global fetch. Its predecessor
- * (the Google Form submitter) was never tested at all, so the outcome-handling
- * branches — a non-2xx, and the 200-with-ok:false that ContentService forces —
- * had no coverage.
+ * Tests for the non-network parts of the ingestor: config validation, the
+ * Baileys envelope filters, and the end-to-end message handler.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { loadConfig } from '../src/config.js';
-import { buildIntakeUrl, relayParadeState } from '../src/appsScriptClient.js';
 import { extractText, isWatchedGroupMessage } from '../src/listener.js';
 import { createMessageHandler } from '../src/index.js';
 
 /** @type {string} JID used as the watched group in the envelope tests. */
 const GROUP_JID = '120363000000000000@g.us';
-
-/** @type {string} Stand-in web app URL. */
-const EXEC_URL = 'https://script.google.com/macros/s/AKfycb-test/exec';
 
 /**
  * A complete environment for loadConfig, so a test can vary one key at a time.
@@ -85,76 +75,6 @@ describe('loadConfig', () => {
   });
 });
 
-describe('appsScriptClient helpers', () => {
-  test('appends the route parameter', () => {
-    expect(buildIntakeUrl(EXEC_URL)).toBe(`${EXEC_URL}?route=paradestate`);
-  });
-
-  test('uses & when the URL already carries a query string', () => {
-    expect(buildIntakeUrl(`${EXEC_URL}?v=2`)).toBe(`${EXEC_URL}?v=2&route=paradestate`);
-  });
-
-});
-
-describe('relayParadeState', () => {
-  /** @type {typeof fetch} The real fetch, restored after each test. */
-  let realFetch;
-  /** @type {!Array<!Array<*>>} Every call the stub received. */
-  let calls;
-
-  beforeEach(() => {
-    realFetch = globalThis.fetch;
-    calls = [];
-  });
-
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
-
-  /**
-   * Installs a fetch stub returning one canned response.
-   *
-   * @param {{ok?: boolean, status?: number, body?: !Object}} response The reply to serve.
-   * @returns {void}
-   */
-  function stubFetch({ ok = true, status = 200, body = { ok: true, appended: true, rowIndex: 7 } }) {
-    globalThis.fetch = async (url, init) => {
-      calls.push([url, init]);
-      return { ok, status, json: async () => body };
-    };
-  }
-
-  const config = { appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' };
-
-  test('posts JSON to the routed URL and reports the row', async () => {
-    stubFetch({});
-    const result = await relayParadeState('PARADE STATE', 'MSG1', config);
-
-    expect(result).toEqual({ appended: true, rowIndex: 7 });
-    const [url, init] = calls[0];
-    expect(url).toBe(`${EXEC_URL}?route=paradestate`);
-    expect(init.method).toBe('POST');
-    expect(init.headers['Content-Type']).toBe('application/json');
-    expect(JSON.parse(init.body)).toEqual({ token: 'tok', messageId: 'MSG1', text: 'PARADE STATE' });
-  });
-
-  test('reports a duplicate as not appended rather than as a failure', async () => {
-    stubFetch({ body: { ok: true, appended: false, rowIndex: 3 } });
-    expect(await relayParadeState('PARADE STATE', 'MSG1', config)).toEqual({ appended: false, rowIndex: 3 });
-  });
-
-  test('throws on a non-2xx response', async () => {
-    stubFetch({ ok: false, status: 500 });
-    expect(relayParadeState('PARADE STATE', 'MSG1', config)).rejects.toThrow(/HTTP 500/);
-  });
-
-  test('throws on a 200 that reports a rejection', async () => {
-    // ContentService cannot set a status code, so a rejection arrives as 200
-    // with ok:false. Treating that as success would lose the message silently.
-    stubFetch({ body: { ok: false, error: 'unauthorised' } });
-    expect(relayParadeState('PARADE STATE', 'MSG1', config)).rejects.toThrow(/unauthorised/);
-  });
-});
 
 describe('listener envelope filters', () => {
   /**
@@ -196,16 +116,25 @@ describe('listener envelope filters', () => {
 });
 
 describe('createMessageHandler', () => {
-  /** @type {typeof fetch} The real fetch, restored after each test. */
-  let realFetch;
+  // The existing `/** @type {string} */ const PARADE_STATE = [...]` declaration stays here
+  // exactly as it is today; only the blocks around it change.
 
-  beforeEach(() => {
-    realFetch = globalThis.fetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
+  /**
+   * An ingestor that records what it was given.
+   *
+   * @param {function(): !Promise<Object>=} impl Replaces the default outcome.
+   * @returns {{calls: !Array<!Array<string>>, ingest: function(string, string): !Promise<Object>}}
+   */
+  function fakeIngestor(impl = async () => ({ status: 'stored', id: 1 })) {
+    const calls = [];
+    return {
+      calls,
+      ingest: async (text, messageId) => {
+        calls.push([text, messageId]);
+        return impl();
+      },
+    };
+  }
 
   /**
    * A minimal well-formed first parade state: enough signals and bulk to clear every
@@ -227,66 +156,37 @@ describe('createMessageHandler', () => {
     'Padding line to clear the character gate comfortably for this test case.',
   ].join('\n');
 
-  test('relays an accepted parade state with its message id', async () => {
-    /** @type {!Array<!Object>} */
-    const bodies = [];
-    globalThis.fetch = async (_url, init) => {
-      bodies.push(JSON.parse(init.body));
-      return { ok: true, status: 200, json: async () => ({ ok: true, appended: true, rowIndex: 4 }) };
-    };
-
-    const handle = createMessageHandler({
-      config: { dryRun: false, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
-      logger: silentLogger,
-    });
+  test('ingests an accepted parade state with its message id', async () => {
+    const ingestor = fakeIngestor();
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
     await handle(PARADE_STATE, { key: { id: 'MSG1' } });
 
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0].messageId).toBe('MSG1');
-    expect(bodies[0].text).toContain('PARADE STATE');
+    expect(ingestor.calls).toHaveLength(1);
+    expect(ingestor.calls[0][1]).toBe('MSG1');
+    expect(ingestor.calls[0][0]).toContain('PARADE STATE');
   });
 
-  test('never relays a rejected message', async () => {
-    let called = false;
-    globalThis.fetch = async () => {
-      called = true;
-      return { ok: true, status: 200, json: async () => ({ ok: true }) };
-    };
-
-    const handle = createMessageHandler({
-      config: { dryRun: false, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
-      logger: silentLogger,
-    });
+  test('never ingests a rejected message', async () => {
+    const ingestor = fakeIngestor();
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
     await handle('Why is your parade state late?', { key: { id: 'MSG2' } });
 
-    expect(called).toBe(false);
+    expect(ingestor.calls).toHaveLength(0);
   });
 
-  test('relays nothing in DRY_RUN', async () => {
-    let called = false;
-    globalThis.fetch = async () => {
-      called = true;
-      return { ok: true, status: 200, json: async () => ({ ok: true }) };
-    };
-
-    const handle = createMessageHandler({
-      config: { dryRun: true, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
-      logger: silentLogger,
-    });
+  test('ingests nothing in DRY_RUN', async () => {
+    const ingestor = fakeIngestor();
+    const handle = createMessageHandler({ config: { dryRun: true }, logger: silentLogger, ingestor });
     await handle(PARADE_STATE, { key: { id: 'MSG3' } });
 
-    expect(called).toBe(false);
+    expect(ingestor.calls).toHaveLength(0);
   });
 
-  test('swallows a relay failure so one bad message cannot stop the listener', async () => {
-    globalThis.fetch = async () => {
-      throw new Error('network down');
-    };
-
-    const handle = createMessageHandler({
-      config: { dryRun: false, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
-      logger: silentLogger,
+  test('swallows a storage failure so one bad message cannot stop the listener', async () => {
+    const ingestor = fakeIngestor(async () => {
+      throw new Error('neon unreachable');
     });
+    const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
 
     expect(await handle(PARADE_STATE, { key: { id: 'MSG4' } })).toBeUndefined();
   });
