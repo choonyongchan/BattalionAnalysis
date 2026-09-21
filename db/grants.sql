@@ -9,24 +9,21 @@
 -- raw_messages.body is a duty commander's raw message. Observed bodies contain NRICs, full
 -- names and diagnoses in one blob.
 --
--- Run once per database, after the migration. Not idempotent in the CREATE ROLE line --
--- see the guard below.
+-- Run once per database, after the migration.
 --
 -- Usage:
---   psql "$DATABASE_URL" -v reader_password="'<generated>'" -f db/grants.sql
+--   psql "$DATABASE_URL" -v reader_password="$(openssl rand -base64 24)" -f db/grants.sql
 -- then set DATABASE_URL_READONLY to that role's connection string.
 
 \set ON_ERROR_STOP on
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashboard_reader') THEN
-    EXECUTE format('CREATE ROLE dashboard_reader LOGIN PASSWORD %L', :reader_password);
-  ELSE
-    EXECUTE format('ALTER ROLE dashboard_reader PASSWORD %L', :reader_password);
-  END IF;
-END
-$$;
+SELECT format('CREATE ROLE dashboard_reader LOGIN PASSWORD %L', :'reader_password')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashboard_reader')
+\gexec
+
+SELECT format('ALTER ROLE dashboard_reader PASSWORD %L', :'reader_password')
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashboard_reader')
+\gexec
 
 -- GRANT CONNECT needs a literal database name, so the name is interpolated at run time
 -- rather than hard-coded, which keeps this file usable against a Neon branch too.

@@ -783,7 +783,7 @@ This role is for a laptop, which is easier to lose than a Vercel project. Its gr
 |---|---|---|
 | `raw_messages` | INSERT … ON CONFLICT, SELECT, UPDATE, sub-select in the orphan sweep | SELECT, INSERT, UPDATE |
 | `parade_submissions` | DELETE, INSERT | SELECT, INSERT, DELETE |
-| `strength_rows`, `personnel_rows`, `command_roster_rows`, `section_counts` | INSERT (DELETE via cascade) | SELECT, INSERT, DELETE |
+| `strength_rows`, `personnel_rows`, `command_roster_rows`, `section_counts` | INSERT (DELETE via cascade) | INSERT |
 
 FormSG tables, `auth_failures` and the reference tables get nothing.
 
@@ -799,20 +799,18 @@ FormSG tables, `auth_failures` and the reference tables get nothing.
 -- statements that module issues, and no FormSG, dashboard or auth table.
 --
 -- Usage:
---   psql "$DATABASE_URL" -v ingest_password="'<generated>'" -f db/grants-ingest.sql
+--   psql "$DATABASE_URL" -v ingest_password="$(openssl rand -base64 24)" -f db/grants-ingest.sql
 -- then put that role's connection string in whatsapp/.env as DATABASE_URL.
 
 \set ON_ERROR_STOP on
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest') THEN
-    EXECUTE format('CREATE ROLE parade_ingest LOGIN PASSWORD %L', :ingest_password);
-  ELSE
-    EXECUTE format('ALTER ROLE parade_ingest PASSWORD %L', :ingest_password);
-  END IF;
-END
-$$;
+SELECT format('CREATE ROLE parade_ingest LOGIN PASSWORD %L', :'ingest_password')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest')
+\gexec
+
+SELECT format('ALTER ROLE parade_ingest PASSWORD %L', :'ingest_password')
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'parade_ingest')
+\gexec
 
 DO $$
 BEGIN
@@ -824,8 +822,9 @@ GRANT USAGE ON SCHEMA public TO parade_ingest;
 
 GRANT SELECT, INSERT, UPDATE ON raw_messages TO parade_ingest;
 
-GRANT SELECT, INSERT, DELETE ON
-  parade_submissions,
+GRANT SELECT, INSERT, DELETE ON parade_submissions TO parade_ingest;
+
+GRANT INSERT ON
   strength_rows,
   personnel_rows,
   command_roster_rows,
@@ -843,7 +842,7 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO parade_ingest;
 - [ ] **Step 2: Apply it to Neon (manual, needs the owner URL)**
 
 ```bash
-psql "$DATABASE_URL" -v ingest_password="'$(openssl rand -base64 24)'" -f db/grants-ingest.sql
+psql "$DATABASE_URL" -v ingest_password="$(openssl rand -base64 24)" -f db/grants-ingest.sql
 ```
 
 Record the password in a password manager, not in the repo.
