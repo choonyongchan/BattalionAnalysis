@@ -34,8 +34,8 @@ const EXEC_URL = 'https://script.google.com/macros/s/AKfycb-test/exec';
 function sampleEnv(overrides = {}) {
   return {
     WA_GROUP_ID: GROUP_JID,
-    APPS_SCRIPT_URL: EXEC_URL,
-    APPS_SCRIPT_TOKEN: 'a-long-random-token',
+    DATABASE_URL: 'postgresql://parade_ingest:pw@host/db?sslmode=require',
+    OPENAI_API_KEY: 'sk-test',
     ...overrides,
   };
 }
@@ -47,20 +47,32 @@ describe('loadConfig', () => {
   test('reads the required settings', () => {
     const config = loadConfig({ env: sampleEnv() });
     expect(config.groupId).toBe(GROUP_JID);
-    expect(config.appsScriptUrl).toBe(EXEC_URL);
-    expect(config.appsScriptToken).toBe('a-long-random-token');
+    expect(config.databaseUrl).toContain('parade_ingest');
+    expect(config.openaiApiKey).toBe('sk-test');
+    expect(config.openaiModel).toBeUndefined();
+    expect(config.parseIntervalMs).toBe(300_000);
     expect(config.dryRun).toBe(false);
     expect(config.logLevel).toBe('info');
   });
 
-  test.each(['WA_GROUP_ID', 'APPS_SCRIPT_URL', 'APPS_SCRIPT_TOKEN'])('rejects a missing %s', (key) => {
+  test.each(['WA_GROUP_ID', 'DATABASE_URL', 'OPENAI_API_KEY'])('rejects a missing %s', (key) => {
     const env = sampleEnv();
     delete env[key];
     expect(() => loadConfig({ env })).toThrow(new RegExp(key));
   });
 
   test('rejects a blank required setting, not just an absent one', () => {
-    expect(() => loadConfig({ env: sampleEnv({ APPS_SCRIPT_TOKEN: '   ' }) })).toThrow(/APPS_SCRIPT_TOKEN/);
+    expect(() => loadConfig({ env: sampleEnv({ OPENAI_API_KEY: '   ' }) })).toThrow(/OPENAI_API_KEY/);
+  });
+
+  test('honours OPENAI_MODEL and PARSE_INTERVAL_MS', () => {
+    const config = loadConfig({ env: sampleEnv({ OPENAI_MODEL: 'gpt-x', PARSE_INTERVAL_MS: '60000' }) });
+    expect(config.openaiModel).toBe('gpt-x');
+    expect(config.parseIntervalMs).toBe(60_000);
+  });
+
+  test('rejects a PARSE_INTERVAL_MS that is not a positive number', () => {
+    expect(() => loadConfig({ env: sampleEnv({ PARSE_INTERVAL_MS: 'soon' }) })).toThrow(/PARSE_INTERVAL_MS/);
   });
 
   test('honours DRY_RUN', () => {

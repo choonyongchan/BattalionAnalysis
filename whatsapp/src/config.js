@@ -51,6 +51,25 @@ function optionalEnv(env, key, fallback) {
 }
 
 /**
+ * Reads an optional positive integer, in milliseconds.
+ *
+ * @param {!Object<string, string>} env The environment to read from.
+ * @param {string} key Name of the variable.
+ * @param {number} fallback Value when the variable is absent or blank.
+ * @returns {number} The parsed value, or the fallback.
+ * @throws {Error} If the variable is set but is not a positive integer.
+ */
+function optionalPositiveInt(env, key, fallback) {
+  const raw = optionalEnv(env, key, '');
+  if (raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${key} must be a positive whole number of milliseconds, got "${raw}".`);
+  }
+  return value;
+}
+
+/**
  * Builds the whole configuration, validating it up front.
  *
  * Loading fails fast at start-up rather than at the moment the first parade
@@ -60,20 +79,25 @@ function optionalEnv(env, key, fallback) {
  * before this module runs, which a test cannot undo — without it, a populated
  * .env on the developer's machine silently overrides whatever the test set.
  *
+ * `DATABASE_URL` is read here only to fail fast. `db/index.ts` reads it again
+ * from `process.env` when the first query runs.
+ *
  * @param {{env?: !Object<string, string>}} [options] `env` defaults to
  *   process.env, which already carries whatsapp/.env.
- * @returns {{groupId: string, appsScriptUrl: string, appsScriptToken: string,
- *   logLevel: string, dryRun: boolean, authDir: string}} The resolved
- *   configuration.
- * @throws {Error} If a required variable is missing.
+ * @returns {{groupId: string, databaseUrl: string, openaiApiKey: string,
+ *   openaiModel: (string|undefined), parseIntervalMs: number, logLevel: string,
+ *   dryRun: boolean, authDir: string}} The resolved configuration.
+ * @throws {Error} If a required variable is missing or a value is malformed.
  */
 export function loadConfig(options = {}) {
   const env = options.env || process.env;
 
   return {
     groupId: requireEnv(env, 'WA_GROUP_ID'),
-    appsScriptUrl: requireEnv(env, 'APPS_SCRIPT_URL'),
-    appsScriptToken: requireEnv(env, 'APPS_SCRIPT_TOKEN'),
+    databaseUrl: requireEnv(env, 'DATABASE_URL'),
+    openaiApiKey: requireEnv(env, 'OPENAI_API_KEY'),
+    openaiModel: optionalEnv(env, 'OPENAI_MODEL', '') || undefined,
+    parseIntervalMs: optionalPositiveInt(env, 'PARSE_INTERVAL_MS', 300_000),
     logLevel: optionalEnv(env, 'LOG_LEVEL', 'info'),
     dryRun: optionalEnv(env, 'DRY_RUN', '0') === '1',
     authDir: AUTH_DIR,
