@@ -38,9 +38,11 @@ export type RecordOutcome =
  * The `wa_message_id` unique constraint does the work that LockService used to: the
  * read-then-append race is settled by the database in one statement rather than by a mutex.
  *
- * A message that exists but has never been parsed is reported as `stored`, not `duplicate`.
- * That is deliberate -- it is how a message stranded by a crashed parse gets picked up again
- * when the bridge resends it.
+ * A message that exists but has never been parsed is reported as `duplicate`, not `stored` --
+ * that status only reports whether this call inserted the row. Either way `parseDue` still
+ * picks the row up on its next run, since it selects on `processed_at IS NULL` rather than on
+ * what this function reported, so a message stranded by a crashed parse is retried when the
+ * bridge resends it.
  *
  * @param db A read-write database handle.
  * @param message The relayed message.

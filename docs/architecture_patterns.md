@@ -8,11 +8,10 @@ Depth lives elsewhere: [DeveloperGuide.md](../DeveloperGuide.md) explains *why* 
 decision was made, [README.md](../README.md) is the operator runbook. This file is the
 map.
 
-## Three independent intakes
+## Two independent intakes
 
-The repo holds three pipelines that share a spreadsheet and — since the web app grew
-extra routes — one router. Otherwise they stay independent: no intake module imports
-another, and a change to one cannot break another.
+The repo holds two pipelines. They stay independent: no intake module imports another,
+and a change to one cannot break another.
 
 | Pipeline | Entry point | Lands in |
 |---|---|---|
@@ -46,8 +45,10 @@ the coupling, and it is deliberately confined to a file with no logic of its own
 
 The WhatsApp runner (`whatsapp/src/index.js`) is the only way in. It stores every
 accepted message through `recordMessage`, then drains the backlog through `parseDue`
-— both in `lib/pipeline.ts` — running once at start-up and again on every
-`PARSE_INTERVAL_MS` tick. A drain is single-flight: a call made while one is already
+— both in `lib/pipeline.ts`. A drain runs once at start-up, again on every
+`PARSE_INTERVAL_MS` tick, and after every message the handler stores — so a new parade
+state is parsed as soon as it arrives, not just swept up on the interval. A drain is
+single-flight: a call made while one is already
 running does not start a second, it just asks the running drain to go round once more
 when it finishes, so two `parseDue` runs never select the same row and pay twice for
 the same extraction. Parsing runs here rather than on Vercel because one extraction

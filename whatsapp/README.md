@@ -164,8 +164,10 @@ constraint tells the caller a row already exists rather than raising.
 
 That is where the dedup has to be, not in-process — Baileys itself redelivers a message after a reconnect, and a
 process restart has no memory of what it stored before it died. A message that exists but was never parsed comes
-back from `recordMessage` as `stored`, not `duplicate`, which is how a row stranded by a crashed parse gets picked
-up on the next drain instead of being silently skipped.
+back from `recordMessage` as `duplicate`, not `stored` — that status only reports whether this call inserted the
+row, and either way `parseDue` picks the row up on the next drain, since it selects on `processed_at IS NULL`
+rather than on what `recordMessage` reported. That is how a row stranded by a crashed parse gets picked up again
+instead of being silently skipped.
 
 ## Layout
 
@@ -195,6 +197,6 @@ messages to the retired Apps Script web app, was deleted when storage and parsin
 | Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun start` |
 | `Missing required environment variable ...` at start-up | `whatsapp/.env` is missing a required key, or the process was started from somewhere other than `whatsapp/` — Bun only loads `.env` out of the working directory |
 | `parse run failed; will retry on the next drain` in the log | `parseDue` threw — usually `DATABASE_URL` unreachable or the OpenAI call failed. The message stays unparsed and the next drain (on `PARSE_INTERVAL_MS`, or the next incoming message) retries it |
-| A message is stored but never parses | Check `OPENAI_API_KEY` is valid and `OPENAI_MODEL` (if set) names a real model; `logger.error` on a failed run names the underlying error |
+| A message is stored but never parses | A 401/429/outage does not throw out of `parseDue` — it only shows up as `failed: N` in the `parse run finished` log, and the row's `raw_messages.error` stays empty since a transient failure is never written there. Check `OPENAI_API_KEY` is valid and has quota, and that `OPENAI_MODEL` (if set) names a real model |
 | A real parade state was rejected | Run with `LOG_LEVEL=debug`; the reason names the failing gate |
 | A first parade state was rejected as "not a first parade state" | Its header has no `FIRST PARADE` marker and no timing before 12:00 — check the timing is in the first 5 non-empty lines |
