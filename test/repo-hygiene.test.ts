@@ -85,7 +85,15 @@ describe('personnel data stays out of git', () => {
      * Test fixtures deliberately use NRIC-shaped placeholders, so this allows the two that
      * exist by name rather than by pattern. Anything else matching is a leak.
      */
-    const ALLOWED = new Set(['S1234568B', 'T0573638I']);
+    /*
+     * Each of these exists so a test can prove an NRIC does NOT reach somewhere:
+     *   S1234568B  a FormSG webhook fixture in the Apps Script harness
+     *   T0573638I  asserted absent from the dashboard feed reply
+     *   T0000001A  asserted absent from a mapped FormSG row
+     * They have to be NRIC-shaped to be worth anything, so they are allowed by exact value
+     * rather than by loosening the pattern.
+     */
+    const ALLOWED = new Set(['S1234568B', 'T0573638I', 'T0000001A']);
     const NRIC = /\b[STFGM]\d{7}[A-Z]\b/g;
 
     const found: string[] = [];

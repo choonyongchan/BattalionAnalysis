@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "test": "bun test ./test/ ./whatsapp/test/",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun --env-file=.env.local scripts/apply-migrations.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

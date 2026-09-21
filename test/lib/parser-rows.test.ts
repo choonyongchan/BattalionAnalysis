@@ -354,3 +354,35 @@ describe('section counts', () => {
     expect(rows.sectionCounts[0]!.statedCount).toBe(2);
   });
 });
+
+describe('placeholder dashes', () => {
+  test('a vacant appointment written as a dash does not become a rank', () => {
+    // Hercules files "PDS MED: -". The model returns the dash faithfully; storing it would
+    // put "-" on the ORBAT page beside real ranks.
+    const rows = buildRows(
+      extraction({
+        command_team: [
+          { role_kind: 'PDS', unit_label: 'MED', rank: '-', name: '-', is_vacant: true },
+        ],
+      }),
+      context,
+    );
+    expect(rows.roster[0]!.rank).toBeNull();
+    expect(rows.roster[0]!.name).toBeNull();
+    expect(rows.roster[0]!.isVacant).toBe(true);
+  });
+
+  test('keeps a real rank and name untouched', () => {
+    const rows = buildRows(
+      extraction({
+        command_team: [
+          { role_kind: 'CDO', unit_label: null, rank: '2LT', name: 'TAN AH KOW', is_vacant: false },
+        ],
+      }),
+      context,
+    );
+    expect(rows.roster[0]!.rank).toBe('2LT');
+    expect(rows.roster[0]!.name).toBe('TAN AH KOW');
+    expect(rows.roster[0]!.isVacant).toBe(false);
+  });
+});

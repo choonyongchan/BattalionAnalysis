@@ -181,17 +181,38 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
     sourceLine: person.source_line,
   }));
 
-  const roster = extraction.command_team.map((member) => ({
-    paradeResponseId: key,
-    roleKind: member.role_kind,
-    unitLabel: member.unit_label,
-    rank: member.rank,
-    name: member.name,
-    nameKey: member.name ? normaliseName(member.name) : null,
-    isVacant: Boolean(member.is_vacant) || !member.name,
-  }));
+  const roster = extraction.command_team.map((member) => {
+    // A vacant appointment is written as "CDS: -", and the model faithfully returns the
+    // dash. Storing it as a rank would put "-" on the ORBAT page beside real ranks.
+    const rank = blankToNull(member.rank);
+    const name = blankToNull(member.name);
+    return {
+      paradeResponseId: key,
+      roleKind: member.role_kind,
+      unitLabel: blankToNull(member.unit_label),
+      rank,
+      name,
+      nameKey: name ? normaliseName(name) : null,
+      isVacant: Boolean(member.is_vacant) || !name,
+    };
+  });
 
   return { submission, strength, personnel, roster, sectionCounts };
+}
+
+/** Placeholders a filer writes to mean "nothing here". */
+const BLANK_PLACEHOLDERS = new Set(['', '-', '--', '–', '—', 'NIL', 'N/A', 'NA']);
+
+/**
+ * Treats a placeholder dash as an absent value.
+ *
+ * @param value A field as the model returned it.
+ * @returns The trimmed value, or null when it carries no information.
+ */
+function blankToNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return BLANK_PLACEHOLDERS.has(trimmed.toUpperCase()) ? null : trimmed;
 }
 
 /**
