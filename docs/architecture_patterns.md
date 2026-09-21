@@ -16,9 +16,8 @@ another, and a change to one cannot break another.
 
 | Pipeline | Entry point | Lands in |
 |---|---|---|
-| Parade state (AI) | `src/parser/Parser.js` — `handlePost` (primary), plus installable `onEdit` and `onFormSubmit` triggers | `Parade State Responses` → `Strength Data`, `Personnel Data`, `Command Roster` |
-| Report sick (FormSG) | `src/formsg/FormSgSheet.js` — `handlePost` | `Report Sick FormSG Responses` |
-| WhatsApp relay | `whatsapp/src/index.js` — a long-running Bun process | POSTs to the parade-state route above |
+| Parade state (AI) | `whatsapp/src/index.js` — long-running Bun process on the ops laptop; parses via `lib/pipeline.ts` | `raw_messages` → `parade_submissions`, `strength_rows`, `personnel_rows`, `command_roster_rows`, `section_counts` |
+| Report sick (FormSG) | `api/formsg.ts` — Vercel Function, FormSG webhook | `formsg_submissions`, `formsg_statuses` |
 
 The WhatsApp relay runs under an in-repo Bun supervisor (`whatsapp/src/supervisor.js`,
 which is what `bun start` runs): it spawns `whatsapp/src/index.js`, forwards its output,
@@ -43,23 +42,24 @@ answer 200.
 `WebApp.js` is therefore the one file that knows all three exist. That is the whole of
 the coupling, and it is deliberately confined to a file with no logic of its own.
 
-## Three ways into the parade-state pipeline
+## How the parade-state pipeline runs
 
-All three converge on `Parser.processRow(rowIndex, previousId)`:
+The WhatsApp runner (`whatsapp/src/index.js`) is the only way in. It stores every
+accepted message through `recordMessage`, then drains the backlog through `parseDue`
+— both in `lib/pipeline.ts` — running once at start-up and again on every
+`PARSE_INTERVAL_MS` tick. A drain is single-flight: a call made while one is already
+running does not start a second, it just asks the running drain to go round once more
+when it finishes, so two `parseDue` runs never select the same row and pay twice for
+the same extraction. Parsing runs here rather than on Vercel because one extraction
+takes 74–126 seconds — past the Hobby plan's 60-second function cap — and Hobby also
+refuses the sub-daily cron that would otherwise have swept a queue. A long-running
+process on the ops laptop has neither limit. The runner connects to Neon as the
+`parade_ingest` role (`db/grants-ingest.sql`), which can store raw messages and write
+parsed rows and nothing else — no FormSG or dashboard access.
 
-- **`handlePost`** — the WhatsApp bridge relays a message; the row is appended and
-  processed in one execution. This is the primary intake. A redelivery whose row is
-  still blank (a first delivery that never finished) is reprocessed in the same
-  execution rather than dropped.
-- **`onEditHandler`** — clearing a row's `parade_response_id` by hand forces a re-run.
-  This is the manual override, and it needs no editor access. `reprocessPendingRows`
-  (Sheets menu macro) is the capped batch equivalent for every still-blank row.
-- **`onFormSubmitHandler`** — the Google Form, kept as a fallback. It needs its own
-  trigger because a Form submission does not fire `onEdit`.
-
-Why the bridge posts rather than writing the sheet through the Sheets API: **installable
-triggers do not fire for API requests**. A direct write would land the row and trigger
-nothing, which is the constraint that originally forced the Form hop.
+`api/whatsapp.ts` and `api/parse-due.ts` — the Vercel webhook and cron drain this
+replaced — are retired but still exist and are still deployed; they are removed only
+after the local runner is verified live.
 
 ## The row is the state
 

@@ -1,20 +1,24 @@
-# WhatsApp → Google Sheets bridge
+# WhatsApp parade-state runner
 
-Watches a WhatsApp group for first parade states, discards everything else, and relays the accepted messages to
-the Apps Script web app that writes the spreadsheet.
+Watches a WhatsApp group for first parade states, discards everything else, and stores and parses the accepted
+messages itself — no relay, no Apps Script, no Vercel Function in the loop.
 
 ```
-WhatsApp group ─► first-parade check ─► POST ?route=paradestate ─► append row ─► Parser.processRow
-   (Baileys)         (signature.js)      (appsScriptClient.js)     └── existing Apps Script project ──┘
+WhatsApp group ─► first-parade check ─► recordMessage ─► parseDue ─► parade_submissions, strength_rows, ...
+   (Baileys)         (signature.js)      (lib/pipeline.ts, on this Bun process, against Neon)
 ```
 
-The handler appends the *Parade State Responses* row **and** runs the pipeline in the same execution, so an
-accepted message reaches *Strength Data* within seconds.
+`recordMessage` stores the text idempotently and returns as soon as it is durable; `parseDue` does the extraction
+and runs behind it, on a drain loop described under *Setup* and *Running it permanently on Windows* below. Storing
+and parsing are split because one extraction takes 74–126 seconds, so a slow model delays a row, it never blocks
+the socket that is still listening for the next message.
 
-**This used to go through a Google Form.** The Form was a pure relay, there only because `onFormSubmit` was the
-one trigger that fired reliably: an installable trigger does not fire for API writes, so writing the sheet
-directly made nothing happen. Handling the POST removes the hop, the scraped `entry.<digits>` id, and the script
-that discovered it. The Form still works, untouched, as a manual fallback.
+**History: this used to relay through Apps Script, and briefly through a Vercel Function plus a cron drain.**
+Parsing moved onto this long-running process because 74–126 seconds is past the Vercel Hobby plan's 60-second
+function cap, and Hobby also refuses the sub-daily cron that would otherwise have swept a backlog. The Vercel
+webhook and cron drain (`api/whatsapp.ts`, `api/parse-due.ts`) are retired but still exist and are still deployed;
+they are removed only after this runner has been verified live. The Apps Script project and its Google Form
+fallback predate both and are fully decommissioned.
 
 ## Why Baileys
 
@@ -36,24 +40,29 @@ If the unofficial-client risk is unacceptable long-term, the durable options are
 |---|---|---|
 | **WhatsApp Cloud API** | ✗ | Official webhooks, but 1:1 only. Companies would DM the parade state to a business number instead of posting in the group. |
 | **Telegram Bot API** | ✓ | Official, free, native group support, real webhooks. The cleanest long-term home if the unit can move channels. |
-| **Google Form** | n/a | Still deployed as the manual fallback; the bridge exists to remove the copy-paste, not to replace the Form. |
+| **Google Form** | n/a | History only — the Apps Script project and its Form fallback are decommissioned; this runner replaced them. |
 
 ## Setup
 
+The runner imports `../lib` and `../db` from the repo root, so both the root package and this one need their
+own install:
+
 ```bash
+# from the repo root
+bun install
+
 cd whatsapp
 bun install
 cp .env.example .env
 ```
 
-**1. Point at the web app.** Deploy the Apps Script project as a web app (see the root `README.md`) and copy its
-`/exec` URL into `APPS_SCRIPT_URL`. Do **not** append a query string — the bridge adds `?route=paradestate`
-itself.
+**1. Point at Neon.** Run `db/grants-ingest.sql` once against the database (see its header comment for the exact
+`psql` invocation) to create the `parade_ingest` role, then put that role's connection string — **not** the
+owner's — into `DATABASE_URL` in `whatsapp/.env`. That role can only store raw messages and write parsed rows.
 
-**2. Share the token.** Put the same long random string into `APPS_SCRIPT_TOKEN` here and into the
-`WHATSAPP_INGEST_TOKEN` script property on the Apps Script side (set it under Project
-Settings → Script Properties). The endpoint
-rejects everything if they disagree, or if the property was never set.
+**2. Add the OpenAI key.** Set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to whatever
+`lib/parser/extract.ts` picks; `PARSE_INTERVAL_MS` (default 300000) is optional too — it only controls how often
+leftovers are swept, since a new message is parsed as soon as it arrives.
 
 **3. Pair WhatsApp and find the group.** Leave `WA_GROUP_ID` blank, set `LOG_LEVEL=debug` and `DRY_RUN=1`, then:
 
@@ -68,7 +77,7 @@ reveals its JID. Copy that into `WA_GROUP_ID` and restart.
 **4. Dry run.** Still with `DRY_RUN=1`, post a real parade state and some chatter in the group. You should see
 exactly one `DRY_RUN` line, and the chatter logged at `debug` with a rejection reason.
 
-**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, and restart.
+**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, and restart with `bun start`.
 
 ## Running it permanently on Windows
 
@@ -147,29 +156,31 @@ run `bun test`.
 
 ## Idempotency
 
-The bridge keeps **no** local record of what it has sent. Dedup lives server-side, keyed on the Baileys message
-id, which the relay sends and the handler stores in the `wa_message_id` column.
+The runner keeps **no** local record of what it has stored. Dedup lives in Neon, on the `wa_message_id` unique
+constraint on `raw_messages`: `recordMessage` inserts on conflict-do-nothing, so an insert that hits the
+constraint tells the caller a row already exists rather than raising.
 
-That is not a simplification for its own sake — it is where the dedup has to be. An Apps Script web app answers
-through a 302, and following it re-sends the POST body, so one call can run the handler twice. No amount of
-bookkeeping in the bridge would catch that. Baileys redelivering after a reconnect is the other cause, and one
-place that sees both is better than two that each see one.
+That is where the dedup has to be, not in-process — Baileys itself redelivers a message after a reconnect, and a
+process restart has no memory of what it stored before it died. A message that exists but was never parsed comes
+back from `recordMessage` as `stored`, not `duplicate`, which is how a row stranded by a crashed parse gets picked
+up on the next drain instead of being silently skipped.
 
 ## Layout
 
 | File | Role |
 |---|---|
-| `src/supervisor.js` | Spawns and restarts the bridge process (this is what `bun start` runs) |
+| `src/supervisor.js` | Spawns and restarts the runner process (this is what `bun start` runs) |
 | `src/index.js` | Wiring and the message handler |
 | `src/signature.js` | First-parade-state detection |
 | `src/listener.js` | Baileys socket, single-socket reconnect, envelope filtering |
-| `src/appsScriptClient.js` | Relays an accepted message to the web app |
+| `src/ingest.js` | Calls `recordMessage` / `parseDue` (`../../lib/pipeline.ts`) and runs the single-flight drain loop |
 | `src/config.js` | `.env` loading and validation |
 | `src/logger.js` | pino logger factory |
 | `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run reset-auth`) |
 | `test/` | `bun test` — signature suite plus the non-network modules |
 
-`auth/` and `.env` hold live credentials and are git-ignored.
+`auth/` and `.env` hold live credentials and are git-ignored. `src/appsScriptClient.js`, which relayed accepted
+messages to the retired Apps Script web app, was deleted when storage and parsing moved into `src/ingest.js`.
 
 ## Troubleshooting
 
@@ -177,13 +188,11 @@ place that sees both is better than two that each see one.
 |---|---|
 | QR code appears on every start | `auth/` is not writable, or the device was unlinked in WhatsApp |
 | `session logged out` / `session is dead` | Run `bun run reset-auth`, then `bun start`, then scan the QR again |
-| Occasional `Bad MAC` in the log, bridge keeps running | One inbound message failed to decrypt; Baileys drops it. No action — if it was a parade state, ask the sender to resend |
-| Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the bridge, `bun run reset-auth`, `bun start`, re-scan |
+| Occasional `Bad MAC` in the log, runner keeps running | One inbound message failed to decrypt; Baileys drops it. No action — if it was a parade state, ask the sender to resend |
+| Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the runner, `bun run reset-auth`, `bun start`, re-scan |
 | Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun start` |
-| `Apps Script rejected the relay: unauthorised` | `APPS_SCRIPT_TOKEN` here does not match the `WHATSAPP_INGEST_TOKEN` script property, or that property was never set |
-| `Apps Script rejected the relay: unknown_route` | `APPS_SCRIPT_URL` already carries a query string, or points at something other than the `/exec` URL |
-| `HTTP 404` on every relay | The web app was never deployed, or was deployed as a new *project* rather than a new *version* |
-| Relay succeeds but nothing appears in the Sheet | A `clasp push` is not a deploy — deploy a new version. Check **Executions** in the Apps Script editor for what the handler logged |
-| Relay reports `already recorded` for a new message | Two messages share a Baileys id, or the row was appended and then had its text edited. A row that is still blank now reprocesses on the next redelivery on its own; only a row already holding a key or `ERROR` needs its `parade_response_id` cleared by hand |
+| `Missing required environment variable ...` at start-up | `whatsapp/.env` is missing a required key, or the process was started from somewhere other than `whatsapp/` — Bun only loads `.env` out of the working directory |
+| `parse run failed; will retry on the next drain` in the log | `parseDue` threw — usually `DATABASE_URL` unreachable or the OpenAI call failed. The message stays unparsed and the next drain (on `PARSE_INTERVAL_MS`, or the next incoming message) retries it |
+| A message is stored but never parses | Check `OPENAI_API_KEY` is valid and `OPENAI_MODEL` (if set) names a real model; `logger.error` on a failed run names the underlying error |
 | A real parade state was rejected | Run with `LOG_LEVEL=debug`; the reason names the failing gate |
 | A first parade state was rejected as "not a first parade state" | Its header has no `FIRST PARADE` marker and no timing before 12:00 — check the timing is in the first 5 non-empty lines |
