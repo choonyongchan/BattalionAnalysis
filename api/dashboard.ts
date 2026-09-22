@@ -66,13 +66,18 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 /**
  * The Vercel entry point.
  *
+ * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
+ * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
+ *
  * @param request The incoming request.
  * @returns The response.
  */
-export default function (request: Request): Promise<Response> {
+function route(request: Request): Promise<Response> {
   return handle(request, {
     loadTabs: () => loadTabs(getDb('DASHBOARD_DATABASE_URL')),
     dashboardPassword: process.env.DASHBOARD_PASSWORD,
     hasDatabase: Boolean(process.env.DASHBOARD_DATABASE_URL),
   });
 }
+
+export { route as GET };

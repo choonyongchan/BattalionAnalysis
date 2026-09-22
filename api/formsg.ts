@@ -109,10 +109,13 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 /**
  * The Vercel entry point.
  *
+ * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
+ * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
+ *
  * @param request The incoming request.
  * @returns The response.
  */
-export default function (request: Request): Promise<Response> {
+function route(request: Request): Promise<Response> {
   return handle(request, {
     db: getDb(),
     secretKey: process.env.FORMSG_SECRET_KEY,
@@ -120,3 +123,5 @@ export default function (request: Request): Promise<Response> {
     sdk: formsgSdk({ mode: 'production' }),
   });
 }
+
+export { route as POST };
