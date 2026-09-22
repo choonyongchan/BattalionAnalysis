@@ -110,11 +110,29 @@ export function csvRecords(text: string): SheetRow[] {
     .map((row) => Object.fromEntries(names.map((name, i) => [name, (row[i] ?? '').trim()])));
 }
 
+/** Month abbreviations in FormSG's export timestamps, e.g. `07 May 2026 19:21:00`. */
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/**
+ * Reads the day, month and year out of a day-first date: `d/M/yyyy` or `d Mon yyyy`.
+ *
+ * @param text The trimmed cell.
+ * @returns `[day, month, year]` as strings, or null.
+ */
+function dayFirstParts(text: string): [string, string, string] | null {
+  const slashed = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/.exec(text);
+  if (slashed) return [slashed[1]!, slashed[2]!, slashed[3]!];
+  const named = /^(\d{1,2}) ([A-Za-z]{3})[A-Za-z]* (\d{4})\b/.exec(text);
+  const month = named ? MONTHS.indexOf(named[2]!.toLowerCase()) + 1 : 0;
+  return named && month ? [named[1]!, String(month), named[3]!] : null;
+}
+
 /**
  * Reads a date cell as ISO `yyyy-MM-dd`.
  *
- * Accepts ISO (what the parser wrote) and the day-first `d/M/yyyy` a Singapore-locale Sheet
- * displays. Anything else is null, so an ambiguous format is rejected rather than guessed.
+ * Accepts ISO (what the parser wrote), the day-first `d/M/yyyy` a Singapore-locale Sheet
+ * displays, and FormSG's `d Mon yyyy`. Anything else is null, so an ambiguous format is
+ * rejected rather than guessed.
  *
  * @param value The cell.
  * @returns The date, or null.
@@ -123,17 +141,17 @@ export function sheetDate(value: string | undefined): string | null {
   const text = (value ?? '').trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/.exec(text);
-  if (!dmy) return null;
-  const [, d, m, y] = dmy;
+  const parts = dayFirstParts(text);
+  if (!parts) return null;
+  const [d, m, y] = parts;
   if (Number(m) > 12 || Number(d) > 31) return null;
-  return `${y}-${m!.padStart(2, '0')}-${d!.padStart(2, '0')}`;
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
 /**
  * Reads a Sheet timestamp, which is Singapore-local wall time, as a UTC ISO instant.
  *
- * @param value e.g. `2026-06-22 08:15:23`, `2026-06-22T08:15:23` or `22/06/2026 8:15:23`.
+ * @param value e.g. `2026-06-22 08:15:23`, `22/06/2026 8:15:23` or `22 Jun 2026 08:15:23`.
  * @returns The instant, or null when the date part is unreadable.
  */
 export function sheetTimestamp(value: string | undefined): string | null {
@@ -330,8 +348,11 @@ export function groupParadeStates(tabs: {
   };
 
   const tallies: Record<string, Tally> = {};
+  const keys = ['strength', 'personnel', 'roster'] as const;
   const mappers = { strength: mapStrength, personnel: mapPersonnel, roster: mapRoster } as const;
-  for (const key of ['strength', 'personnel', 'roster'] as const) {
+  /** CSV row numbers grouped under each id, so a dropped group's rows are reported too. */
+  const rowNumbers = new Map<string, Array<[(typeof keys)[number], number]>>();
+  for (const key of keys) {
     const tally: Tally = { read: 0, rejected: [] };
     tabs[key].forEach((row, index) => {
       tally.read++;
@@ -339,16 +360,22 @@ export function groupParadeStates(tabs: {
       const mapped = mappers[key]({ ...row, parade_response_id: id });
       const group = mapped ? groupFor(id) : null;
       if (!mapped || !group) tally.rejected.push(index + 2);
-      else group[key].push(mapped);
+      else {
+        group[key].push(mapped);
+        rowNumbers.set(id, [...(rowNumbers.get(id) ?? []), [key, index + 2]]);
+      }
     });
     tallies[key] = tally;
   }
 
   // A submission with no Company roll-up would chart as zero strength; the parser refuses
-  // those, so the import does too.
+  // those, so the import does too, and reports every row it drops with them.
   for (const [id, group] of groups) {
-    if (!group.strength.some((row) => row.unitType === 'Company')) groups.delete(id);
+    if (group.strength.some((row) => row.unitType === 'Company')) continue;
+    groups.delete(id);
+    for (const [key, rowNumber] of rowNumbers.get(id) ?? []) tallies[key]!.rejected.push(rowNumber);
   }
+  for (const key of keys) tallies[key]!.rejected.sort((a, b) => a - b);
   return { groups, tallies };
 }
 
@@ -375,8 +402,10 @@ export function mapFormSg(row: SheetRow): Record<string, unknown> | null {
  * @returns The insert, or null without a readable date.
  */
 export function mapHoliday(row: SheetRow): Record<string, unknown> | null {
-  const date = sheetDate(row.date);
-  return date ? { date, name: orNull(row.name) } : null;
+  // The backup's rows hold `date<TAB>name` in the date cell, with the name cell empty.
+  const [dateCell, tabbedName] = (row.date ?? '').split('\t');
+  const date = sheetDate(dateCell);
+  return date ? { date, name: orNull(row.name) ?? orNull(tabbedName) } : null;
 }
 
 /**

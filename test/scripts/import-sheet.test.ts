@@ -54,6 +54,9 @@ describe('sheetDate', () => {
     ['2026-06-22 08:00:00', '2026-06-22'],
     ['22/6/2026', '2026-06-22'],
     ['01/02/2026', '2026-02-01'],
+    ['07 May 2026 19:21:00', '2026-05-07'],
+    ['3 Sep 2026', '2026-09-03'],
+    ['12 Foo 2026', null],
     ['', null],
     ['June 22', null],
     ['6/22/2026', null],
@@ -67,6 +70,7 @@ describe('sheetTimestamp', () => {
     expect(sheetTimestamp('2026-06-22 08:15:23')).toBe('2026-06-22T00:15:23.000Z');
     expect(sheetTimestamp('22/06/2026 7:05:00')).toBe('2026-06-21T23:05:00.000Z');
     expect(sheetTimestamp('2026-06-22')).toBe('2026-06-21T16:00:00.000Z');
+    expect(sheetTimestamp('07 May 2026 19:21:00')).toBe('2026-05-07T11:21:00.000Z');
     expect(sheetTimestamp('nonsense')).toBeNull();
   });
 });
@@ -145,7 +149,8 @@ describe('groupParadeStates', () => {
       extractedAt: '2026-06-21T23:45:00.000Z',
     });
     expect([group.strength.length, group.personnel.length, group.roster.length]).toEqual([2, 1, 1]);
-    expect(tallies.strength).toEqual({ read: 4, rejected: [5] });
+    // Row 4 belongs to a submission with no Company roll-up; row 5 to an unknown company.
+    expect(tallies.strength).toEqual({ read: 4, rejected: [4, 5] });
     expect(JSON.stringify([...groups.values()])).not.toContain('never read');
   });
 
@@ -196,6 +201,10 @@ describe('mapFormSg', () => {
 describe('settings tabs', () => {
   test('holidays and rotations map, and bad rows are tallied by CSV row number', () => {
     expect(mapHoliday({ date: '9/8/2026', name: 'National Day' })).toEqual({ date: '2026-08-09', name: 'National Day' });
+    expect(mapHoliday({ date: "2026-01-01\tNew Year's Day", name: '' })).toEqual({
+      date: '2026-01-01',
+      name: "New Year's Day",
+    });
     expect(mapRotation({ name: 'R1', start_date: '2026-07-01', end_date: '2026-09-30' })).toEqual({
       name: 'R1',
       startDate: '2026-07-01',
