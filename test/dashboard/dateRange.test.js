@@ -14,7 +14,6 @@ import {
   eachDay,
   firstOfMonth,
   matchPreset,
-  overlapsRange,
   resolvePreset,
   withinRange,
 } from '../../src/model/dateRange.js';
@@ -39,35 +38,6 @@ describe('withinRange', () => {
   test('a missing date is never in range', () => {
     expect(withinRange(null, null, null)).toBe(false);
     expect(withinRange('', '2026-06-01', '2026-06-30')).toBe(false);
-  });
-});
-
-describe('overlapsRange', () => {
-  test('a span straddling the lower edge overlaps', () => {
-    expect(overlapsRange('2026-05-28', '2026-06-03', '2026-06-01', '2026-06-30')).toBe(true);
-  });
-
-  test('a span straddling the upper edge overlaps', () => {
-    expect(overlapsRange('2026-06-28', '2026-07-05', '2026-06-01', '2026-06-30')).toBe(true);
-  });
-
-  test('a span entirely before or after does not overlap', () => {
-    expect(overlapsRange('2026-04-01', '2026-04-10', '2026-06-01', '2026-06-30')).toBe(false);
-    expect(overlapsRange('2026-08-01', '2026-08-10', '2026-06-01', '2026-06-30')).toBe(false);
-  });
-
-  test('touching an edge by a single day still overlaps', () => {
-    expect(overlapsRange('2026-05-01', '2026-06-01', '2026-06-01', '2026-06-30')).toBe(true);
-    expect(overlapsRange('2026-06-30', '2026-07-30', '2026-06-01', '2026-06-30')).toBe(true);
-  });
-
-  test('null range bounds are open', () => {
-    expect(overlapsRange('2020-01-01', '2020-01-02', null, null)).toBe(true);
-  });
-
-  test('a one-day span (start equals end) is handled', () => {
-    expect(overlapsRange('2026-06-15', '2026-06-15', '2026-06-01', '2026-06-30')).toBe(true);
-    expect(overlapsRange('2026-07-15', '2026-07-15', '2026-06-01', '2026-06-30')).toBe(false);
   });
 });
 

@@ -1,18 +1,17 @@
 /**
  * The dashboard's read of Neon: each Neon value must come back as the cell the retired Sheet
  * held, because every number in `src/model/` is computed from those cells.
+ *
+ * The cell helpers are pure. `loadTabs` runs against the Neon test branch (`TEST_DATABASE_URL`),
+ * filled through the app's own write paths -- the parade pipeline and the FormSG route -- and
+ * each tab is checked against the dummy data that went in.
+ * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
-import { describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import { sql } from 'drizzle-orm';
+import { handle as handleFormsg } from '../../api/formsg.ts';
 import type { Db } from '../../db/index.ts';
-import {
-  commandRosterRows,
-  paradeSubmissions,
-  personnelRows,
-  publicHolidays,
-  reportSickFormsg,
-  rotations,
-  strengthRows,
-} from '../../db/schema.ts';
+import { publicHolidays, rotations } from '../../db/schema.ts';
 import {
   loadTabs,
   personnelNumDays,
@@ -22,6 +21,7 @@ import {
   sgtDateTime,
   toTab,
 } from '../../lib/dashboard.ts';
+import { ingestMessage } from '../../lib/pipeline.ts';
 import {
   FORBIDDEN_HEADERS,
   FORBIDDEN_SUBMISSION_HEADERS,
@@ -30,8 +30,12 @@ import {
   STRENGTH_HEADERS,
   TABS as SHEET_TABS,
 } from '../../src/data/tabs.js';
+import { DB_TIMEOUT_MS, hasTestDb, readOnlyTestDb, resetTestDb, TEST_DASHBOARD_DATABASE_URL } from '../support/db.ts';
+import { FAKE_NRIC, FORM_KEYS, POST_URI, SICK_SPECS, sgtDay, testSdk, webhookRequest } from '../support/formsg.ts';
+import { allEntries, companyTotals, expectedCounts, expectedKey, renderEntry, renderParadeState } from '../support/paradeState.ts';
+import { SCENARIOS } from '../support/scenarios.ts';
 
-const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS', string>;
+const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS', string>;
 
 describe('platoonOf', () => {
   test.each([
@@ -116,86 +120,108 @@ describe('toTab', () => {
   });
 });
 
-/**
- * A stand-in for the Drizzle handle: every chain resolves to the rows for its `from` table.
- *
- * @param rows Rows per table.
- * @returns The fake handle.
- */
-function fakeDb(rows: Map<unknown, unknown[]>): Db {
-  const chain = (table: unknown): any => {
-    const self: any = {
-      innerJoin: () => self,
-      leftJoin: () => self,
-      where: () => self,
-      orderBy: () => self,
-      then: (resolve: (value: unknown[]) => unknown, reject: (e: unknown) => unknown) =>
-        Promise.resolve(rows.get(table) ?? []).then(resolve, reject),
-    };
-    return self;
-  };
-  return { select: () => ({ from: chain }) } as unknown as Db;
-}
 
-describe('loadTabs', () => {
-  const SUBMISSION = { id: 'Archer_2026-09-18_FPS', date: '2026-09-18', session: 'FPS', company: 'Archer' };
-  const db = fakeDb(
-    new Map<unknown, unknown[]>([
-      [strengthRows, [{ ...SUBMISSION, unitLabel: 'PLATOON 2', unitType: 'PLATOON', totalStrength: 30, totalPresent: 28 }]],
-      [
-        personnelRows,
-        [
-          {
-            ...SUBMISSION,
-            unitLabel: 'COY HQ',
-            fourD: '2105',
-            name: 'TEST PERSON',
-            rank: 'REC',
-            reasonCategory: 'Status',
-            startDate: '2026-09-01',
-            endDate: null,
-            numDays: null,
-            isPermanent: true,
-            dutyType: 'EXCUSE',
-            subReason: 'RMJ',
-            reportSickType: null,
-            location: null,
-          },
-        ],
-      ],
-      [commandRosterRows, [{ ...SUBMISSION, roleKind: 'PDS', unitLabel: '2', rank: '3SG', name: 'TEST PDS' }]],
-      [reportSickFormsg, [{ timestamp: '2026-09-18 00:15:23+00', rank: 'REC', name: 'TEST PERSON', fourD: '2105', unitCoy: 'Archer', reportSickType: 'RSI', reason: 'fever', symptoms: 'Fever' }]],
-      [paradeSubmissions, [{ id: SUBMISSION.id, filedAt: '2026-09-17 23:30:00+00' }]],
-      [publicHolidays, [{ date: '2026-08-09', name: 'National Day' }]],
-      [rotations, [{ name: 'R1', start_date: '2026-07-01', end_date: '2026-09-30' }]],
-    ]),
-  );
+describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’s own write paths', () => {
+  const SPECS = SCENARIOS.map(({ spec }) => spec);
+  const HOLIDAY = { date: '2026-08-09', name: 'National Day' };
+  const ROTATION = { name: 'R1', startDate: '2026-07-01', endDate: '2026-09-30' };
+  let db: Db;
+  let tabs: Awaited<ReturnType<typeof loadTabs>>;
 
-  test('answers every tab the dashboard reads, under its own header rows', async () => {
-    const tabs = await loadTabs(db);
+  beforeAll(async () => {
+    db = await resetTestDb();
+    for (const [index, spec] of SPECS.entries()) {
+      await ingestMessage(db, { waMessageId: `wa-${index}`, body: renderParadeState(spec) }, new Date(`${spec.date}T00:30:00Z`));
+    }
+    for (const spec of SICK_SPECS) {
+      await handleFormsg(webhookRequest(spec), { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
+    }
+    await db.insert(publicHolidays).values(HOLIDAY);
+    await db.insert(rotations).values(ROTATION);
+    tabs = await loadTabs(db);
+  }, DB_TIMEOUT_MS * 3);
+
+  /**
+   * A tab's rows as records keyed by header.
+   *
+   * @param tab The tab name.
+   * @returns The records.
+   */
+  function records(tab: string): Array<Record<string, unknown>> {
+    const [header, ...rows] = tabs[tab] as [string[], ...unknown[][]];
+    return rows.map((row) => Object.fromEntries(header.map((name, index) => [name, row[index]])));
+  }
+
+  test('answers every tab the dashboard reads, under its own header rows', () => {
     expect(Object.keys(tabs).sort()).toEqual(Object.values(SHEET_TABS as Record<string, string>).sort());
     expect(tabs[TABS.STRENGTH]![0]).toEqual(STRENGTH_HEADERS);
     expect(tabs[TABS.PERSONNEL]![0]).toEqual(PERSONNEL_HEADERS);
     expect(tabs[TABS.FORMSG]![0]).toEqual(FORMSG_HEADERS);
   });
 
-  test('shapes each value as the Sheet cell it replaces', async () => {
-    const tabs = await loadTabs(db);
-    const record = (tab: string) => {
-      const [header, row] = tabs[tab] as [string[], unknown[]];
-      return Object.fromEntries(header.map((name, i) => [name, row[i]]));
-    };
-    expect(record(TABS.STRENGTH)).toMatchObject({ platoon: '2', unit_type: 'PLATOON', total_present: 28 });
-    expect(record(TABS.PERSONNEL)).toMatchObject({ platoon: 'HQ', num_days: 999, reason: 'PERM EXCUSE (RMJ)', end_date: '' });
-    expect(record(TABS.ROSTER)).toMatchObject({ role: 'PDS2', name: 'TEST PDS' });
-    expect(record(TABS.FORMSG)).toMatchObject({ Timestamp: '2026-09-18T08:15:23', 'Unit & Coy': 'Archer' });
-    expect(record(TABS.SUBMISSIONS)).toEqual({ Timestamp: '2026-09-18T07:30:00', parade_response_id: SUBMISSION.id });
-  });
-
-  test('no NRIC or message-body header can leave the database', async () => {
-    const headers = Object.values(await loadTabs(db)).flatMap((values) => values[0] as string[]);
-    for (const forbidden of [...FORBIDDEN_HEADERS, ...FORBIDDEN_SUBMISSION_HEADERS]) {
-      expect(headers).not.toContain(forbidden);
+  test('Strength Data has one row per strength block, with the stated figures', () => {
+    const rows = records(TABS.STRENGTH);
+    expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + expectedCounts(spec).strength, 0));
+    for (const spec of SPECS) {
+      const company = rows.find((row) => row.parade_response_id === expectedKey(spec) && row.unit_type === 'Company');
+      expect(company).toMatchObject({ date: spec.date, company: spec.company, total_present: companyTotals(spec).total.present });
     }
   });
+
+  test('Personnel Data has one row per entry line, with platoons and the PERM sentinel', () => {
+    const rows = records(TABS.PERSONNEL);
+    const entries = SPECS.flatMap((spec) => allEntries(spec).map((entry) => ({ spec, entry })));
+    expect(rows).toHaveLength(entries.length);
+    expect(rows.map((row) => row.name).sort()).toEqual(entries.map(({ entry }) => entry.name).sort());
+    for (const { spec, entry } of entries) {
+      const row = rows.find((candidate) => candidate.parade_response_id === expectedKey(spec) && candidate.name === entry.name && candidate.reason_category === entry.section);
+      expect(row!.platoon).toBe(entry.unit === 'HQ' ? 'HQ' : entry.unit.replace('PL ', ''));
+      if (entry.perm) expect(row).toMatchObject({ num_days: 999, reason: expect.stringContaining('PERM') });
+    }
+  });
+
+  test('Command Roster has every appointment, a PDS carrying its platoon', () => {
+    const rows = records(TABS.ROSTER);
+    expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + spec.command.length, 0));
+    expect(rows.map((row) => row.role)).toContain('PDS1');
+  });
+
+  test('the FormSG tab has each submission once, in Singapore time, with no NRIC', () => {
+    const rows = records(TABS.FORMSG);
+    expect(rows).toHaveLength(SICK_SPECS.length);
+    for (const spec of SICK_SPECS) {
+      const row = rows.find((candidate) => candidate['[Myinfo] Name'] === spec.name);
+      expect(String(row!.Timestamp)).toStartWith(sgtDay(spec.created));
+    }
+    expect(JSON.stringify(tabs)).not.toContain(FAKE_NRIC);
+  });
+
+  test('the submissions tab lists each parade state once; holidays and rotations come through', () => {
+    expect(records(TABS.SUBMISSIONS).map((row) => row.parade_response_id).sort()).toEqual(SPECS.map(expectedKey).sort());
+    expect(records(TABS.HOLIDAYS)).toEqual([HOLIDAY]);
+    expect(records(TABS.ROTATIONS)).toEqual([
+      { name: ROTATION.name, start_date: ROTATION.startDate, end_date: ROTATION.endDate },
+    ]);
+  });
+
+  test('no NRIC header, and no message text, can leave the database', () => {
+    const headers = Object.values(tabs).flatMap((values) => values[0] as string[]);
+    for (const forbidden of [...FORBIDDEN_HEADERS, ...FORBIDDEN_SUBMISSION_HEADERS]) expect(headers).not.toContain(forbidden);
+    // A whole entry line appears only in the message body and `source_line`, neither of which is read.
+    const line = renderEntry(SCENARIOS[1]!.spec.units[0]!.entries[0]!, 1);
+    expect(JSON.stringify(tabs)).not.toContain(line);
+  });
+});
+
+describe.skipIf(!hasTestDb || !TEST_DASHBOARD_DATABASE_URL)('as the read-only dashboard_read role', () => {
+  test('reads every tab, but can neither read a message body nor write', async () => {
+    const owner = await resetTestDb();
+    await ingestMessage(owner, { waMessageId: 'wa-1', body: renderParadeState(SCENARIOS[1]!.spec) }, new Date('2026-09-18T00:30:00Z'));
+    const reader = readOnlyTestDb();
+
+    const tabs = await loadTabs(reader);
+    expect(tabs[TABS.PERSONNEL]!.length).toBeGreaterThan(1);
+    await expect(reader.execute(sql`select body from raw_messages`)).rejects.toThrow();
+    await expect(reader.execute(sql`delete from raw_messages`)).rejects.toThrow();
+  }, DB_TIMEOUT_MS);
 });

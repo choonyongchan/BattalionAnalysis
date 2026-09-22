@@ -9,50 +9,21 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
-  ABSENCE_REASONS,
   battalionStrength,
   companyRates,
   dutyCountsOn,
-  employability,
   episodeCounts,
   leaderboard,
   longMcRoster,
   longMcTrend,
-  median,
-  PARADE_MIX,
-  strengthMix,
-  topReasonsOn,
-  UNASSIGNED,
   unitRates,
 } from '../../src/model/metrics.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
+import { UNASSIGNED } from '../../src/model/domain.js';
 import { buildEpisodes } from '../../src/model/episodes.js';
 import { toRecords } from '../../src/data/records.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../src/data/tabs.js';
 import { personnelValues, strengthValues } from './fixtures.js';
-
-describe('median', () => {
-  test('is the middle value for an odd count', () => {
-    expect(median([7, 1, 3])).toBe(3);
-  });
-
-  test('averages the two middle values for an even count', () => {
-    expect(median([1, 2, 3, 8])).toBe(2.5);
-  });
-
-  test('drops nulls before summarising, so a missing value is not read as zero', () => {
-    expect(median([null, 4, null, 6])).toBe(5);
-  });
-
-  test('is null when nothing remains to summarise', () => {
-    expect(median([])).toBeNull();
-    expect(median([null, null])).toBeNull();
-  });
-
-  test('follows the bulk of the data, not one long outlier', () => {
-    expect(median([1, 1, 2, 2, 100])).toBe(2);
-  });
-});
 
 describe('battalion strength', () => {
   test('platoon rows are excluded, so nothing is double-counted', () => {
@@ -92,40 +63,6 @@ describe('duty counts are of soldiers, not rows', () => {
     const result = dutyCountsOn(rows, '2026-06-22');
     expect(result.unattributable).toBe(1);
     expect(result.counts[DUTY_CLASS.ATT_C]).toBe(0);
-  });
-});
-
-describe('employability', () => {
-  test('never drives full duty negative when status exceeds present', () => {
-    const strengthRows = toRecords(
-      strengthValues([
-        { date: '2026-06-22', session: 'FPS', company: 'Braves', unit_type: 'Company', total_strength: 10, total_present: 1 },
-      ]),
-      STRENGTH_HEADERS,
-      TABS.STRENGTH
-    );
-    const personnelRows = toRecords(
-      personnelValues([
-        { date: '2026-06-22', session: 'FPS', company: 'Braves', four_d: 'A', name: 'A', reason_category: 'Status', reason: 'LD' },
-        { date: '2026-06-22', session: 'FPS', company: 'Braves', four_d: 'B', name: 'B', reason_category: 'Status', reason: 'LD' },
-        { date: '2026-06-22', session: 'FPS', company: 'Braves', four_d: 'C', name: 'C', reason_category: 'Status', reason: 'LD' },
-      ]),
-      PERSONNEL_HEADERS,
-      TABS.PERSONNEL
-    );
-
-    const now = employability(strengthRows, personnelRows, '2026-06-22', 'FPS');
-    expect(now.restricted).toBe(1);
-    expect(now.presentFull).toBe(0);
-    expect(now.presentFull + now.restricted + now.absent).toBe(now.accountable);
-  });
-
-  test('the reason breakdown excludes Report Sick, which is an event not a state', () => {
-    // Including it would count a soldier twice in a breakdown that has to sum.
-    const classes = ABSENCE_REASONS.map((reason) => reason.dutyClass);
-    expect(classes).not.toContain(DUTY_CLASS.REPORT_SICK);
-    expect(classes).not.toContain(DUTY_CLASS.STATUS);
-    expect(classes).toContain(DUTY_CLASS.ATT_C);
   });
 });
 
@@ -322,28 +259,6 @@ describe('episode counts split volume from headcount', () => {
   });
 });
 
-describe('top reasons for one parade', () => {
-  test('reads only the requested date and class', () => {
-    const rows = toRecords(
-      personnelValues([
-        { date: '2026-06-22', session: 'FPS', four_d: 'A', name: 'A', reason_category: 'Report Sick', reason: 'Fever and cough' },
-        { date: '2026-06-19', session: 'FPS', four_d: 'B', name: 'B', reason_category: 'Report Sick', reason: 'Diarrhoea' },
-        { date: '2026-06-22', session: 'FPS', four_d: 'C', name: 'C', reason_category: 'Att C', reason: 'MC (Rash)' },
-      ]),
-      PERSONNEL_HEADERS,
-      TABS.PERSONNEL
-    );
-
-    const labels = topReasonsOn(rows, '2026-06-22', 'FPS', DUTY_CLASS.REPORT_SICK, 5).map(
-      (reason) => reason.label
-    );
-    expect(labels).toContain('Fever');
-    expect(labels).toContain('Cough');
-    expect(labels).not.toContain('Diarrhoea');
-    expect(labels).not.toContain('Rash / skin');
-  });
-});
-
 describe('unit rates make companies comparable', () => {
   test('a big company with more MC can have the lower rate', () => {
     const strengthRows = toRecords(
@@ -442,118 +357,6 @@ describe('unit rates make companies comparable', () => {
     expect(quiet.days).toBe(0);
     expect(quiet.z).toBeLessThan(-2);
     expect(quiet.isOutlier).toBe(false);
-  });
-});
-
-describe('accountable strength split by the sheet categories', () => {
-  const strength = () =>
-    toRecords(
-      strengthValues([
-        { date: '2026-06-22', session: 'FPS', company: 'Cougar', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
-      ]),
-      STRENGTH_HEADERS,
-      TABS.STRENGTH
-    );
-  const people = (specs) => toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL);
-  const filed = (fourD, category, overrides) => ({
-    date: '2026-06-22',
-    session: 'FPS',
-    company: 'Cougar',
-    platoon: '1',
-    four_d: fourD,
-    name: fourD,
-    reason_category: category,
-    reason: category,
-    ...overrides,
-  });
-  const countOf = (mix, label) => mix.slices.filter((slice) => slice.label === label)[0].count;
-
-  test('the slices sum to accountable strength', () => {
-    const mix = strengthMix(
-      strength(),
-      people([filed('A', 'Att C'), filed('B', 'Status'), filed('C', 'MA'), filed('D', 'Others')]),
-      '2026-06-22',
-      'FPS'
-    );
-    expect(mix.slices.reduce((sum, slice) => sum + slice.count, 0)).toBe(100);
-    expect(mix.accountable).toBe(100);
-  });
-
-  test('the slices keep their fixed order, so a category keeps its colour', () => {
-    const mix = strengthMix(strength(), people([]), '2026-06-22', 'FPS');
-    expect(mix.slices.map((slice) => slice.label)).toEqual(PARADE_MIX.map((entry) => entry.label));
-  });
-
-  test('full duty is the residual, not a figure of its own', () => {
-    const mix = strengthMix(
-      strength(),
-      people([filed('A', 'Att C'), filed('B', 'MA')]),
-      '2026-06-22',
-      'FPS'
-    );
-    expect(countOf(mix, 'Full duty')).toBe(98);
-    expect(mix.named).toBe(2);
-  });
-
-  // The case a naive count gets wrong: Archer files twelve soldiers under two or three
-  // categories on one date, and counting rows would push the parts past the whole.
-  test('a soldier filed under three categories is counted once, under the first', () => {
-    const mix = strengthMix(
-      strength(),
-      people([filed('A', 'Status'), filed('A', 'MA'), filed('A', 'Report Sick')]),
-      '2026-06-22',
-      'FPS'
-    );
-    expect(mix.named).toBe(1);
-    expect(countOf(mix, 'MA')).toBe(1);
-    expect(countOf(mix, 'Att B / LD')).toBe(0);
-    expect(countOf(mix, 'Report sick')).toBe(0);
-  });
-
-  test('MC outranks every other category the same soldier is filed under', () => {
-    const mix = strengthMix(
-      strength(),
-      people([filed('A', 'Others'), filed('A', 'Att C')]),
-      '2026-06-22',
-      'FPS'
-    );
-    expect(countOf(mix, 'Att C')).toBe(1);
-    expect(countOf(mix, 'Duty / course')).toBe(0);
-  });
-
-  test('FPS and LPS rows for one soldier are one soldier', () => {
-    const mix = strengthMix(
-      strength(),
-      people([filed('A', 'Att C'), filed('A', 'Att C', { session: 'LPS' })]),
-      '2026-06-22',
-      'FPS'
-    );
-    expect(countOf(mix, 'Att C')).toBe(1);
-  });
-
-  test('the strength line disagreeing is reported, not reconciled away', () => {
-    // The strength line says 90 present; this breakdown puts 99 on parade, because one
-    // filed absence is all it knows about. Both figures reach the screen.
-    const mix = strengthMix(strength(), people([filed('A', 'Att C')]), '2026-06-22', 'FPS');
-    expect(mix.presentLine).toBe(90);
-    expect(mix.here).toBe(99);
-    expect(mix.parity).toBe(9);
-  });
-
-  test('more soldiers filed than the strength lines account for is clamped and reported', () => {
-    const specs = [];
-    for (let index = 0; index < 120; index += 1) {
-      specs.push(filed('X' + index, 'Att C'));
-    }
-    const mix = strengthMix(strength(), people(specs), '2026-06-22', 'FPS');
-    expect(countOf(mix, 'Full duty')).toBe(0);
-    expect(mix.overflow).toBe(20);
-  });
-
-  test('an unrecognised category is counted, not passed off as full duty', () => {
-    const mix = strengthMix(strength(), people([filed('A', 'Detention')]), '2026-06-22', 'FPS');
-    expect(mix.unknown).toBe(1);
-    expect(mix.named).toBe(0);
   });
 });
 

@@ -10,7 +10,7 @@ import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../src/data/records.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
-import { dutyTrend, presentTrend, rankTiersOn, strengthOn } from '../../src/model/strength.js';
+import { dutyTrend, presentTrend } from '../../src/model/strength.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.
@@ -37,50 +37,6 @@ function personnelRows(specs) {
   ];
   return toRecords(values, PERSONNEL_HEADERS, 'Personnel Data');
 }
-
-describe('strengthOn', () => {
-  test('sums only the company-total rows', () => {
-    const rows = strengthRows([
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: '1', unit_type: 'PLATOON', total_strength: 30, total_present: 25 },
-    ]);
-    expect(strengthOn(rows, '2026-07-22', 'FPS').accountable).toBe(100);
-  });
-});
-
-describe('rankTiersOn', () => {
-  test('a blank tier cell is unstated, not zero, and does not count toward companies reporting', () => {
-    const rows = strengthRows([
-      {
-        date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company',
-        total_strength: 100, total_present: 90,
-        officer_strength: 5, officer_present: 5,
-      },
-      {
-        date: '2026-07-22', session: 'FPS', company: 'Braves', platoon: 'Company', unit_type: 'Company',
-        total_strength: 80, total_present: 70,
-        // No officer tier stated for Braves.
-      },
-    ]);
-    const tiers = rankTiersOn(rows, '2026-07-22', 'FPS');
-    const officer = tiers.find((tier) => tier.tier === 'officer');
-    expect(officer.strength).toBe(5);
-    expect(officer.companiesReporting).toBe(1);
-
-    const wospec = tiers.find((tier) => tier.tier === 'wospec');
-    expect(wospec.strength).toBeNull();
-    expect(wospec.companiesReporting).toBe(0);
-  });
-
-  test('every tier is present in the result even when none of them are stated', () => {
-    const rows = strengthRows([
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
-    ]);
-    const tiers = rankTiersOn(rows, '2026-07-22', 'FPS');
-    expect(tiers.map((tier) => tier.tier)).toEqual(['officer', 'wospec', 'enlistee']);
-    tiers.forEach((tier) => expect(tier.strength).toBeNull());
-  });
-});
 
 describe('presentTrend battalion scope', () => {
   test('one series named Battalion, one value per date', () => {

@@ -103,5 +103,18 @@ paint time. `DESIGN.md` is the visual reference.
 
 ## Testing
 
-`bun test` from the repo root (`./test/`; the WhatsApp bridge's tests are in `./test/whatsapp/`). No network, no database,
-no API key: routes take injected dependencies, and the dashboard's model layer is pure.
+`bun test` from the repo root (`./test/`; the WhatsApp bridge's tests are in `./test/whatsapp/`).
+
+- **Pure suites always run**, offline: the parser, FormSG mapping (with the real SDK in its
+  `test` mode), the dashboard model, the bridge's helpers, and every refusal a route makes
+  before it touches the store (asserted against a store that throws if touched).
+- **DB and end-to-end suites** run against a Neon test branch named by `TEST_DATABASE_URL`
+  (see `.env.example`) through the app's own `neon-http` driver, and are skipped when it is
+  unset. `test/support/db.ts` migrates the branch, empties every table before each test, and
+  refuses a URL on the same endpoint as any app database. `test/e2e/` serves the three routes on
+  a local port and drives them with the bridge's handler, the dashboard's `src/data/` calls and
+  real signed FormSG webhooks, then checks what `src/model/` computes.
+- **Only the OpenAI call is faked** (`ModelParser`), because it is a paid external API.
+- Tests are data-driven over dummy data: `test/support/paradeState.ts` renders a parade state
+  from a spec in the standard template, `scenarios.ts` holds named and seeded random specs, and
+  expectations are counted off the spec rather than the implementation. Names are synthetic.

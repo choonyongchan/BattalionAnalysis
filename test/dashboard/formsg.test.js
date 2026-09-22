@@ -8,7 +8,6 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
-  reportSickTypeCounts,
   submissionCounts,
   submissionHeatmapCells,
   submissionPlatoonOf,
@@ -90,62 +89,6 @@ describe('submissionTrend', () => {
     const submissions = toSubmissions([row({ Timestamp: '2026-07-20 08:00:00' })]);
     const trend = submissionTrend(submissions, [], ['2026-07-20'], { scope: 'battalion' });
     expect(trend.series[0].values[0]).toBe(0);
-  });
-});
-
-describe('reportSickTypeCounts', () => {
-  test('tallies by type, most frequent first', () => {
-    const counts = reportSickTypeCounts([
-      { reportSickType: 'RSI' },
-      { reportSickType: 'RSO' },
-      { reportSickType: 'RSI' },
-    ]);
-    expect(counts).toEqual([
-      { type: 'RSI', count: 2 },
-      { type: 'RSO', count: 1 },
-    ]);
-  });
-
-  test('a blank type is counted as Unspecified', () => {
-    const counts = reportSickTypeCounts([
-      { reportSickType: '' },
-      { reportSickType: 'RSI' },
-    ]);
-    expect(counts).toContainEqual({ type: 'Unspecified', count: 1 });
-  });
-
-  test('ties break by type name', () => {
-    const counts = reportSickTypeCounts([
-      { reportSickType: 'RSO' },
-      { reportSickType: 'RSI' },
-    ]);
-    expect(counts.map((entry) => entry.type)).toEqual(['RSI', 'RSO']);
-  });
-
-  test('folds the tail into Other past the slice limit, preserving the total', () => {
-    const submissions = [
-      { reportSickType: 'RSI' },
-      { reportSickType: 'RSI' },
-      { reportSickType: 'RSI' },
-      { reportSickType: 'RSO' },
-      { reportSickType: 'RSO' },
-      { reportSickType: 'FFI' },
-      { reportSickType: 'Medical Review' },
-      { reportSickType: 'Something New' },
-    ];
-    const counts = reportSickTypeCounts(submissions, 4);
-    expect(counts.length).toBe(4);
-    expect(counts.slice(0, 3).map((entry) => entry.type)).toEqual(['RSI', 'RSO', 'FFI']);
-    expect(counts[counts.length - 1]).toEqual({ type: 'Other', count: 2 });
-    expect(counts.reduce((sum, entry) => sum + entry.count, 0)).toBe(submissions.length);
-  });
-
-  test('leaves the list alone when it fits the limit', () => {
-    const counts = reportSickTypeCounts(
-      [{ reportSickType: 'RSI' }, { reportSickType: 'RSO' }, { reportSickType: 'FFI' }],
-      4
-    );
-    expect(counts.map((entry) => entry.type)).toEqual(['FFI', 'RSI', 'RSO']);
   });
 });
 

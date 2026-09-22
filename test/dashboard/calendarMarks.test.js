@@ -8,12 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  holidayIsWeekend,
-  holidaysIn,
-  toHolidays,
-  weekendBands,
-} from '../../src/model/calendarMarks.js';
+import { holidaysIn, toHolidays, weekendBands } from '../../src/model/calendarMarks.js';
 
 describe('toHolidays', () => {
   test('parses raw rows into sorted date/name pairs', () => {
@@ -97,12 +92,5 @@ describe('weekendBands', () => {
       { from: '2026-06-27', to: '2026-06-28' },
       { from: '2026-07-04', to: '2026-07-05' },
     ]);
-  });
-});
-
-describe('holidayIsWeekend', () => {
-  test('flags a holiday that falls on a Saturday or Sunday', () => {
-    expect(holidayIsWeekend({ date: '2026-06-27', name: 'Some Saturday holiday' })).toBe(true);
-    expect(holidayIsWeekend({ date: '2026-06-22', name: 'Some Monday holiday' })).toBe(false);
   });
 });

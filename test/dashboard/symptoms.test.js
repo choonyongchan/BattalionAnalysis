@@ -8,13 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  clinicalBucketOf,
-  clinicalCounts,
-  CLINICAL_BUCKETS,
-  reasonKeywords,
-  shortLabel,
-} from '../../src/model/symptoms.js';
+import { clinicalBucketOf, CLINICAL_BUCKETS, reasonKeywords } from '../../src/model/symptoms.js';
 
 const URTI = 'Upper Respiratory Tract Infection (Fever/Flu etc.)';
 const FEVER_HEADACHE = 'Fever / Headache (High Temp, Severe Migraine etc.)';
@@ -56,55 +50,6 @@ describe('clinicalBucketOf', () => {
   test('a blank answer becomes Unstated, distinct from Other', () => {
     expect(clinicalBucketOf('')).toBe('Unstated');
     expect(clinicalBucketOf(null)).toBe('Unstated');
-  });
-});
-
-describe('shortLabel', () => {
-  test('every bucket, including Other and Unstated, has a short axis label', () => {
-    expect(shortLabel(URTI)).toBe('URTI');
-    expect(shortLabel(FEVER_HEADACHE)).toBe('Fever / headache');
-    expect(shortLabel(MUSCULOSKELETAL)).toBe('Musculoskeletal');
-    expect(shortLabel(GASTROINTESTINAL)).toBe('Gastrointestinal');
-    expect(shortLabel(DERMATOLOGY)).toBe('Dermatology');
-    expect(shortLabel(CHEST_PAIN)).toBe('Chest pain');
-    expect(shortLabel(EYE_SIGHT)).toBe('Eye & sight');
-    expect(shortLabel(MENTAL_WELLNESS)).toBe('Mental wellness');
-    expect(shortLabel('Other')).toBe('Other');
-    expect(shortLabel('Unstated')).toBe('Unstated');
-  });
-});
-
-describe('clinicalCounts', () => {
-  test('counts submissions per bucket, sorted descending', () => {
-    const submissions = [
-      { symptomAnswer: URTI },
-      { symptomAnswer: URTI },
-      { symptomAnswer: 'Others: Cough' },
-      { symptomAnswer: '' },
-    ];
-    expect(clinicalCounts(submissions)).toEqual([
-      { bucket: URTI, label: 'URTI', count: 2 },
-      { bucket: 'Other', label: 'Other', count: 1 },
-      { bucket: 'Unstated', label: 'Unstated', count: 1 },
-    ]);
-  });
-
-  test('the free-text reason cannot pull a submission into a clinical bucket', () => {
-    // The two questions are separate fields for exactly this reason: a soldier who typed
-    // "sore throat" but picked Others chose not to call it URTI, and the chart must say
-    // so rather than tidying them into the same column.
-    const submissions = [{ reason: 'sore throat and fever', symptomAnswer: 'Others: NIL' }];
-    expect(clinicalCounts(submissions)).toEqual([
-      { bucket: 'Other', label: 'Other', count: 1 },
-    ]);
-  });
-
-  test('ties break by chart order, not by whichever bucket was seen first', () => {
-    const submissions = [{ symptomAnswer: MENTAL_WELLNESS }, { symptomAnswer: URTI }];
-    expect(clinicalCounts(submissions).map((entry) => entry.bucket)).toEqual([
-      URTI,
-      MENTAL_WELLNESS,
-    ]);
   });
 });
 

@@ -18,7 +18,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
 const MIGRATIONS_DIR = join(import.meta.dir, '..', 'db', 'migrations');
 
@@ -29,16 +29,35 @@ interface JournalEntry {
   tag: string;
 }
 
-/**
- * Applies every migration that has not been recorded yet.
- *
- * @returns Nothing; progress is logged and a failure throws.
- */
-async function main(): Promise<void> {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is not set.');
-  const sql = neon(url);
+/** One migration file, keyed as drizzle-kit records it. */
+export interface Migration extends JournalEntry {
+  text: string;
+  /** SHA-256 of the file, the key in `drizzle.__drizzle_migrations`. */
+  hash: string;
+}
 
+/**
+ * Reads every migration in journal order.
+ *
+ * @returns The migrations.
+ */
+export function readMigrations(): Migration[] {
+  const journal = JSON.parse(
+    readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
+  ) as { entries: JournalEntry[] };
+  return journal.entries.map((entry) => {
+    const text = readFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8');
+    return { ...entry, text, hash: createHash('sha256').update(text).digest('hex') };
+  });
+}
+
+/**
+ * Creates drizzle-kit's bookkeeping table if it is missing.
+ *
+ * @param sql A Neon query function.
+ * @returns Nothing.
+ */
+export async function ensureMigrationsTable(sql: NeonQueryFunction<false, false>): Promise<void> {
   await sql`create schema if not exists drizzle`;
   await sql`
     create table if not exists drizzle.__drizzle_migrations (
@@ -46,19 +65,26 @@ async function main(): Promise<void> {
       hash text not null,
       created_at bigint
     )`;
+}
+
+/**
+ * Applies every migration that has not been recorded yet.
+ *
+ * @param url The connection string of the database to migrate.
+ * @param log Where progress goes; the test suite passes a no-op.
+ * @returns Nothing; a failure throws.
+ */
+export async function applyMigrations(url: string, log: (line: string) => void = console.log): Promise<void> {
+  const sql = neon(url);
+  await ensureMigrationsTable(sql);
 
   const applied = await sql`select hash from drizzle.__drizzle_migrations`;
-  const seen = new Set(applied.map((row: Record<string, unknown>) => String(row.hash)));
+  const seen = new Set((applied as Record<string, unknown>[]).map((row) => String(row.hash)));
 
-  const journal = JSON.parse(
-    readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
-  ) as { entries: JournalEntry[] };
-
-  for (const entry of journal.entries) {
-    const text = readFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8');
-    const hash = createHash('sha256').update(text).digest('hex');
+  for (const entry of readMigrations()) {
+    const { text, hash } = entry;
     if (seen.has(hash)) {
-      console.log(`skip  ${entry.tag} (already applied)`);
+      log(`skip  ${entry.tag} (already applied)`);
       continue;
     }
 
@@ -67,7 +93,7 @@ async function main(): Promise<void> {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    console.log(`apply ${entry.tag} (${statements.length} statements)`);
+    log(`apply ${entry.tag} (${statements.length} statements)`);
     for (const [index, statement] of statements.entries()) {
       try {
         await sql.query(statement);
@@ -80,8 +106,19 @@ async function main(): Promise<void> {
     await sql`
       insert into drizzle.__drizzle_migrations (hash, created_at)
       values (${hash}, ${entry.when})`;
-    console.log(`done  ${entry.tag}`);
+    log(`done  ${entry.tag}`);
   }
 }
 
-await main();
+/**
+ * Migrates the database named by `DATABASE_URL`.
+ *
+ * @returns Nothing; progress is logged and a failure throws.
+ */
+async function main(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL is not set.');
+  await applyMigrations(url);
+}
+
+if (import.meta.main) await main();

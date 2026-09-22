@@ -1,51 +1,41 @@
 /**
- * The parade intake route: who may call what, how bodies are checked, and how pipeline
- * outcomes map to status codes. The store is a fake; the pipeline has its own tests.
- */
-import { describe, expect, test } from 'bun:test';
-import { handle, type Deps, type Store } from '../../api/parade.ts';
-import type { IngestOutcome } from '../../lib/pipeline.ts';
-
-const PASSWORD = 'dashboard-pw';
-const SECRET = 'relay-secret';
-const URL = 'https://example.vercel.app/api/parade';
-
-const PARSED: IngestOutcome = {
-  status: 'parsed',
-  id: 1,
-  paradeResponseId: 'Archer_2026-09-18_FPS',
-  counts: { strength: 2, personnel: 1, roster: 1, sectionCounts: 6 },
-};
-
-/**
- * Builds deps over a store that records its calls.
+ * The parade intake route: who may call what, how bodies are checked, and what each answer
+ * means for the database.
  *
- * @param overrides Store methods to replace, and secrets to change.
- * @returns The deps and the recorded calls.
+ * Refusals run offline against a store that fails the test if touched, which proves nothing was
+ * read or written. Everything that reaches the store runs the real pipeline against the Neon test
+ * branch, and is checked by what the route answers and what the tables then hold.
+ * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
-function setup(overrides: Partial<Store> & { dashboardPassword?: string; ingestSecret?: string } = {}) {
-  const calls: Array<[string, ...unknown[]]> = [];
-  const store: Store = {
-    ingest: async (message) => (calls.push(['ingest', message]), PARSED),
-    edit: async (id, body) => (calls.push(['edit', id, body]), PARSED),
-    remove: async (id) => (calls.push(['remove', id]), true),
-    list: async () => (calls.push(['list']), [{ id: 1 }]),
-    get: async (id) => (calls.push(['get', id]), { id, body: 'TEXT' }),
-    ...overrides,
-  };
-  const deps: Deps = {
-    store,
-    dashboardPassword: 'dashboardPassword' in overrides ? overrides.dashboardPassword : PASSWORD,
-    ingestSecret: 'ingestSecret' in overrides ? overrides.ingestSecret : SECRET,
-  };
-  return { deps, calls };
-}
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { handle, type Deps } from '../../api/parade.ts';
+import type { Db } from '../../db/index.ts';
+import { DASHBOARD_PASSWORD, INGEST_SECRET, paradeDeps } from '../support/app.ts';
+import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
+import { expectedCounts, expectedKey, renderParadeState, type ParadeSpec } from '../support/paradeState.ts';
+import { DOUBTFUL_EDITS, LAST_PARADE, SCENARIOS } from '../support/scenarios.ts';
+
+const URL = 'https://example.vercel.app/api/parade';
+const SPEC = SCENARIOS[1]!.spec;
+const GOOD = renderParadeState(SPEC);
+const DOUBTFUL = DOUBTFUL_EDITS[0]!.edit(GOOD);
+
+/** A store that fails the test if the route reaches it. */
+const UNTOUCHABLE: Deps = {
+  store: new Proxy({} as Deps['store'], {
+    get() {
+      throw new Error('The route reached the store on a request it should have refused.');
+    },
+  }),
+  dashboardPassword: DASHBOARD_PASSWORD,
+  ingestSecret: INGEST_SECRET,
+};
 
 /**
  * Builds a request.
  *
  * @param method The HTTP method.
- * @param options Token, query string and JSON body.
+ * @param options Token, query string and JSON (or raw) body.
  * @returns The request.
  */
 function request(method: string, options: { token?: string; query?: string; body?: unknown } = {}): Request {
@@ -54,133 +44,160 @@ function request(method: string, options: { token?: string; query?: string; body
   return new Request(URL + (options.query ?? ''), {
     method,
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
   });
 }
 
-describe('authorisation', () => {
-  test('refuses every request when neither secret is configured', async () => {
-    const { deps } = setup({ dashboardPassword: undefined, ingestSecret: undefined });
-    expect((await handle(request('GET', { token: PASSWORD }), deps)).status).toBe(503);
-  });
-
-  test('refuses a missing or wrong token', async () => {
-    const { deps, calls } = setup();
-    expect((await handle(request('GET'), deps)).status).toBe(401);
-    expect((await handle(request('GET', { token: 'guess' }), deps)).status).toBe(401);
-    expect(calls).toHaveLength(0);
-  });
-
-  test('lets the relay POST but nothing else', async () => {
-    const { deps } = setup();
-    expect((await handle(request('POST', { token: SECRET, body: { waMessageId: 'wa-1', body: 'TEXT' } }), deps)).status).toBe(200);
-    expect((await handle(request('GET', { token: SECRET }), deps)).status).toBe(403);
-    expect((await handle(request('DELETE', { token: SECRET, query: '?id=1' }), deps)).status).toBe(403);
-  });
-
-  test('an unset relay secret does not open the route to an empty token', async () => {
-    const { deps } = setup({ ingestSecret: undefined });
-    expect((await handle(request('POST', { token: ' ', body: { waMessageId: 'x', body: 'TEXT' } }), deps)).status).toBe(401);
-  });
-
-  test('answers 405 with Allow for other methods', async () => {
-    const { deps } = setup();
-    const response = await handle(request('PATCH', { token: PASSWORD }), deps);
-    expect(response.status).toBe(405);
-    expect(response.headers.get('Allow')).toContain('DELETE');
-  });
-});
-
-describe('POST', () => {
-  test('passes the relay its own WhatsApp id', async () => {
-    const { deps, calls } = setup();
-    await handle(request('POST', { token: SECRET, body: { waMessageId: 'wa-9', body: 'TEXT' } }), deps);
-    expect(calls[0]).toEqual(['ingest', { waMessageId: 'wa-9', body: 'TEXT' }]);
-  });
-
-  test('requires the relay to send a WhatsApp id', async () => {
-    const { deps } = setup();
-    expect((await handle(request('POST', { token: SECRET, body: { body: 'TEXT' } }), deps)).status).toBe(400);
-  });
-
-  test('keys a dashboard deposit on its text, ignoring any id it sends', async () => {
-    const { deps, calls } = setup();
-    await handle(request('POST', { token: PASSWORD, body: { waMessageId: 'spoof', body: 'TEXT' } }), deps);
-    await handle(request('POST', { token: PASSWORD, body: { body: 'TEXT\n' } }), deps);
-    const ids = calls.map((call) => (call[1] as { waMessageId: string }).waMessageId);
-    expect(ids[0]).toStartWith('manual:');
-    expect(ids[1]).toBe(ids[0]);
-  });
-
-  test('rejects an empty or oversized body', async () => {
-    const { deps } = setup();
-    expect((await handle(request('POST', { token: PASSWORD, body: { body: '  ' } }), deps)).status).toBe(400);
-    expect((await handle(request('POST', { token: PASSWORD, body: { body: 'x'.repeat(50_001) } }), deps)).status).toBe(413);
-  });
+describe('requests refused before the store', () => {
+  const RELAY_POST = { waMessageId: 'wa-1', body: GOOD };
 
   test.each([
-    [{ status: 'needs_review', id: 1, problems: ['p'] } as IngestOutcome, 422],
-    [{ status: 'rejected', id: 1, reason: 'r' } as IngestOutcome, 422],
-    [{ status: 'already_parsed', id: 1, paradeResponseId: 'k' } as IngestOutcome, 200],
-  ])('maps %o to %i', async (outcome, status) => {
-    const { deps } = setup({ ingest: async () => outcome });
-    const response = await handle(request('POST', { token: PASSWORD, body: { body: 'TEXT' } }), deps);
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual(outcome);
+    ['no token', request('GET'), 401],
+    ['a wrong token', request('GET', { token: 'guess' }), 401],
+    ['a blank token', request('POST', { token: ' ', body: RELAY_POST }), 401],
+    ['the relay listing', request('GET', { token: INGEST_SECRET }), 403],
+    ['the relay editing', request('PUT', { token: INGEST_SECRET, query: '?id=1', body: { body: GOOD } }), 403],
+    ['the relay deleting', request('DELETE', { token: INGEST_SECRET, query: '?id=1' }), 403],
+    ['a PATCH', request('PATCH', { token: DASHBOARD_PASSWORD }), 405],
+    ['an empty body', request('POST', { token: DASHBOARD_PASSWORD, body: { body: '  ' } }), 400],
+    ['a non-string body', request('POST', { token: DASHBOARD_PASSWORD, body: { body: 42 } }), 400],
+    ['malformed JSON', request('POST', { token: DASHBOARD_PASSWORD, body: '{broken' }), 400],
+    ['an oversized body', request('POST', { token: DASHBOARD_PASSWORD, body: { body: 'x'.repeat(50_001) } }), 413],
+    ['a relay POST with no WhatsApp id', request('POST', { token: INGEST_SECRET, body: { body: GOOD } }), 400],
+    ['a malformed id', request('GET', { token: DASHBOARD_PASSWORD, query: '?id=abc' }), 400],
+    ['a zero id', request('GET', { token: DASHBOARD_PASSWORD, query: '?id=0' }), 400],
+    ['a DELETE with no id', request('DELETE', { token: DASHBOARD_PASSWORD }), 400],
+    ['a PUT with no id', request('PUT', { token: DASHBOARD_PASSWORD, body: { body: GOOD } }), 400],
+  ] as const)('%s → %d', async (_name, incoming, status) => {
+    expect((await handle(incoming, UNTOUCHABLE)).status).toBe(status);
   });
 
-  test('turns a store failure into a 500 that does not echo it', async () => {
-    const { deps } = setup({
-      ingest: async () => {
-        throw new Error('insert failed: REC TAN AH KOW');
-      },
-    });
-    const response = await handle(request('POST', { token: PASSWORD, body: { body: 'TEXT' } }), deps);
+  test('every request is refused when neither secret is configured', async () => {
+    const unconfigured = { ...UNTOUCHABLE, dashboardPassword: undefined, ingestSecret: undefined };
+    expect((await handle(request('GET', { token: DASHBOARD_PASSWORD }), unconfigured)).status).toBe(503);
+  });
+
+  test('an unset relay secret does not let the relay in', async () => {
+    const noRelay = { ...UNTOUCHABLE, ingestSecret: undefined };
+    expect((await handle(request('POST', { token: INGEST_SECRET, body: RELAY_POST }), noRelay)).status).toBe(401);
+  });
+
+  test('a 405 names the allowed methods', async () => {
+    const response = await handle(request('PATCH', { token: DASHBOARD_PASSWORD }), UNTOUCHABLE);
+    expect(response.headers.get('Allow')).toContain('DELETE');
+  });
+
+  test('a store failure is a 500 that does not echo personnel text', async () => {
+    const failing: Deps = {
+      ...UNTOUCHABLE,
+      store: { ...UNTOUCHABLE.store, ingest: async () => Promise.reject(new Error('insert failed: REC ALPHA TAN')) } as Deps['store'],
+    };
+    const response = await handle(request('POST', { token: DASHBOARD_PASSWORD, body: { body: GOOD } }), failing);
     expect(response.status).toBe(500);
-    expect(await response.text()).not.toContain('TAN AH KOW');
+    expect(await response.text()).not.toContain('ALPHA TAN');
   });
 });
 
-describe('dashboard management', () => {
-  test('lists messages, uncached', async () => {
-    const { deps } = setup();
-    const response = await handle(request('GET', { token: PASSWORD }), deps);
-    expect(await response.json()).toEqual({ messages: [{ id: 1 }] });
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-  });
+describe.skipIf(!hasTestDb)('requests that reach the pipeline', () => {
+  let db: Db;
+  let deps: Deps;
+  beforeEach(async () => {
+    db = await resetTestDb();
+    deps = paradeDeps(db, { now: () => new Date(`${SPEC.date}T00:30:00Z`) });
+  }, DB_TIMEOUT_MS);
 
-  test('reads one message by id, 404 when unknown', async () => {
-    const { deps } = setup();
-    expect(await (await handle(request('GET', { token: PASSWORD, query: '?id=4' }), deps)).json()).toEqual({ id: 4, body: 'TEXT' });
-    const missing = setup({ get: async () => null });
-    expect((await handle(request('GET', { token: PASSWORD, query: '?id=4' }), missing.deps)).status).toBe(404);
-  });
+  /**
+   * Sends a request and reads the JSON answer.
+   *
+   * @param incoming The request.
+   * @returns Status, body and headers.
+   */
+  async function send(incoming: Request) {
+    const response = await handle(incoming, deps);
+    // Typed loosely: each test asserts the shape it expects.
+    return { status: response.status, body: (await response.json()) as any, headers: response.headers };
+  }
 
-  test('rejects a malformed id', async () => {
-    const { deps } = setup();
-    expect((await handle(request('GET', { token: PASSWORD, query: '?id=abc' }), deps)).status).toBe(400);
-    expect((await handle(request('DELETE', { token: PASSWORD }), deps)).status).toBe(400);
-  });
+  /**
+   * Relays a message as the WhatsApp bridge does.
+   *
+   * @param waMessageId The WhatsApp id.
+   * @param body The text.
+   * @returns The answer.
+   */
+  function relay(waMessageId: string, body: string) {
+    return send(request('POST', { token: INGEST_SECRET, body: { waMessageId, body } }));
+  }
 
-  test('edits by id', async () => {
-    const { deps, calls } = setup();
-    const response = await handle(request('PUT', { token: PASSWORD, query: '?id=4', body: { body: 'NEW' } }), deps);
-    expect(response.status).toBe(200);
-    expect(calls[0]).toEqual(['edit', 4, 'NEW']);
-  });
+  test.each([
+    ['a template message', GOOD, 200, 'parsed'],
+    ['a doubtful message', DOUBTFUL, 422, 'needs_review'],
+    ['a last parade state', renderParadeState(LAST_PARADE), 422, 'rejected'],
+  ] as const)('relaying %s answers %d %s', async (_name, text, status, outcome) => {
+    const answer = await relay('wa-1', text);
+    expect(answer.status).toBe(status);
+    expect(answer.body.status).toBe(outcome);
+    expect(await countRows(db, 'raw_messages')).toBe(1);
+    expect(await countRows(db, 'parade_submissions')).toBe(outcome === 'parsed' ? 1 : 0);
+  }, DB_TIMEOUT_MS);
 
-  test('an edit that does not parse is a 422, an unknown id a 404', async () => {
-    const bad = setup({ edit: async (id) => ({ status: 'needs_review', id, problems: ['p'] }) });
-    expect((await handle(request('PUT', { token: PASSWORD, query: '?id=4', body: { body: 'NEW' } }), bad.deps)).status).toBe(422);
-    const gone = setup({ edit: async (id) => ({ status: 'not_found', id }) });
-    expect((await handle(request('PUT', { token: PASSWORD, query: '?id=4', body: { body: 'NEW' } }), gone.deps)).status).toBe(404);
-  });
+  test('a relayed message writes one row per line, under its key', async () => {
+    const answer = await relay('wa-1', GOOD);
+    expect(answer.body).toMatchObject({ paradeResponseId: expectedKey(SPEC), counts: expectedCounts(SPEC) });
+    expect(await countRows(db, 'personnel_rows', expectedKey(SPEC))).toBe(expectedCounts(SPEC).personnel);
+  }, DB_TIMEOUT_MS);
 
-  test('deletes by id, 404 when unknown', async () => {
-    const { deps, calls } = setup();
-    expect((await handle(request('DELETE', { token: PASSWORD, query: '?id=4' }), deps)).status).toBe(200);
-    expect(calls[0]).toEqual(['remove', 4]);
-    const missing = setup({ remove: async () => false });
-    expect((await handle(request('DELETE', { token: PASSWORD, query: '?id=4' }), missing.deps)).status).toBe(404);
-  });
+  test('a relay retry of a delivered message is a final 200 that changes nothing', async () => {
+    await relay('wa-1', GOOD);
+    const retry = await relay('wa-1', GOOD);
+    expect(retry).toMatchObject({ status: 200, body: { status: 'already_parsed' } });
+    expect(await countRows(db, 'raw_messages')).toBe(1);
+  }, DB_TIMEOUT_MS);
+
+  test('the same text deposited twice from the dashboard is one message, whatever id it claims', async () => {
+    await send(request('POST', { token: DASHBOARD_PASSWORD, body: { waMessageId: 'spoof', body: GOOD } }));
+    const again = await send(request('POST', { token: DASHBOARD_PASSWORD, body: { body: `${GOOD}\n` } }));
+
+    expect(again.body.status).toBe('already_parsed');
+    const list = await send(request('GET', { token: DASHBOARD_PASSWORD }));
+    expect(list.body.messages).toHaveLength(1);
+    expect(list.body.messages[0].waMessageId).toStartWith('manual:');
+  }, DB_TIMEOUT_MS);
+
+  test('the list carries no text and is never cached; one message by id carries its text', async () => {
+    const { body: posted } = await relay('wa-1', GOOD);
+    const list = await send(request('GET', { token: DASHBOARD_PASSWORD }));
+
+    expect(list.headers.get('Cache-Control')).toBe('no-store');
+    expect(list.body.messages[0]).not.toHaveProperty('body');
+    expect(JSON.stringify(list.body)).not.toContain(SPEC.units[0]!.entries[0]!.name);
+    expect((await send(request('GET', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}` }))).body).toEqual({ id: posted.id, body: GOOD });
+    expect((await send(request('GET', { token: DASHBOARD_PASSWORD, query: '?id=999' }))).status).toBe(404);
+  }, DB_TIMEOUT_MS);
+
+  test('an edit that parses replaces the rows; one that does not is a 422 and changes nothing', async () => {
+    const { body: posted } = await relay('wa-1', GOOD);
+    const moved: ParadeSpec = { ...SPEC, date: '2026-09-19' };
+
+    const bad = await send(request('PUT', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}`, body: { body: DOUBTFUL } }));
+    expect(bad.status).toBe(422);
+    expect(await countRows(db, 'parade_submissions', expectedKey(SPEC))).toBe(1);
+
+    const good = await send(request('PUT', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}`, body: { body: renderParadeState(moved) } }));
+    expect(good).toMatchObject({ status: 200, body: { paradeResponseId: expectedKey(moved) } });
+    expect(await countRows(db, 'parade_submissions', expectedKey(SPEC))).toBe(0);
+    expect(await countRows(db, 'parade_submissions', expectedKey(moved))).toBe(1);
+
+    const missing = await send(request('PUT', { token: DASHBOARD_PASSWORD, query: '?id=999', body: { body: GOOD } }));
+    expect(missing.status).toBe(404);
+  }, DB_TIMEOUT_MS);
+
+  test('a delete removes the message and its rows; a second delete is a 404', async () => {
+    const { body: posted } = await relay('wa-1', GOOD);
+
+    expect((await send(request('DELETE', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}` }))).body).toEqual({ status: 'deleted', id: posted.id });
+    expect(await countRows(db, 'raw_messages')).toBe(0);
+    expect(await countRows(db, 'personnel_rows')).toBe(0);
+    expect((await send(request('DELETE', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}` }))).status).toBe(404);
+  }, DB_TIMEOUT_MS);
 });

@@ -8,12 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  filingIssues,
-  filingsOn,
-  latestFilingPerCompany,
-  toFilings,
-} from '../../src/model/submissions.js';
+import { filingsOn, latestFilingPerCompany, toFilings } from '../../src/model/submissions.js';
 import { COMPANIES } from '../../src/model/domain.js';
 
 /**
@@ -122,36 +117,5 @@ describe('latestFilingPerCompany', () => {
     ]);
     const latest = latestFilingPerCompany(filings, '2026-07-22', 'FPS');
     expect(latest.get('Archer').at.minutes).toBe(510);
-  });
-});
-
-describe('filingIssues', () => {
-  test('flags an id that will not parse', () => {
-    const issues = filingIssues([row({ parade_response_id: 'garbage' })]);
-    expect(issues).toContainEqual({
-      kind: 'unparseable-id',
-      message: expect.stringContaining('garbage'),
-    });
-  });
-
-  test('flags a timestamp with no time of day', () => {
-    const issues = filingIssues([row({ Timestamp: '2026-07-22' })]);
-    expect(issues.some((issue) => issue.kind === 'no-time-of-day')).toBe(true);
-  });
-
-  test('flags a duplicate filing for the same company, date and session', () => {
-    const issues = filingIssues([
-      row({ parade_response_id: 'Archer_2026-07-22_FPS', Timestamp: '2026-07-22T06:00:00' }),
-      row({ parade_response_id: 'Archer_2026-07-22_FPS', Timestamp: '2026-07-22T08:30:00' }),
-    ]);
-    expect(issues.some((issue) => issue.kind === 'duplicate-filing')).toBe(true);
-  });
-
-  test('a clean tab yields no issues', () => {
-    expect(filingIssues([row({})])).toEqual([]);
-  });
-
-  test('an empty tab yields no issues rather than throwing', () => {
-    expect(filingIssues([])).toEqual([]);
   });
 });

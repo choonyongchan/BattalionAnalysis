@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../src/data/records.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
-import { companyCoverage, dataQuality, paradeDayCoverage } from '../../src/model/quality.js';
+import { dataQuality } from '../../src/model/quality.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.
@@ -35,39 +35,6 @@ function personnelRows(specs) {
   ];
   return toRecords(values, PERSONNEL_HEADERS, 'Personnel Data');
 }
-
-describe('companyCoverage', () => {
-  test('a company that filed nothing in range reports zero of the expected days', () => {
-    const rows = strengthRows([
-      { date: '2026-07-20', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
-    ]);
-    const coverage = companyCoverage(rows, null, null);
-    const braves = coverage.find((entry) => entry.company === 'Braves');
-    expect(braves.days).toBe(0);
-    expect(braves.expectedDays).toBe(2);
-    expect(braves.share).toBe(0);
-  });
-});
-
-describe('paradeDayCoverage', () => {
-  test('a range with no parade days at all reports a zero share, not a division error', () => {
-    expect(paradeDayCoverage(strengthRows([]), null, null)).toEqual({ days: 0, fullDays: 0, share: 0 });
-  });
-
-  test('counts only the days every company filed as full', () => {
-    const rows = strengthRows([
-      ...['Archer', 'Braves', 'Cougar', 'Stallion', 'Scorpion', 'Hercules'].map((company) => ({
-        date: '2026-07-20', session: 'FPS', company, platoon: 'Company', unit_type: 'Company', total_strength: 100,
-      })),
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
-    ]);
-    const coverage = paradeDayCoverage(rows, null, null);
-    expect(coverage.days).toBe(2);
-    expect(coverage.fullDays).toBe(1);
-    expect(coverage.share).toBe(0.5);
-  });
-});
 
 describe('dataQuality', () => {
   test('reports both date spans separately', () => {

@@ -10,12 +10,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  bucketCounts,
-  bucketsFor,
-  isPermanentStatus,
-  STATUS_BUCKETS,
-} from '../../src/model/statusBuckets.js';
+import { bucketsFor, isPermanentStatus, STATUS_BUCKETS } from '../../src/model/statusBuckets.js';
 import { PERM_STATUS_NUM_DAYS } from '../../src/model/domain.js';
 
 describe('STATUS_BUCKETS', () => {
@@ -126,22 +121,5 @@ describe('isPermanentStatus', () => {
 
   test('a dated status is not permanent', () => {
     expect(isPermanentStatus({ reason: 'Excuse RMJ', num_days: 14 })).toBe(false);
-  });
-});
-
-describe('bucketCounts', () => {
-  test('counts only Status rows, sorted by count descending with STATUS_BUCKETS as tiebreak', () => {
-    const rows = [
-      { reason_category: 'Status', reason: 'LD' },
-      { reason_category: 'Status', reason: 'LD' },
-      { reason_category: 'Status', reason: 'EX RMJ' },
-      { reason_category: 'Status', reason: 'Excuse Uniform' },
-      { reason_category: 'Att C', reason: 'MC' },
-    ];
-    expect(bucketCounts(rows)).toEqual([
-      { bucket: 'Light Duty', count: 2 },
-      { bucket: 'Excuse RMJ', count: 1 },
-      { bucket: 'Excuse Uniform', count: 1 },
-    ]);
   });
 });

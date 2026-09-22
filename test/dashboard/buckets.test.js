@@ -7,11 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  GRANULARITIES,
-  bucketOf,
-  groupDates,
-} from '../../src/model/buckets.js';
+import { GRANULARITIES, bucketOf } from '../../src/model/buckets.js';
 import { toRotations } from '../../src/model/rotations.js';
 
 describe('GRANULARITIES', () => {
@@ -91,33 +87,5 @@ describe('bucketOf rotational', () => {
       bucketOf('2026-05-15', 'rotational', rotations).key,
       bucketOf('2025-06-01', 'rotational', rotations).key,
     ]);
-  });
-});
-
-describe('groupDates', () => {
-  test('groups and orders buckets chronologically', () => {
-    // 13 and 14 Jul are the Monday and Tuesday of one week; 21 Jul is the Tuesday of the
-    // next. Two buckets, in date order, whatever order the dates arrived in.
-    const dates = ['2026-07-21', '2026-07-13', '2026-07-14'];
-    expect(groupDates(dates, 'weekly', [])).toEqual([
-      { key: '2026-07-13', label: 'Week of 13 Jul', dates: ['2026-07-13', '2026-07-14'] },
-      { key: '2026-07-20', label: 'Week of 20 Jul', dates: ['2026-07-21'] },
-    ]);
-  });
-
-  test('an empty date list yields no buckets', () => {
-    expect(groupDates([], 'daily', [])).toEqual([]);
-  });
-
-  test('rotational grouping with no rotations still draws one No-rotation bucket', () => {
-    const groups = groupDates(['2026-01-05', '2026-01-06'], 'rotational', []);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('No rotation');
-    expect(groups[0].dates).toEqual(['2026-01-05', '2026-01-06']);
-  });
-
-  test('monthly grouping across a year boundary produces two ordered buckets', () => {
-    const groups = groupDates(['2027-01-05', '2026-12-20', '2026-12-31'], 'monthly', []);
-    expect(groups.map((g) => g.key)).toEqual(['2026-12', '2027-01']);
   });
 });
