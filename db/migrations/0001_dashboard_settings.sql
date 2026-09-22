@@ -1,3 +1,19 @@
+-- Databases built from the retired 0000_needy_lockheed already have both tables, in an older
+-- shape (rotations keyed by name, nullable end_date, updated_at). They were never written to,
+-- so they are replaced; this refuses to run if either holds a row.
+DO $$
+BEGIN
+  IF (to_regclass('public.public_holidays') IS NOT NULL AND EXISTS (SELECT 1 FROM public_holidays))
+    OR (to_regclass('public.rotations') IS NOT NULL AND EXISTS (SELECT 1 FROM rotations)) THEN
+    RAISE EXCEPTION 'public_holidays or rotations has rows; migrate them by hand before 0001';
+  END IF;
+END
+$$;
+--> statement-breakpoint
+DROP TABLE IF EXISTS "public_holidays";
+--> statement-breakpoint
+DROP TABLE IF EXISTS "rotations";
+--> statement-breakpoint
 CREATE TABLE "public_holidays" (
 	"date" date PRIMARY KEY NOT NULL,
 	"name" text

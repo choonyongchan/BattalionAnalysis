@@ -22,8 +22,8 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 ## Dashboard → Neon
 - [x] Read API `api/dashboard.ts` behind `DASHBOARD_PASSWORD`, as the read-only `dashboard_read` role (`db/grants-dashboard.sql`).
 - [x] `src/data/feed.js` reads it; the Apps Script feed URL and `src/data/config.js` are gone.
-- [ ] `bun run db:migrate` (adds `public_holidays`, `rotations`).
-- [ ] `bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql`; check as `dashboard_read` that `select body from raw_messages` fails.
+- [x] `bun run db:migrate` (replaced the empty old-shape `public_holidays`/`rotations`; `0000` baselined in `drizzle.__drizzle_migrations`, since the live DB was built from the retired `0000_needy_lockheed`).
+- [x] `bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql`; verified as `dashboard_read`: `body` and writes are denied (URL saved in `.env.local`).
 - [ ] Set `DASHBOARD_DATABASE_URL` on Vercel; redeploy.
 - [ ] Export every Sheet tab to CSV (outside the repo); `scripts/import-sheet.ts <dir> --dry-run`, review rejections, then run it for real; rerun to confirm 0 inserted.
 - [ ] Compare a few dates on the deployed dashboard against the Sheet (strength, MC/MA, report sick, ORBAT, holidays, rotations).
