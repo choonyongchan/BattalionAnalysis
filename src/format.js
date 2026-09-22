@@ -53,20 +53,6 @@ export function fmtPercent(value) {
   return Number.isFinite(value) ? Math.round(value * 100) + '%' : '—';
 }
 
-/**
- * Formats a part of a total as a percentage, to one decimal place.
- *
- * Distinct from `fmtPercent` in both argument shape and precision, and named so the two
- * cannot be confused at a call site.
- * @param {number} part The part.
- * @param {number} total The whole.
- * @returns {string} e.g. '18.4%', or '—' when the total is zero or missing.
- */
-export function fmtShareOf(part, total) {
-  return Number.isFinite(part) && Number.isFinite(total) && total > 0
-    ? fmtDecimal((part / total) * 100, '%')
-    : '—';
-}
 
 /**
  * Formats an ISO date the way the unit writes it, e.g. '22 Jun 26'.

@@ -4,9 +4,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { loadConfig } from '../src/config.js';
-import { extractText, isWatchedGroupMessage } from '../src/listener.js';
-import { createMessageHandler } from '../src/index.js';
+import { loadConfig } from '../../whatsapp/src/config.js';
+import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
+import { createMessageHandler } from '../../whatsapp/src/index.js';
 import { DrizzleQueryError } from '../../node_modules/drizzle-orm/errors.js';
 
 /** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
@@ -18,9 +18,9 @@ const GROUP_JID = '120363000000000000@g.us';
 /**
  * A complete environment for loadConfig, so a test can vary one key at a time.
  *
- * Passed in explicitly rather than set on process.env: whatsapp/.env is loaded
+ * Passed in explicitly rather than set on process.env: .env.whatsapp is loaded
  * into process.env as a side effect that a test cannot undo, so a populated
- * .env on the developer's machine used to override whatever the test set.
+ * .env.whatsapp on the developer's machine used to override whatever the test set.
  *
  * @param {!Object<string, string>=} overrides Keys to merge over the defaults.
  * @returns {!Object<string, string>} An environment object.
@@ -53,6 +53,11 @@ describe('loadConfig', () => {
     const env = sampleEnv();
     delete env[key];
     expect(() => loadConfig({ env })).toThrow(new RegExp(key));
+  });
+
+  test('allows a blank WA_GROUP_ID only in a dry run', () => {
+    expect(loadConfig({ env: sampleEnv({ WA_GROUP_ID: '', DRY_RUN: '1' }) }).groupId).toBe('');
+    expect(() => loadConfig({ env: sampleEnv({ WA_GROUP_ID: '' }) })).toThrow(/WA_GROUP_ID/);
   });
 
   test('rejects a blank required setting, not just an absent one', () => {

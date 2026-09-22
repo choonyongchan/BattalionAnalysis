@@ -25,14 +25,17 @@ import { parseDue, recordMessage } from '../../lib/pipeline.ts';
  * Counts only. A result's reason can quote the message, and the message holds
  * names and NRICs, so none of it goes to the log.
  *
- * @param {{results: !Array<{outcome: string}>, skipped: number}} run What
- *   `parseDue` returned.
- * @returns {{parsed: number, rejected: number, failed: number, skipped: number}}
- *   The tally.
+ * @param {{results: !Array<{outcome: string, parser: (string|undefined)}>, skipped: number}} run
+ *   What `parseDue` returned.
+ * @returns {{parsed: number, rejected: number, failed: number, skipped: number, llm: number}}
+ *   The tally; `llm` counts messages the template parser handed to the model.
  */
 export function tallyRun(run) {
-  const tally = { parsed: 0, rejected: 0, failed: 0, skipped: run.skipped };
-  for (const result of run.results) tally[result.outcome] += 1;
+  const tally = { parsed: 0, rejected: 0, failed: 0, skipped: run.skipped, llm: 0 };
+  for (const result of run.results) {
+    tally[result.outcome] += 1;
+    if (result.parser === 'llm') tally.llm += 1;
+  }
   return tally;
 }
 

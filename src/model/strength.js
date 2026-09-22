@@ -3,9 +3,8 @@
  *
  * `metrics.battalionStrength` already answers the single-day battalion question and is
  * reused rather than reimplemented — two functions computing "how many turned up" is how
- * a commander ends up seeing two different numbers for it. What is added here is the two
- * things it does not do: the rank tiers, whose columns have always been in Strength Data
- * and never read, and the by-company split every trend line on the Overview needs.
+ * a commander ends up seeing two different numbers for it. What is added here is the
+ * by-company split every trend line on the Overview needs.
  *
  * **A company that did not file is a gap, not a zero.** Only 5 of 45 parade days in the
  * observed data carry all six companies, so this distinction is not an edge case — it is
@@ -21,25 +20,6 @@ import { identityOf } from './identity.js';
 import { battalionStrength, dutyCountsOn } from './metrics.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 
-/**
- * The three rank tiers Strength Data breaks a company into.
- * @type {Array<{tier: string, label: string, strengthKey: string, presentKey: string}>}
- */
-export const RANK_TIERS = [
-  {
-    tier: 'officer',
-    label: 'Officer',
-    strengthKey: 'officer_strength',
-    presentKey: 'officer_present',
-  },
-  { tier: 'wospec', label: 'WOSpec', strengthKey: 'wospec_strength', presentKey: 'wospec_present' },
-  {
-    tier: 'enlistee',
-    label: 'Enlistee',
-    strengthKey: 'enlistee_strength',
-    presentKey: 'enlistee_present',
-  },
-];
 
 /**
  * The company-total rows for one parade.
@@ -57,48 +37,7 @@ function companyRowsOn_(strengthRows, isoDate, session) {
   );
 }
 
-/**
- * The battalion's strength and present count on one parade.
- *
- * A thin naming layer over `metrics.battalionStrength`, so pages read `strengthOn` beside
- * `rankTiersOn` and `presentTrend` rather than reaching into two modules for one picture.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} isoDate Parade date.
- * @param {string} session Parade session.
- * @returns {!Object} Accountable and present strength, and which companies reported.
- */
-export function strengthOn(strengthRows, isoDate, session) {
-  return battalionStrength(strengthRows, isoDate, session);
-}
 
-/**
- * Strength and present count by rank tier on one parade.
- *
- * A blank tier cell means the message did not break that tier out, which is not the same
- * as nobody being in it. Such a cell contributes to neither total and is excluded from
- * `companiesReporting`, so a tier's figure always states how many companies it covers.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} isoDate Parade date.
- * @param {string} session Parade session.
- * @returns {Array<{tier: string, label: string, strength: ?number, present: ?number,
- *     share: ?number, companiesReporting: number}>} One entry per tier, in rank order.
- */
-export function rankTiersOn(strengthRows, isoDate, session) {
-  const rows = companyRowsOn_(strengthRows, isoDate, session);
-  return RANK_TIERS.map((tier) => {
-    const stated = rows.filter((row) => toNumber(row[tier.strengthKey]) !== null);
-    const strength = stated.reduce((sum, row) => sum + toNumber(row[tier.strengthKey]), 0);
-    const present = stated.reduce((sum, row) => sum + (toNumber(row[tier.presentKey]) || 0), 0);
-    return {
-      tier: tier.tier,
-      label: tier.label,
-      strength: stated.length > 0 ? strength : null,
-      present: stated.length > 0 ? present : null,
-      share: strength > 0 ? present / strength : null,
-      companiesReporting: stated.length,
-    };
-  });
-}
 
 /**
  * Per-company accountable and present strength on one parade, keyed by company.

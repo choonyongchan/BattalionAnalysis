@@ -5,27 +5,30 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "test": "bun test ./test/ ./whatsapp/test/",
+    "test": "bun test ./test/",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun --env-file=.env.local scripts/apply-migrations.ts",
-    "db:studio": "drizzle-kit studio"
+    "whatsapp": "bun --env-file=.env.whatsapp whatsapp/src/supervisor.js",
+    "whatsapp:bridge": "bun --env-file=.env.whatsapp whatsapp/src/index.js",
+    "whatsapp:reset-auth": "bun whatsapp/scripts/reset-auth.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "@opengovsg/formsg-sdk": "^8.0.2",
     "@preact/signals": "^2.0.1",
+    "@whiskeysockets/baileys": "^6.7.9",
     "drizzle-orm": "^0.45.2",
     "echarts": "^5.6.0",
     "echarts-wordcloud": "^2.1.0",
     "fuse.js": "^7.1.0",
+    "pino": "^9.5.0",
     "preact": "^10.26.4",
+    "qrcode-terminal": "^0.12.0",
     "wouter-preact": "^3.7.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.1",
     "@types/bun": "^1.4.2",
-    "@types/node": "^22.10.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0",
     "vite": "^6.2.0"

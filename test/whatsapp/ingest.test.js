@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { createIngestor, tallyRun } from '../src/ingest.js';
+import { createIngestor, tallyRun } from '../../whatsapp/src/ingest.js';
 import { DrizzleQueryError } from '../../node_modules/drizzle-orm/errors.js';
 
 /** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
@@ -17,10 +17,10 @@ const silentLogger = { info: () => {}, debug: () => {}, warn: () => {}, error: (
 /**
  * A parse run with no work in it.
  *
- * @returns {{results: !Array<!Object>, skipped: number, stoppedEarly: boolean}}
+ * @returns {{results: !Array<!Object>, skipped: number}}
  */
 function emptyRun() {
-  return { results: [], skipped: 0, stoppedEarly: false };
+  return { results: [], skipped: 0 };
 }
 
 /**
@@ -37,13 +37,17 @@ function deferred() {
 }
 
 describe('tallyRun', () => {
-  test('counts results by outcome and carries skipped', () => {
+  test('counts results by outcome and model fallbacks, and carries skipped', () => {
     const run = {
-      results: [{ outcome: 'parsed' }, { outcome: 'parsed' }, { outcome: 'rejected' }, { outcome: 'failed' }],
+      results: [
+        { outcome: 'parsed', parser: 'deterministic' },
+        { outcome: 'parsed', parser: 'llm' },
+        { outcome: 'rejected' },
+        { outcome: 'failed' },
+      ],
       skipped: 3,
-      stoppedEarly: false,
     };
-    expect(tallyRun(run)).toEqual({ parsed: 2, rejected: 1, failed: 1, skipped: 3 });
+    expect(tallyRun(run)).toEqual({ parsed: 2, rejected: 1, failed: 1, skipped: 3, llm: 1 });
   });
 });
 
@@ -140,8 +144,8 @@ describe('createIngestor.drain', () => {
 
   test('keeps going while the run reports a backlog beyond its limit', async () => {
     const runs = [
-      { results: [{ outcome: 'parsed' }], skipped: 1, stoppedEarly: false },
-      { results: [{ outcome: 'parsed' }], skipped: 0, stoppedEarly: false },
+      { results: [{ outcome: 'parsed' }], skipped: 1 },
+      { results: [{ outcome: 'parsed' }], skipped: 0 },
     ];
     let parseCalls = 0;
     const ingestor = createIngestor({
@@ -168,7 +172,7 @@ describe('createIngestor.drain', () => {
       record: async () => ({ status: 'stored', id: 1 }),
       parse: async () => {
         parseCalls += 1;
-        return { results: failedResults, skipped: 5, stoppedEarly: false };
+        return { results: failedResults, skipped: 5 };
       },
     });
 

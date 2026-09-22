@@ -19,7 +19,11 @@ import { createLogger } from './logger.js';
 /** @type {string} Absolute path to the bridge entry point. */
 const BRIDGE_ENTRY = join(import.meta.dir, 'index.js');
 
-/** @type {string} Working directory for the child (the module root). */
+/**
+ * @type {string} Working directory for the child (the module root). Not the repo
+ * root: Bun auto-loads .env.local from the child's cwd, which would leak the
+ * owner's secrets into the bridge. whatsapp/ holds no env file.
+ */
 const MODULE_ROOT = join(import.meta.dir, '..');
 
 /** @type {number} Consecutive crash-restarts before the supervisor gives up. */
@@ -52,7 +56,8 @@ const CLEAN_EXIT_CODES = new Set([0, 3]);
  *   it was started.
  */
 function startChild() {
-  const proc = Bun.spawn(['bun', BRIDGE_ENTRY], {
+  // execPath, not 'bun': a scheduled task's PATH may not include ~/.bun/bin.
+  const proc = Bun.spawn([process.execPath, BRIDGE_ENTRY], {
     cwd: MODULE_ROOT,
     env: process.env,
     stdin: 'ignore',
@@ -195,7 +200,7 @@ export async function runSupervisor() {
       logLoudly(
         logger,
         `giving up after ${MAX_RESTARTS} consecutive restarts ` +
-          `(last exit code=${exitCode} signal=${signalCode}). Fix the error above, then \`bun start\`.`
+          `(last exit code=${exitCode} signal=${signalCode}). Fix the error above, then \`bun run whatsapp\`.`
       );
       return 1;
     }

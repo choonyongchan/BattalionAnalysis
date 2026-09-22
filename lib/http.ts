@@ -1,22 +1,4 @@
-/**
- * The small amount of HTTP every route repeats.
- *
- * These routes are Web-standard handlers -- `(Request) => Response` -- which is what makes
- * them testable without a mock server: a test constructs a real `Request` and reads a real
- * `Response`. Vercel's Node runtime accepts this signature directly.
- *
- * Three things here exist because Apps Script could not do them, and each was a real weakness
- * rather than an inconvenience:
- *
- *   - **Status codes.** `ContentService` answers 200 to everything, so the bridge had to read
- *     `body.ok` to find out whether its message was stored. A relay that cannot distinguish
- *     "rejected" from "retry me" either loses messages or duplicates them.
- *   - **Request headers.** The shared secret travelled in the JSON body, which meant it was
- *     also in every log line that recorded a request body. Here it is a header.
- *   - **Constant-time comparison.** `a === b` on a secret leaks its length and its matching
- *     prefix through timing. `timingSafeEqual` does not.
- */
-import { timingSafeEqual } from 'node:crypto';
+/** Small helpers for the Web-standard `(Request) => Response` routes in `api/`. */
 
 /** The JSON content type, written once so a typo cannot make one route answer as text. */
 const JSON_TYPE = 'application/json; charset=utf-8';
@@ -49,64 +31,6 @@ export function methodNotAllowed(allowed: string[]): Response {
   return json(405, { error: `Method not allowed. Use ${allowed.join(' or ')}.` }, {
     Allow: allowed.join(', '),
   });
-}
-
-/**
- * Compares two secrets without leaking their contents through timing.
- *
- * Length is compared first and separately. That does leak the length of the expected secret,
- * which is unavoidable -- `timingSafeEqual` throws on a length mismatch -- and harmless:
- * knowing a token is 32 characters long does not help anyone guess it.
- *
- * @param a One secret. May be null or undefined when a header was absent.
- * @param b The other.
- * @returns True when both are present, non-empty and equal.
- */
-export function secretEquals(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (!a || !b) return false;
-  const left = Buffer.from(a, 'utf8');
-  const right = Buffer.from(b, 'utf8');
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
-
-/**
- * Reads a bearer token from an `Authorization` header.
- *
- * @param request The incoming request.
- * @returns The token, or null when the header is absent or not a bearer.
- */
-export function bearerToken(request: Request): string | null {
-  const header = request.headers.get('authorization');
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1]!.trim() : null;
-}
-
-/**
- * Checks a request's bearer token against a configured secret.
- *
- * FAILS CLOSED. An unset environment variable denies every request rather than allowing
- * every request, which is the failure mode that matters: a deployment that forgets to set
- * `WHATSAPP_INGEST_TOKEN` should stop accepting parade states, not accept them from anyone.
- * The two cases are told apart in the response so the misconfiguration is diagnosable, but
- * both are refusals.
- *
- * @param request The incoming request.
- * @param expected The configured secret, typically from `process.env`.
- * @param name The variable's name, for the misconfiguration message.
- * @returns Null when authorised, or the response to return.
- */
-export function requireBearer(
-  request: Request,
-  expected: string | undefined,
-  name: string,
-): Response | null {
-  if (!expected) return json(503, { error: `${name} is not configured.` });
-  if (!secretEquals(bearerToken(request), expected)) {
-    return json(401, { error: 'Unauthorised.' }, { 'WWW-Authenticate': 'Bearer' });
-  }
-  return null;
 }
 
 /** A parsed body, or the response explaining why it could not be parsed. */

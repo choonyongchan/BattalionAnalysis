@@ -1,14 +1,11 @@
 /**
  * Environment-backed configuration for the WhatsApp bridge.
  *
- * Every secret and deployment-specific value lives in whatsapp/.env, mirroring
- * the convention the FormSG module uses for its own credentials. Nothing here
- * is ever hard-coded into source.
- *
- * Bun reads .env out of the working directory on start-up, so there is no
- * dotenv call here. That does mean the bridge must be started from whatsapp/,
- * which is what `bun start` and the startup shortcut both do — see whatsapp/README.md.
- * Started from anywhere else, the required variables read as missing and
+ * Every secret and deployment-specific value lives in the repo-root
+ * .env.whatsapp, loaded by `bun --env-file=.env.whatsapp` (the `whatsapp`
+ * package script). It is separate from .env.local because both define
+ * DATABASE_URL: the bridge must use the parade_ingest role, never the owner.
+ * Started without that file, the required variables read as missing and
  * `loadConfig` says so by name rather than failing later and vaguely.
  */
 
@@ -32,7 +29,7 @@ export const AUTH_DIR = join(MODULE_ROOT, 'auth');
 function requireEnv(env, key) {
   const value = (env[key] || '').trim();
   if (value.length === 0) {
-    throw new Error(`Missing required environment variable ${key}. Copy .env.example to .env and fill it in.`);
+    throw new Error(`Missing required environment variable ${key}. Copy .env.whatsapp.example to .env.whatsapp, fill it in, and start with \`bun run whatsapp\`.`);
   }
   return value;
 }
@@ -75,15 +72,19 @@ function optionalPositiveInt(env, key, fallback) {
  * Loading fails fast at start-up rather than at the moment the first parade
  * state arrives.
  *
- * `env` is injectable because Bun has already merged .env into `process.env`
+ * `env` is injectable because Bun has already merged .env.whatsapp into `process.env`
  * before this module runs, which a test cannot undo — without it, a populated
- * .env on the developer's machine silently overrides whatever the test set.
+ * .env.whatsapp on the developer's machine silently overrides whatever the test set.
+ *
+ * `WA_GROUP_ID` may be blank only under `DRY_RUN=1`: the listener then accepts
+ * every chat, which is how the group's JID is discovered (README step 3), and a
+ * live run must never store parade states from the wrong chat.
  *
  * `DATABASE_URL` is read here only to fail fast. `db/index.ts` reads it again
  * from `process.env` when the first query runs.
  *
  * @param {{env?: !Object<string, string>}} [options] `env` defaults to
- *   process.env, which already carries whatsapp/.env.
+ *   process.env, which already carries .env.whatsapp.
  * @returns {{groupId: string, databaseUrl: string, openaiApiKey: string,
  *   openaiModel: (string|undefined), parseIntervalMs: number, logLevel: string,
  *   dryRun: boolean, authDir: string}} The resolved configuration.
@@ -91,15 +92,16 @@ function optionalPositiveInt(env, key, fallback) {
  */
 export function loadConfig(options = {}) {
   const env = options.env || process.env;
+  const dryRun = optionalEnv(env, 'DRY_RUN', '0') === '1';
 
   return {
-    groupId: requireEnv(env, 'WA_GROUP_ID'),
+    groupId: dryRun ? optionalEnv(env, 'WA_GROUP_ID', '') : requireEnv(env, 'WA_GROUP_ID'),
     databaseUrl: requireEnv(env, 'DATABASE_URL'),
     openaiApiKey: requireEnv(env, 'OPENAI_API_KEY'),
     openaiModel: optionalEnv(env, 'OPENAI_MODEL', '') || undefined,
     parseIntervalMs: optionalPositiveInt(env, 'PARSE_INTERVAL_MS', 300_000),
     logLevel: optionalEnv(env, 'LOG_LEVEL', 'info'),
-    dryRun: optionalEnv(env, 'DRY_RUN', '0') === '1',
+    dryRun,
     authDir: AUTH_DIR,
   };
 }

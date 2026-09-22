@@ -125,8 +125,8 @@
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
-  letter-spacing: -0.24px;
+  font-size: 14px;
+  letter-spacing: -0.224px;
 }
 
 th,
@@ -140,7 +140,6 @@ td {
 th {
   color: var(--ink-muted);
   font-weight: 600;
-  font-size: 13px;
   position: sticky;
   top: 0;
   background: var(--surface);
@@ -163,7 +162,7 @@ th.th-sortable:hover {
 
 .th-sort-indicator {
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 tbody tr:last-child td {
@@ -177,7 +176,7 @@ tbody tr:last-child td {
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline);
   background: var(--surface);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .banner--warning {
@@ -247,7 +246,7 @@ tbody tr:last-child td {
 }
 
 .soldiersearch__meta {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-muted);
 }
 
@@ -267,11 +266,9 @@ tbody tr:last-child td {
 /* --------------------------------------------------------------- progress */
 
 /*
- * The wait made visible. Two things move at different speeds on purpose: the fill
- * advances over tens of seconds, which is too slow to read as motion, so a sheen crosses
- * it every two seconds to say the page is still alive. The sheen is decoration and the
- * global reduced-motion rule stops it; the fill is information and keeps moving, because
- * its width is set from the elapsed time rather than by an animation.
+ * The wait made visible. The fill's width is set from the elapsed time rather than by an
+ * animation, and the elapsed counter beneath it ticks every second, so the page reads as
+ * alive without a decorative sheen (DESIGN.md: no gradients).
  */
 .loading {
   margin-top: var(--space-xl);
@@ -297,19 +294,6 @@ tbody tr:last-child td {
   transition: width 260ms linear;
 }
 
-.loading__fill::after {
-  content: '';
-  display: block;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 100%
-  );
-  animation: loading-sheen 2s ease-in-out infinite;
-}
-
 .loading__stage {
   font-size: 14px;
   letter-spacing: -0.224px;
@@ -321,13 +305,4 @@ tbody tr:last-child td {
   letter-spacing: -0.12px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
-}
-
-@keyframes loading-sheen {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
 }

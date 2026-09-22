@@ -1,8 +1,9 @@
 /**
  * The seven pages, in the order a commander reads them.
  *
- * One list, used three times: the sidebar renders it, the router matches it, and the page
- * head takes its title from it. Adding a page means adding a row here and nothing else.
+ * One list, used three times: the sidebar renders it, the router matches it, and the
+ * narrow-screen top bar takes its label from it. Adding a page means adding a row here
+ * and nothing else.
  *
  * The grouping is the reading order, not a taxonomy. Overview answers "what is the
  * battalion today". The three medical pages answer the same four questions of report
@@ -19,58 +20,65 @@ import {
   SoldierIcon,
   StatusIcon,
 } from './icons.jsx';
+import { Overview } from '../pages/Overview.jsx';
+import { ReportSick } from '../pages/ReportSick.jsx';
+import { McMa } from '../pages/McMa.jsx';
+import { Status } from '../pages/Status.jsx';
+import { Soldier } from '../pages/Soldier.jsx';
+import { Orbat } from '../pages/Orbat.jsx';
+import { Settings } from '../pages/Settings.jsx';
 
 /**
- * Every page: its route, its label, its icon, and the sidebar group it sits in.
- * @type {!Array<{path: string, label: string, title: string, group: string, icon: function}>}
+ * Every page: its route, its component, its label, its icon, and the sidebar group it sits in.
+ * @type {!Array<{path: string, component: function, label: string, group: string, icon: function}>}
  */
 export const ROUTES = [
   {
     path: '/overview',
+    component: Overview,
     label: 'Overview',
-    title: 'Battalion Overview',
     group: 'Overview',
     icon: OverviewIcon,
   },
   {
     path: '/report-sick',
+    component: ReportSick,
     label: 'Report Sick',
-    title: 'Report Sick',
     group: 'Medical',
     icon: ReportSickIcon,
   },
   {
     path: '/mc-ma',
+    component: McMa,
     label: 'MC / MA',
-    title: 'MC and Medical Appointments',
     group: 'Medical',
     icon: McMaIcon,
   },
   {
     path: '/status',
+    component: Status,
     label: 'Status',
-    title: 'Status (Att B / LD)',
     group: 'Medical',
     icon: StatusIcon,
   },
   {
     path: '/soldier',
+    component: Soldier,
     label: 'Soldier',
-    title: 'Soldier Search',
     group: 'People',
     icon: SoldierIcon,
   },
   {
     path: '/orbat',
+    component: Orbat,
     label: 'ORBAT',
-    title: 'Order of Battle',
     group: 'People',
     icon: OrbatIcon,
   },
   {
     path: '/settings',
+    component: Settings,
     label: 'Settings',
-    title: 'Settings',
     group: '',
     icon: SettingsIcon,
   },

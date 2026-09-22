@@ -1,10 +1,6 @@
 /**
- * The parse run's time budget and backlog accounting.
- *
- * Extraction itself is covered by `parser-extract.test.ts` and `parser-rows.test.ts`. What is
- * tested here is the part that only matters under a platform timeout: a run must stop before
- * it is killed, and it must report honestly what it did not reach, or a backlog looks like an
- * empty queue.
+ * The parse run: which parser handles a message, and the backlog accounting (`skipped`),
+ * which the WhatsApp drain loop reads to decide whether to go round again.
  */
 import { describe, expect, test } from 'bun:test';
 import { parseDue } from '../../lib/pipeline.ts';
@@ -45,6 +41,9 @@ function fakeDb(due: DueRow[]): any {
       return builder;
     },
     update: () => ({ set: () => ({ where: async () => undefined }) }),
+    delete: () => ({ where: () => ({}) }),
+    insert: () => ({ values: () => ({}) }),
+    batch: async () => undefined,
   };
 }
 
@@ -62,50 +61,46 @@ function messages(n: number): DueRow[] {
   }));
 }
 
-describe('the deadline', () => {
-  test('starts nothing once the deadline has passed', async () => {
-    /*
-     * The model is never called, so this passes with a nonsense API key. That is the
-     * assertion: a run out of time must not begin an extraction it cannot finish, because
-     * the extraction is billed whether or not its result is used.
-     */
-    const run = await parseDue(fakeDb(messages(3)), {
-      apiKey: 'unused',
-      deadline: 1_000,
-      clock: () => 2_000,
-    });
+/** A fetch that always fails, so every extraction is a transient failure left unprocessed. */
+const offline = (async () => {
+  throw new Error('offline');
+}) as unknown as typeof fetch;
 
-    expect(run.results).toEqual([]);
-    expect(run.stoppedEarly).toBe(true);
+describe('skipped', () => {
+  test('counts what lay beyond the batch limit', async () => {
+    const run = await parseDue(fakeDb(messages(7)), { apiKey: 'unused', limit: 5, fetchImpl: offline });
+
+    // Five attempted (and failed transiently), two never looked at.
+    expect(run.results.map((r) => r.outcome)).toEqual(Array(5).fill('failed'));
+    expect(run.skipped).toBe(2);
   });
 
-  test('reports everything it did not reach as skipped', async () => {
-    const run = await parseDue(fakeDb(messages(7)), {
-      apiKey: 'unused',
-      limit: 5,
-      deadline: 1_000,
-      clock: () => 2_000,
-    });
-
-    // All seven are still due: the five it selected and the two beyond the limit.
-    expect(run.skipped).toBe(7);
-  });
-
-  test('does not stop early when there is no deadline', async () => {
+  test('is zero for an empty queue', async () => {
     const run = await parseDue(fakeDb([]), { apiKey: 'unused' });
-    expect(run.stoppedEarly).toBe(false);
-    expect(run.skipped).toBe(0);
+    expect(run).toEqual({ results: [], skipped: 0 });
+  });
+});
+
+describe('parser choice', () => {
+  test('a template message is parsed without calling the model', async () => {
+    const body = [
+      '40 SAR BRAVES COMPANY',
+      'FIRST PARADE STATE',
+      'DATE: 180926 TIME: 0700',
+      'COMPANY: 10/12',
+      'ATT C: 1',
+      '1. 1101 REC TAN AH KOW - 2D MC (170926-180926)',
+    ].join('\n');
+    const due = [{ id: 1, waMessageId: 'wa-1', body }];
+    const run = await parseDue(fakeDb(due), { apiKey: 'unused', fetchImpl: offline });
+
+    // `offline` throws, so reaching the model would have made this 'failed'.
+    expect(run.results[0]).toMatchObject({ outcome: 'parsed', parser: 'deterministic', counts: { personnel: 1 } });
   });
 
-  test('an empty queue is not an early stop', async () => {
-    // The two must stay distinguishable: "nothing to do" and "no time left" call for
-    // different reactions from whoever is watching the schedule.
-    const run = await parseDue(fakeDb([]), {
-      apiKey: 'unused',
-      deadline: 9_999,
-      clock: () => 1_000,
-    });
-    expect(run.results).toEqual([]);
-    expect(run.stoppedEarly).toBe(false);
+  test('a message the template parser doubts goes to the model', async () => {
+    const run = await parseDue(fakeDb(messages(1)), { apiKey: 'unused', fetchImpl: offline });
+    expect(run.results[0]!.outcome).toBe('failed');
+    expect(run.results[0]!.reason).toContain('offline');
   });
 });

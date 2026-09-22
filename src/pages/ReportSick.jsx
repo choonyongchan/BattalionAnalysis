@@ -1,37 +1,44 @@
 /**
  * Report sick: the parade-state and FormSG picture of who is reporting sick.
  *
- * Everything shared with MC/MA and Status lives in `CategoryPage`; this file supplies
- * only what is unique to report sick — the FormSG clinical-bucket trend, the free-text
+ * The sections shared with MC/MA and Status come from `shared/category.jsx`; this file
+ * adds what is unique to report sick — the FormSG side of every panel, the free-text
  * word cloud, and the hour-of-day histogram, none of which the other two categories have
  * a source for.
  */
 
-import { useMemo } from 'preact/hooks';
-import { company, dataset } from '../app/state.js';
 import { Card, Coverage } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
-import { Tile } from '../components/Tile.jsx';
+import { Tile, TileRow } from '../components/Tile.jsx';
+import { ChartCard, Histogram, WordCloud } from '../charts/index.js';
 import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
-import { buildEpisodes } from '../model/episodes.js';
 import {
   submissionCounts,
   submissionHeatmapCells,
   submissionRateByCompany,
   submissionRateByPlatoon,
   submissionTrend,
-  toSubmissions,
   topSubmitters,
 } from '../model/formsg.js';
-import { datesPresent, episodeCounts } from '../model/metrics.js';
-import { scopeDataset, scopeSubmissions } from '../model/scope.js';
-import { soldierIndex } from '../model/soldier.js';
+import { episodeCounts } from '../model/metrics.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { isWeekend } from '../model/dates.js';
 import { withinRange } from '../model/dateRange.js';
 import { toTimeOfDay } from '../model/values.js';
-import { CategoryPage } from './shared/CategoryPage.jsx';
+import {
+  CategoryPage,
+  DutyTrend,
+  EpisodeTiles,
+  PlatoonHeatmap,
+  ReasonsOverTime,
+  SoldierLookup,
+  TrendSection,
+  useCategory,
+} from './shared/category.jsx';
+
+/** @type {string} The duty class this page is about. */
+const DUTY = DUTY_CLASS.REPORT_SICK;
 
 /**
  * Formats a rate-per-100 cell, keeping the em dash the rate functions use for "no
@@ -53,17 +60,16 @@ function fmtRate_(per100) {
  * Platoon is not something FormSG states; it is inferred from the submitter's 4D through
  * the same rule `model/platoon.js` applies elsewhere, and a submission with no usable 4D
  * is placed under HQ. The coverage note on the platoon table says so.
- * @param {{submissions: Array<!Object>, strength: Array<!Object>, from: string,
- *     to: string}} props FormSG submissions and Strength Data, unfiltered, plus the
- *     range to restrict them to.
+ * @param {{submissions: Array<!Object>, strength: Array<!Object>, range: !Object}} props
+ *     FormSG submissions already restricted to the range, Strength Data unfiltered, and
+ *     the range to restrict it to.
  * @returns {!preact.VNode} The three cards.
  */
-function ReportedSickRankings({ submissions, strength, from, to }) {
-  const ranged = submissions.filter((s) => withinRange(s.date, from, to));
-  const strengthRanged = strength.filter((row) => withinRange(row.date, from, to));
-  const top = topSubmitters(ranged, 10);
-  const companies = submissionRateByCompany(ranged, strengthRanged);
-  const platoons = submissionRateByPlatoon(ranged, strengthRanged);
+function ReportedSickRankings({ submissions, strength, range }) {
+  const strengthRanged = strength.filter((row) => withinRange(row.date, range.from, range.to));
+  const top = topSubmitters(submissions, 10);
+  const companies = submissionRateByCompany(submissions, strengthRanged);
+  const platoons = submissionRateByPlatoon(submissions, strengthRanged);
 
   return (
     <>
@@ -159,42 +165,31 @@ function hourBins(submissions) {
 
 /**
  * The Report Sick page.
+ *
+ * Every panel carries both sources of the same event: the parade state ("Reporting
+ * Sick") and FormSG ("Reported Sick"). The second tile row ends with the absolute gap
+ * between the two counts, because a reader comparing the channels needs the pair on
+ * screen at once.
  * @returns {!preact.VNode} The page.
  */
 export function ReportSick() {
-  const full = dataset.value;
-  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
-  const calendarDates = useMemo(() => datesPresent(full.strength), [full.strength]);
-  const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
-  const submissions = useMemo(
-    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
-    [data.formSg, company.value]
-  );
-  const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
+  const { data, episodes, submissions, index, range } = useCategory();
+  const ranged = submissions.filter((s) => withinRange(s.date, range.from, range.to));
+  const formSg = submissionCounts(ranged).total;
+  const paradeEpisodes = episodeCounts(range.episodes, DUTY).total.episodes;
 
-  const reasonSource = useMemo(
-    () => ({ rows: submissions, dateOf: (s) => s.date, labelsOf: (s) => [clinicalBucketOf(s.symptomAnswer)] }),
-    [submissions]
-  );
-  const rangedSubmissions = (from, to) => submissions.filter((s) => withinRange(s.date, from, to));
-
-  const wordCloudBuilder = (from, to) => reasonKeywords(rangedSubmissions(from, to), 60);
-  const histogramBuilder = (from, to) => hourBins(rangedSubmissions(from, to));
-  const heatmapBuilder = (from, to) => submissionHeatmapCells(rangedSubmissions(from, to));
-
-  // The top row carries both sources of the same event side by side: three parade-state
-  // "Reporting Sick" tiles from CategoryPage, then these four FormSG "Reported Sick" ones,
-  // ending with the absolute gap between the two counts. A reader comparing the channels
-  // needs the pair on screen at once.
-  const secondTileRow = (from, to) => {
-    const ranged = rangedSubmissions(from, to);
-    const formSg = submissionCounts(ranged).total;
-    const paradeEpisodes = episodeCounts(
-      episodes.filter((e) => e.startDate && withinRange(e.startDate, from, to)),
-      DUTY_CLASS.REPORT_SICK
-    ).total.episodes;
-    return (
-      <>
+  return (
+    <CategoryPage title="Report Sick" range={range}>
+      <EpisodeTiles
+        range={range}
+        dutyClass={DUTY}
+        labels={{
+          episodes: 'Reporting Sick (Parade State) Count',
+          soldiers: 'Soldiers Reporting Sick',
+          perSoldier: 'Mean Reporting Sick Count per Soldier',
+        }}
+      />
+      <TileRow>
         <Tile label="Reported Sick (FormSG)" value={fmtInt(formSg.submissions)} />
         <Tile label="Soldiers Reported Sick" value={fmtInt(formSg.soldiers)} />
         <Tile
@@ -202,50 +197,36 @@ export function ReportSick() {
           value={formSg.perSoldier === null ? '—' : formSg.perSoldier.toFixed(1)}
         />
         <Tile label="Δ Report Sick" value={fmtInt(Math.abs(paradeEpisodes - formSg.submissions))} />
-      </>
-    );
-  };
-  const extraTrend = {
-    title: 'Reported Sick (FormSG) Trend',
-    coverage: 'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.',
-    trendFn: (scope, dates) => submissionTrend(submissions, data.strength, dates, { scope, session: 'FPS' }),
-  };
-
-  return (
-    <CategoryPage
-      title="Report Sick"
-      dataset={data}
-      calendarDates={calendarDates}
-      episodes={episodes}
-      dutyClass={DUTY_CLASS.REPORT_SICK}
-      leaderboardMetric="count"
-      reasonSource={reasonSource}
-      reasonsTitle="Top Report Sick Categories over time"
-      tileLabels={{
-        episodes: 'Reporting Sick (Parade State) Count',
-        soldiers: 'Soldiers Reporting Sick',
-        perSoldier: 'Mean Reporting Sick Count per Soldier',
-      }}
-      secondTileRow={secondTileRow}
-      trendTitle="Reporting Sick (Parade State) Trend"
-      extraTrend={extraTrend}
-      showHeatmap
-      heatmapBuilder={heatmapBuilder}
-      heatmapTitle="Reported Sick (FormSG) — by Company and Platoon"
-      heatmapCoverage="Count of FormSG submissions. Platoon is inferred from the 4D; a submission with no 4D is placed under HQ."
-      heatmapValueName="submissions"
-      heatmapEmpty="No FormSG submissions in range to place on the grid."
-      showWordCloud
-      wordCloudTitle="Top Self-Reported Report Sick Reasons"
-      wordCloudBuilder={wordCloudBuilder}
-      showHistogram
-      histogramBuilder={histogramBuilder}
-      showLeaderboard={false}
-      showUnitRankings={false}
-      soldierIndex={index}
-      afterLeaderboardBuilder={(from, to) => (
-        <ReportedSickRankings submissions={submissions} strength={data.strength} from={from} to={to} />
-      )}
-    />
+      </TileRow>
+      <DutyTrend title="Reporting Sick (Parade State) Trend" data={data} dutyClass={DUTY} range={range} />
+      <TrendSection
+        title="Reported Sick (FormSG) Trend"
+        coverage="FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap."
+        trendFn={(scope, dates) => submissionTrend(submissions, data.strength, dates, { scope, session: 'FPS' })}
+        range={range}
+      />
+      <PlatoonHeatmap
+        cells={submissionHeatmapCells(ranged)}
+        title="Reported Sick (FormSG) — by Company and Platoon"
+        coverage="Count of FormSG submissions. Platoon is inferred from the 4D; a submission with no 4D is placed under HQ."
+        valueName="submissions"
+        empty="No FormSG submissions in range to place on the grid."
+      />
+      <ReasonsOverTime
+        title="Top Report Sick Categories over time"
+        rows={submissions}
+        dateOf={(s) => s.date}
+        labelsOf={(s) => [clinicalBucketOf(s.symptomAnswer)]}
+        range={range}
+      />
+      <ChartCard title="Top Self-Reported Report Sick Reasons" empty="No free-text reasons recorded in range.">
+        <WordCloud words={reasonKeywords(ranged, 60)} />
+      </ChartCard>
+      <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
+        <Histogram bins={hourBins(ranged)} />
+      </ChartCard>
+      <ReportedSickRankings submissions={ranged} strength={data.strength} range={range} />
+      <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
+    </CategoryPage>
   );
 }

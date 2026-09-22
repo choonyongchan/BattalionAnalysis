@@ -1,12 +1,6 @@
 /**
- * Vocabulary and normalisation shared by both intake paths and the dashboard.
- *
- * Every function here is pure and free of I/O, so the same rules run in a Vercel Function,
- * in a local script and in tests without a database or a network.
- *
- * The enum values are not restated here. They are read from `db/schema.ts`, which is the
- * single source of truth: `lib/parser/schema.ts` builds the OpenAI strict-JSON enums from
- * the same arrays, so the parser cannot emit a value the database would reject.
+ * Pure vocabulary and normalisation shared by the WhatsApp parser and FormSG intake.
+ * Enum values come from `db/schema.ts`; the dashboard keeps its own copy in `src/model/domain.js`.
  */
 import {
   companyEnum,
@@ -19,15 +13,12 @@ import {
 
 export const COMPANIES = companyEnum.enumValues;
 export const SESSIONS = sessionEnum.enumValues;
-export const UNIT_TYPES = unitTypeEnum.enumValues;
 export const REASON_CATEGORIES = reasonCategoryEnum.enumValues;
 export const ROLE_KINDS = roleKindEnum.enumValues;
 export const REPORT_SICK_TYPES = reportSickTypeEnum.enumValues;
 
 export type Company = (typeof COMPANIES)[number];
-export type Session = (typeof SESSIONS)[number];
-export type UnitType = (typeof UNIT_TYPES)[number];
-export type ReasonCategory = (typeof REASON_CATEGORIES)[number];
+export type UnitType = (typeof unitTypeEnum.enumValues)[number];
 
 /**
  * Characters that carry no identity information but vary between how two people type the

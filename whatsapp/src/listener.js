@@ -19,7 +19,6 @@
  * from auth/.
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
@@ -152,21 +151,20 @@ function createSocket({ version, state, logger }) {
  * @param {import('pino').Logger} params.logger Logger for status output.
  * @param {function(?string, Object): Promise<void>} params.onMessage Per-message
  *   callback.
- * @param {function(Object): Promise<void>} [params.onReady] Called with the
- *   socket once the connection opens.
+ * @param {function(): void} params.onOpen Called once the connection opens.
  * @param {function(): (void|Promise<void>)} params.saveCreds Baileys credential
  *   persister.
  * @param {function(?number): void} params.onClose Called with the disconnect
  *   status code when the connection closes.
  * @returns {void}
  */
-function attachHandlers({ socket, groupId, logger, onMessage, onReady, saveCreds, onClose }) {
+function attachHandlers({ socket, groupId, logger, onMessage, onOpen, saveCreds, onClose }) {
   socket.ev.on('creds.update', saveCreds);
 
-  socket.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') {
-      return;
-    }
+  // Every upsert type, not just 'notify': messages that arrived while the bridge was
+  // down are replayed as 'append', and dropping them loses the parade states posted
+  // during a crash. Replays are harmless -- Neon dedups on wa_message_id.
+  socket.ev.on('messages.upsert', async ({ messages }) => {
     for (const envelope of messages) {
       if (!isWatchedGroupMessage(envelope, groupId || envelope.key?.remoteJid)) {
         continue;
@@ -179,7 +177,7 @@ function attachHandlers({ socket, groupId, logger, onMessage, onReady, saveCreds
     }
   });
 
-  socket.ev.on('connection.update', async (update) => {
+  socket.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
@@ -189,9 +187,7 @@ function attachHandlers({ socket, groupId, logger, onMessage, onReady, saveCreds
 
     if (connection === 'open') {
       logger.info('connected to WhatsApp');
-      if (onReady) {
-        await onReady(socket);
-      }
+      onOpen();
       return;
     }
 
@@ -239,17 +235,12 @@ function teardownSocket(socket, logger) {
  * @param {import('pino').Logger} options.logger Logger for status output.
  * @param {function(string, Object): Promise<void>} options.onMessage Called with
  *   the message text and its Baileys envelope for each watched message.
- * @param {function(Object): Promise<void>} [options.onReady] Called with the
- *   live socket once the connection opens.
  * @returns {Promise<void>} Rejects when the listener needs operator action.
  */
 export async function startListener(options) {
-  const { authDir, groupId, logger, onMessage, onReady } = options;
+  const { authDir, groupId, logger, onMessage } = options;
 
-  if (!existsSync(authDir)) {
-    mkdirSync(authDir, { recursive: true });
-  }
-
+  // useMultiFileAuthState creates authDir itself.
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -270,11 +261,8 @@ export async function startListener(options) {
         groupId,
         logger,
         onMessage,
-        onReady: async (live) => {
+        onOpen: () => {
           attempt = 0;
-          if (onReady) {
-            await onReady(live);
-          }
         },
         saveCreds,
         onClose: (statusCode) => handleClose(socket, statusCode),
@@ -300,7 +288,7 @@ export async function startListener(options) {
       if (kind === 'fatal') {
         const err = new Error(
           `WhatsApp session is dead (statusCode=${statusCode}). Delete whatsapp/auth/ and re-pair: ` +
-            'run `bun run reset-auth`, then `bun start`.'
+            'run `bun run whatsapp:reset-auth`, then `bun run whatsapp`.'
         );
         err.fatal = true;
         logger.error(err.message);

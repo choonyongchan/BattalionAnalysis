@@ -1,9 +1,6 @@
 /**
- * Decrypts a FormSG webhook body into answers.
- *
- * The crypto version is detected from the payload: `encryptedSubmissionSecretKey` means v3.
- * v3 answers carry no question text, so they need `FIELD_IDS` in `fields.ts`.
- * `verifiedContent` (which holds the NRIC) is never decrypted.
+ * Decrypts a FormSG webhook body (v2 or v3) into answers.
+ * `verifiedContent`, which holds the NRIC, is never decrypted.
  */
 import type { DecryptedSubmission, FormSgAnswer } from './map.ts';
 

@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { computeBackoffMs, isCleanExit, nextRestartCount } from '../src/supervisor.js';
+import { computeBackoffMs, isCleanExit, nextRestartCount } from '../../whatsapp/src/supervisor.js';
 
 describe('computeBackoffMs', () => {
   test('grows with each consecutive restart', () => {

@@ -12,7 +12,7 @@
  */
 
 import { loadAll } from '../data/feed.js';
-import { dataset, loadError, reset, status } from './state.js';
+import { dataset, loadError, status } from './state.js';
 
 /** @type {string} The password the viewer typed, for this tab only. */
 let password = '';
@@ -78,7 +78,5 @@ function load_(failStatus, forgetOnFail) {
  * @returns {void}
  */
 export function lock() {
-  password = '';
-  reset();
   window.location.reload();
 }

@@ -1,14 +1,6 @@
 /**
- * The one implementation of extract -> validate -> replace.
- *
- * The local WhatsApp runner calls `recordMessage` and `parseDue` in-process (see
- * `docs/superpowers/plans/2026-09-21-local-parade-state-parser.md`), so there is exactly one
- * code path that writes parade-state rows and exactly one place a rule about them can live.
- *
- * Intake and parsing are split because the model is slow. A real message took 74 seconds
- * against the flex tier, and the messiest took 126. So `recordMessage` returns the moment
- * the text is safely stored, and the parse drains afterwards. A slow model then delays a
- * row; it never loses one.
+ * The single parade-state write path: `recordMessage` stores a WhatsApp message, `parseDue` later
+ * extracts (template parser first, model on doubt), validates and replaces its rows.
  */
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import {
@@ -20,8 +12,12 @@ import {
   strengthRows,
 } from '../db/schema.ts';
 import { cleanText, paradeResponseId } from './domain.ts';
+import { parseParadeState } from './parser/deterministic.ts';
 import { ExtractionError, extract } from './parser/extract.ts';
 import { buildRows, validate } from './parser/rows.ts';
+
+/** Recorded on `parade_submissions.model` when no model was involved. */
+const DETERMINISTIC_MODEL = 'deterministic';
 
 /** The database handle, as returned by `drizzle(neon(...))`. */
 type Db = any;
@@ -90,6 +86,8 @@ export interface ParseResult {
   id: number;
   waMessageId: string;
   outcome: 'parsed' | 'rejected' | 'failed';
+  /** Which parser produced the extraction; absent when the model call itself failed. */
+  parser?: 'deterministic' | 'llm';
   paradeResponseId?: string;
   reason?: string;
   counts?: { strength: number; personnel: number; roster: number; sectionCounts: number };
@@ -103,24 +101,13 @@ export interface ParseOptions {
   fetchImpl?: typeof fetch;
   /** Overridden in tests so `today` is deterministic. */
   now?: () => Date;
-  /**
-   * Epoch milliseconds after which no further message is started.
-   *
-   * The caller running under a platform timeout sets this. Stopping early is not a failure:
-   * whatever was not reached is still unprocessed, so the next run picks it up.
-   */
-  deadline?: number;
-  /** Overridden in tests. Defaults to `Date.now`. */
-  clock?: () => number;
 }
 
 /** What a parse run did, and what it left behind. */
 export interface ParseRun {
   results: ParseResult[];
-  /** Messages that were due but not started, because the deadline or limit was reached. */
+  /** Messages still unprocessed after the run, beyond the ones attempted (the batch limit). */
   skipped: number;
-  /** True when the run stopped on its deadline rather than running out of work. */
-  stoppedEarly: boolean;
 }
 
 /**
@@ -131,11 +118,10 @@ export interface ParseRun {
  *
  * @param db A read-write database handle.
  * @param options API key, batch limit and test seams.
- * @returns One result per message attempted.
+ * @returns One result per message attempted, and how many were left for the next run.
  */
 export async function parseDue(db: Db, options: ParseOptions): Promise<ParseRun> {
   const limit = options.limit ?? 20;
-  const clock = options.clock ?? Date.now;
 
   const [backlog] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -150,19 +136,8 @@ export async function parseDue(db: Db, options: ParseOptions): Promise<ParseRun>
     .limit(limit);
 
   const results: ParseResult[] = [];
-  let stoppedEarly = false;
 
   for (const message of due) {
-    /*
-     * Checked before starting, never during. A message is either attempted whole or not at
-     * all, because its write is one batch: stopping here leaves the row unprocessed and the
-     * next run repeats it, whereas stopping mid-parse would mean paying for an extraction
-     * whose result is thrown away.
-     */
-    if (options.deadline !== undefined && clock() >= options.deadline) {
-      stoppedEarly = true;
-      break;
-    }
     try {
       results.push(await parseOne(db, message, options));
     } catch (error) {
@@ -180,11 +155,7 @@ export async function parseDue(db: Db, options: ParseOptions): Promise<ParseRun>
    * run. Counting it as skipped as well would double-count it; subtracting only what was
    * attempted keeps `skipped` meaning "not looked at".
    */
-  return {
-    results,
-    skipped: Math.max(0, (backlog?.n ?? 0) - results.length),
-    stoppedEarly,
-  };
+  return { results, skipped: Math.max(0, (backlog?.n ?? 0) - results.length) };
 }
 
 /**
@@ -202,14 +173,15 @@ async function parseOne(
 ): Promise<ParseResult> {
   const now = options.now ? options.now() : new Date();
   const today = now.toISOString().slice(0, 10);
-  const model = options.model;
 
-  const extraction = await extract(message.body, {
-    apiKey: options.apiKey,
-    today,
-    model,
-    fetchImpl: options.fetchImpl,
-  });
+  // The template parser is free and instant; the model only sees messages it is unsure of.
+  const rules = parseParadeState(message.body, today);
+  const parser: ParseResult['parser'] = rules.problems.length === 0 ? 'deterministic' : 'llm';
+  const model = parser === 'deterministic' ? DETERMINISTIC_MODEL : options.model;
+  const extraction =
+    parser === 'deterministic'
+      ? rules.extraction
+      : await extract(message.body, { apiKey: options.apiKey, today, model, fetchImpl: options.fetchImpl });
 
   const reason = validate(extraction);
   if (reason !== '') {
@@ -218,6 +190,7 @@ async function parseOne(
       id: message.id,
       waMessageId: message.waMessageId,
       outcome: extraction.rejected ? 'rejected' : 'failed',
+      parser,
       reason,
     };
   }
@@ -235,6 +208,7 @@ async function parseOne(
     id: message.id,
     waMessageId: message.waMessageId,
     outcome: 'parsed',
+    parser,
     paradeResponseId: key,
     counts: {
       strength: rows.strength.length,

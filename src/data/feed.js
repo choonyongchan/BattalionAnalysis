@@ -68,14 +68,6 @@ const OPTIONAL_TAB_SPECS = [
 ];
 
 /**
- * Whether a feed URL has been configured.
- * @returns {boolean} True when `config.js` names an endpoint.
- */
-function isConfigured() {
-  return FEED_URL !== '';
-}
-
-/**
  * Requests every tab from the feed.
  * @param {string} password The password the viewer typed.
  * @returns {!Promise<!Object<string, !Array<!Array<*>>>>} Tab name to values.
@@ -159,12 +151,6 @@ function readOptional(tabs, spec, notes) {
  * @returns {!Promise<!Object>} Records per tab, plus `generatedAt` and `notes`.
  */
 export function loadAll(password) {
-  if (!isConfigured()) {
-    return Promise.reject(
-      new Error('No feed URL is set. Add one to src/data/config.js — see docs/dashboard.md.')
-    );
-  }
-
   return fetchTabs(password).then(({ tabs, generatedAt }) => {
     const notes = {};
     const data = { generatedAt, notes, available: {} };

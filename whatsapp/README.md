@@ -43,21 +43,20 @@ If the unofficial-client risk is unacceptable long-term, the durable options are
 
 ## Setup
 
-The runner imports `../lib` and `../db` from the repo root, so both the root package and this one need their
-own install:
+The runner shares the repo root's `package.json`, and every command below runs **from the repo root**:
 
 ```bash
-# from the repo root
 bun install
-
-cd whatsapp
-bun install
-cp .env.example .env
+cp .env.whatsapp.example .env.whatsapp
 ```
+
+Its settings live in `.env.whatsapp`, not `.env.local`: both define `DATABASE_URL`, and the runner must use the
+`parade_ingest` role, never the owner. `bun run whatsapp` loads only `.env.whatsapp` (`--env-file`), and the
+supervisor starts the bridge with `whatsapp/` as its working directory so Bun cannot auto-load `.env.local`.
 
 **1. Point at Neon.** From the repo root, run `bun --env-file=.env.local scripts/apply-grants.ts db/grants-ingest.sql`
 once to create the `parade_ingest` role, then put the connection string it prints — **not** the
-owner's — into `DATABASE_URL` in `whatsapp/.env`. That role can only store raw messages and write parsed rows.
+owner's — into `DATABASE_URL` in `.env.whatsapp`. That role can only store raw messages and write parsed rows.
 
 **2. Add the OpenAI key.** Set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to whatever
 `lib/parser/extract.ts` picks; `PARSE_INTERVAL_MS` (default 300000) is optional too — it only controls how often
@@ -66,7 +65,7 @@ leftovers are swept, since a new message is parsed as soon as it arrives.
 **3. Pair WhatsApp and find the group.** Leave `WA_GROUP_ID` blank, set `LOG_LEVEL=debug` and `DRY_RUN=1`, then:
 
 ```bash
-bun start
+bun run whatsapp
 ```
 
 Scan the QR code with *WhatsApp → Settings → Linked devices → Link a device*. With `WA_GROUP_ID` blank the
@@ -76,28 +75,55 @@ reveals its JID. Copy that into `WA_GROUP_ID` and restart.
 **4. Dry run.** Still with `DRY_RUN=1`, post a real parade state and some chatter in the group. You should see
 exactly one `DRY_RUN` line, and the chatter logged at `debug` with a rejection reason.
 
-**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, and restart with `bun start`.
+**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, and restart with `bun run whatsapp`.
 
 ## Running it permanently on Windows
 
-`bun start` launches a supervisor (`src/supervisor.js`), not the bridge directly. The supervisor spawns
+`bun run whatsapp` launches a supervisor (`src/supervisor.js`), not the bridge directly. The supervisor spawns
 `src/index.js` as a child, forwards its output, and restarts it on a crash **up to 3 consecutive times** with a
 growing backoff (3s, 15s, 60s). A child that stayed up for 5 minutes before crashing is treated as a fresh
 incident and the counter resets, so an occasional crash after hours of healthy running still gets the full
 three attempts. After the 3rd consecutive restart the supervisor prints a fatal banner and exits non-zero.
 A clean child exit (code 0), or the "session is dead" exit (code 3), is not restarted.
 
-`bun run start:bridge` runs the bridge unsupervised — use it for debugging.
+`bun run whatsapp:bridge` runs the bridge unsupervised — use it for debugging.
 
-To start it at login, create a shortcut in `shell:startup` (Win+R → `shell:startup`) pointing at:
+### Task Scheduler (the outer layer)
 
+The supervisor gives up after 3 fast crashes, so something must relaunch *it*. Pair once interactively with
+`bun run whatsapp` (the QR needs a terminal), stop it, then register the task from an elevated PowerShell in the
+repo root:
+
+```powershell
+New-Item -ItemType Directory -Force whatsapp\data | Out-Null
+$bun  = (Get-Command bun).Source
+$act  = New-ScheduledTaskAction -Execute cmd.exe -WorkingDirectory $PWD `
+          -Argument "/c `"`"$bun`" --env-file=.env.whatsapp whatsapp\src\supervisor.js >> whatsapp\data\bridge.log 2>&1`""
+$trig = @(
+  New-ScheduledTaskTrigger -AtStartup
+  New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+)
+$set  = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) `
+          -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+          -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+$cred = Get-Credential $env:USERNAME
+Register-ScheduledTask WhatsAppBridge -Action $act -Trigger $trig -Settings $set `
+  -User $cred.UserName -Password $cred.GetNetworkCredential().Password
+powercfg /change standby-timeout-ac 0   # a sleeping PC receives nothing
 ```
-cmd /c "cd /d C:\Users\Administrator\Documents\Projects\BattalionDataAnalysis\whatsapp && bun start >> bridge.log 2>&1"
-```
 
-That shortcut (or Task Scheduler with "restart on failure", which also survives reboots) is the outer layer
-that relaunches the supervisor itself after it gives up. It only runs while the machine is awake and logged
-in. If uptime matters, move it to an always-on Linux host — nothing in the code is Windows-specific.
+What each piece buys:
+
+- **Every-5-minutes trigger + `IgnoreNew`** is the watchdog: while the bridge runs, each tick is a no-op; once
+  it is dead for any reason (supervisor gave up, killed, OOM), the next tick relaunches it. Worst-case gap is
+  5 minutes, and no messages are lost — Baileys delivers what arrived while offline on reconnect.
+- **`ExecutionTimeLimit` zero** — the default kills any task after 72 hours.
+- **User + password** — "run whether logged on or not", so it survives reboots (Windows Update) with nobody
+  logged in.
+- A dead session (exit 3) is relaunched too and fails the same way each tick; `whatsapp\data\bridge.log` says to
+  re-pair. Stop it with `Disable-ScheduledTask WhatsAppBridge; Get-Process bun | Stop-Process`.
+
+`whatsapp\data\bridge.log` is never rotated; truncate it by hand if it ever matters.
 
 ## Self-healing reconnect
 
@@ -111,7 +137,7 @@ Baileys' in-memory state from `auth/` usually clears a wedged socket.
 
 `loggedOut`, `badSession` and `connectionReplaced` are fatal: the listener prints "delete whatsapp/auth/ and
 re-pair" and exits code 3, so the supervisor stops instead of looping into the same wall. Run
-`bun run reset-auth` (deletes `auth/`), then `bun start`, then scan the QR.
+`bun run whatsapp:reset-auth` (deletes `auth/`), then `bun run whatsapp`, then scan the QR.
 
 An isolated `Bad MAC` on a single inbound message is handled inside Baileys — that one message is dropped and
 the socket keeps running. Nothing in the reconnect logic reacts to it.
@@ -153,7 +179,7 @@ also stamps `processed_at` so the row is not retried. The reason sits beside the
 visible in the database.
 
 To retune, edit `MIN_LINES` / `MIN_CHARS` / `FIRST_PARADE_CUTOFF_HOUR` at the top of `src/signature.js`, then
-run `bun test`.
+run `bun test ./test/whatsapp/`.
 
 ## Idempotency
 
@@ -172,17 +198,17 @@ instead of being silently skipped.
 
 | File | Role |
 |---|---|
-| `src/supervisor.js` | Spawns and restarts the runner process (this is what `bun start` runs) |
+| `src/supervisor.js` | Spawns and restarts the runner process (this is what `bun run whatsapp` runs) |
 | `src/index.js` | Wiring and the message handler |
 | `src/signature.js` | First-parade-state detection |
 | `src/listener.js` | Baileys socket, single-socket reconnect, envelope filtering |
 | `src/ingest.js` | Calls `recordMessage` / `parseDue` (`../../lib/pipeline.ts`) and runs the single-flight drain loop |
-| `src/config.js` | `.env` loading and validation |
+| `src/config.js` | `.env.whatsapp` validation |
 | `src/logger.js` | pino logger factory |
-| `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run reset-auth`) |
-| `test/` | `bun test` — signature suite plus the non-network modules |
+| `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run whatsapp:reset-auth`) |
+| `../test/whatsapp/` | `bun test ./test/whatsapp/` — signature suite plus the non-network modules |
 
-`auth/` and `.env` hold live credentials and are git-ignored. `src/appsScriptClient.js`, which relayed accepted
+`auth/` and the root `.env.whatsapp` hold live credentials and are git-ignored. `src/appsScriptClient.js`, which relayed accepted
 messages to the retired Apps Script web app, was deleted when storage and parsing moved into `src/ingest.js`.
 
 ## Troubleshooting
@@ -190,11 +216,11 @@ messages to the retired Apps Script web app, was deleted when storage and parsin
 | Symptom | Cause |
 |---|---|
 | QR code appears on every start | `auth/` is not writable, or the device was unlinked in WhatsApp |
-| `session logged out` / `session is dead` | Run `bun run reset-auth`, then `bun start`, then scan the QR again |
+| `session logged out` / `session is dead` | Run `bun run whatsapp:reset-auth`, then `bun run whatsapp`, then scan the QR again |
 | Occasional `Bad MAC` in the log, runner keeps running | One inbound message failed to decrypt; Baileys drops it. No action — if it was a parade state, ask the sender to resend |
-| Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the runner, `bun run reset-auth`, `bun start`, re-scan |
-| Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun start` |
-| `Missing required environment variable ...` at start-up | `whatsapp/.env` is missing a required key, or the process was started from somewhere other than `whatsapp/` — Bun only loads `.env` out of the working directory |
+| Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the runner, `bun run whatsapp:reset-auth`, `bun run whatsapp`, re-scan |
+| Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun run whatsapp` |
+| `Missing required environment variable ...` at start-up | `.env.whatsapp` is missing a required key, or the process was started some way other than `bun run whatsapp` (which passes `--env-file=.env.whatsapp`) |
 | `parse run failed; will retry on the next drain` in the log | `parseDue` threw — usually `DATABASE_URL` unreachable or the OpenAI call failed. The message stays unparsed and the next drain (on `PARSE_INTERVAL_MS`, or the next incoming message) retries it |
 | A message is stored but never parses | A 401/429/outage does not throw out of `parseDue` — it only shows up as `failed: N` in the `parse run finished` log, and the row's `raw_messages.error` stays empty since a transient failure is never written there. Check `OPENAI_API_KEY` is valid and has quota, and that `OPENAI_MODEL` (if set) names a real model |
 | A real parade state was rejected | Run with `LOG_LEVEL=debug`; the reason names the failing gate |

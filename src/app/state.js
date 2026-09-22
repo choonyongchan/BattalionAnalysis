@@ -39,17 +39,3 @@ export const company = signal('ALL');
  * @type {!import('@preact/signals').ReadonlySignal<boolean>}
  */
 export const isReady = computed(() => status.value === 'ready' && dataset.value !== null);
-
-/**
- * Returns the dashboard to its locked state, discarding everything loaded.
- * @returns {void}
- */
-export function reset() {
-  dataset.value = null;
-  status.value = 'locked';
-  loadError.value = '';
-  selectedDate.value = null;
-  dateFrom.value = null;
-  dateTo.value = null;
-  company.value = 'ALL';
-}

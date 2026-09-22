@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { DisconnectReason } from '@whiskeysockets/baileys';
-import { classifyDisconnect, reconnectDelayMs } from '../src/listener.js';
+import { classifyDisconnect, reconnectDelayMs } from '../../whatsapp/src/listener.js';
 
 describe('classifyDisconnect', () => {
   test('treats a logged-out session as fatal', () => {

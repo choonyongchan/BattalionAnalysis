@@ -15,7 +15,7 @@ Apps Script web app still serves the dashboard feed until the dashboard moves to
 | `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`), migrations, the runner's role (`grants-ingest.sql`). Only tables something writes; dashboard tables and a read-only role arrive with the dashboard's move to Neon |
 | `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → extract → validate → replace), `parser/`, `formsg/`, `http.ts`, `domain.ts` |
 | `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
-| `whatsapp/` | Long-running Bun process on the ops laptop | Baileys listener under `supervisor.js`; the only parade-state intake. `ingest.js` stores via `recordMessage` and drains via `parseDue` (see below) |
+| `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`) | Baileys listener under `supervisor.js`; the only parade-state intake. `ingest.js` stores via `recordMessage` and drains via `parseDue` (see below) |
 | `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | Read-only dashboard. See `docs/dashboard.md` |
 | `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql) |
 
@@ -27,6 +27,16 @@ call during a running drain only asks it to go round once more — so two `parse
 pay twice for the same extraction. Parsing runs locally rather than on Vercel because one
 extraction takes 74–126 s, past Hobby's 60 s cap, and Hobby refuses sub-daily crons. The
 runner connects as `parade_ingest`, which can write parade-state tables and nothing else.
+
+Each message goes to `lib/parser/deterministic.ts` first: a rule-based reader of the standard
+template (`parade-state-example/parade_state_template.txt`) that takes about a millisecond and
+returns the same `Extraction` shape as the model. It also returns `problems`, one for every line
+or header it cannot read with certainty (an unknown duty word outside OTHERS, unreadable
+dates, a line outside any section, a missing company or date). Any problem at all sends the
+whole message to the OpenAI extractor instead; the parser never stores a guess. Submissions it
+wrote have `model = 'deterministic'`, and the runner logs how many fell back (`llm` in the
+parse-run tally). A new filing habit that makes it fall back is fixed by teaching it one more
+rule, with a synthetic case in `test/lib/parser-deterministic.test.ts`.
 
 ## Rules that hold everywhere
 
@@ -63,5 +73,5 @@ paint time. `DESIGN.md` is the visual reference.
 
 ## Testing
 
-`bun test` from the repo root (`./test/` and `./whatsapp/test/`). No network, no database,
+`bun test` from the repo root (`./test/`; the WhatsApp bridge's tests are in `./test/whatsapp/`). No network, no database,
 no API key: routes take injected dependencies, and the dashboard's model layer is pure.

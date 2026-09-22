@@ -130,15 +130,4 @@ export function weekendBands(fromIso, toIso) {
   });
   return bands;
 }
-
-/**
- * Whether a holiday falls on a Saturday or Sunday.
- *
- * Lets a caller skip drawing a weekend band and a holiday line on the same column, since
- * stacking both annotations on one day says nothing a single mark would not.
- * @param {{date: string}} holiday A holiday, as from `toHolidays`.
- * @returns {boolean} True when the holiday's date is a Saturday or Sunday.
- */
-export function holidayIsWeekend(holiday) {
-  return isWeekend(holiday.date);
-}
+

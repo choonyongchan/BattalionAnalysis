@@ -32,9 +32,6 @@ export const TABS = {
 
 /**
  * Headers read from "Strength Data".
- *
- * The rank tiers are read as well as the totals: a present rate by rank tier costs
- * nothing once the columns are here, and they are already written on every row.
  * @type {string[]}
  */
 export const STRENGTH_HEADERS = [
@@ -46,12 +43,6 @@ export const STRENGTH_HEADERS = [
   'unit_type',
   'total_strength',
   'total_present',
-  'officer_strength',
-  'officer_present',
-  'wospec_strength',
-  'wospec_present',
-  'enlistee_strength',
-  'enlistee_present',
 ];
 
 /**

@@ -25,11 +25,6 @@ export const COMPANIES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Scorpion', 
  */
 export const PLATOONS = ['1', '2', '3', '4', 'HQ'];
 
-/**
- * Allowed parade sessions: first parade of the day, and last.
- * @type {string[]}
- */
-export const SESSIONS = ['FPS', 'LPS'];
 
 /**
  * The `unit_type` marking a Strength Data row as a whole-company total.

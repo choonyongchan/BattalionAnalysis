@@ -52,32 +52,6 @@ export function withinRange(isoDate, from, to) {
   return true;
 }
 
-/**
- * Tests whether a [startIso, endIso] span overlaps a range at all.
- *
- * Used for episodes, which have a duration: an MC that began before the window but
- * runs into it is part of the window's picture, so the test is overlap, not
- * containment. Either range bound may be null (open).
- * @param {?string} startIso Span start, ISO 'yyyy-MM-dd'.
- * @param {?string} endIso Span end, ISO 'yyyy-MM-dd'.
- * @param {?string} from Range lower bound, or null for open.
- * @param {?string} to Range upper bound, or null for open.
- * @returns {boolean} Whether the span touches the range.
- */
-export function overlapsRange(startIso, endIso, from, to) {
-  const start = startIso || endIso;
-  const end = endIso || startIso;
-  if (!start || !end) {
-    return false;
-  }
-  if (to && start > to) {
-    return false;
-  }
-  if (from && end < from) {
-    return false;
-  }
-  return true;
-}
 
 /**
  * Every ISO date from `from` to `to`, inclusive of both ends, in order.

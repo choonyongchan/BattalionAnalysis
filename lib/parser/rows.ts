@@ -1,24 +1,9 @@
 /**
- * Turns an extraction into the rows that go into the database.
- *
- * This layer derives almost nothing, on purpose. The parade state is a report a duty
- * commander typed, and its internal arithmetic is known to disagree with itself: three of
- * fifteen audited messages had strength figures that did not add up, section headers
- * disagreed with the lines beneath them 14 times in 391, and a stated day-count routinely
- * differs from the date range printed beside it. Reconciling any of that here would replace
- * a fact the unit reported with a number this code invented.
- *
- * So: what the message says is stored as the message says it. Disagreements are preserved
- * (see `section_counts`) and surfaced as data-quality findings in the dashboard, not fixed
- * during ingestion.
- *
- * The one exception is a wrong year digit -- "190936" for "190926" -- which the prompt
- * corrects and `validate` catches if it slips through, because a 2036 row silently escapes
- * every date filter in the dashboard rather than looking wrong.
+ * Validates an extraction and turns it into database rows, storing what the message says
+ * without reconciling its arithmetic (disagreements surface as data-quality findings).
  */
-import { normaliseFourD, normaliseName, unitTypeOf } from '../domain.ts';
-import { COMPANIES, REASON_CATEGORIES } from '../domain.ts';
-import type { Extraction } from './extract.ts';
+import { COMPANIES, REASON_CATEGORIES, normaliseFourD, normaliseName, unitTypeOf } from '../domain.ts';
+import type { Extraction } from './extraction.ts';
 
 /** How far from the parade date a stated date may be before it is treated as a typo. */
 const MAX_DATE_DRIFT_DAYS = 550;

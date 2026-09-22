@@ -86,23 +86,4 @@ export function isPermanentStatus(row) {
   }
   return /\bperm/i.test(toText(row && row.reason));
 }
-
-/**
- * Counts Status rows per bucket, for the bucket bar chart.
- * @param {Array<!Object>} rows Personnel Data records.
- * @returns {Array<{bucket: string, count: number}>} Buckets with at least one row,
- *     sorted by count descending, ties broken by STATUS_BUCKETS order.
- */
-export function bucketCounts(rows) {
-  const counts = new Map();
-  rows
-    .filter((row) => toText(row && row.reason_category) === 'Status')
-    .forEach((row) => {
-      bucketsFor(row.reason).forEach((bucket) => {
-        counts.set(bucket, (counts.get(bucket) || 0) + 1);
-      });
-    });
-  return STATUS_BUCKETS.filter((bucket) => counts.has(bucket))
-    .map((bucket) => ({ bucket, count: counts.get(bucket) }))
-    .sort((a, b) => b.count - a.count || STATUS_BUCKETS.indexOf(a.bucket) - STATUS_BUCKETS.indexOf(b.bucket));
-}
+

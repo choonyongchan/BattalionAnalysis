@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { isFirstParade, isParadeState } from '../src/signature.js';
+import { isFirstParade, isParadeState } from '../../whatsapp/src/signature.js';
 
 describe('isParadeState - chatter', () => {
   /** @type {Array<[string, string]>} Label and text of each rejected message. */

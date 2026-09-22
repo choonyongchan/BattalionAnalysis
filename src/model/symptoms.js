@@ -40,37 +40,8 @@ export const OTHER_BUCKET = 'Other';
 /** @type {string} The bucket for a submission that answered the question with nothing. */
 export const UNSTATED_BUCKET = 'Unstated';
 
-/**
- * Chart-axis labels, because the verbatim options run to seventy characters.
- * @type {!Object<string, string>}
- */
-const SHORT_LABELS = {
-  [CLINICAL_BUCKETS[0]]: 'URTI',
-  [CLINICAL_BUCKETS[1]]: 'Fever / headache',
-  [CLINICAL_BUCKETS[2]]: 'Musculoskeletal',
-  [CLINICAL_BUCKETS[3]]: 'Gastrointestinal',
-  [CLINICAL_BUCKETS[4]]: 'Dermatology',
-  [CLINICAL_BUCKETS[5]]: 'Chest pain',
-  [CLINICAL_BUCKETS[6]]: 'Eye & sight',
-  [CLINICAL_BUCKETS[7]]: 'Mental wellness',
-  [OTHER_BUCKET]: OTHER_BUCKET,
-  [UNSTATED_BUCKET]: UNSTATED_BUCKET,
-};
 
-/**
- * Every bucket a submission can land in, in chart order.
- * @type {string[]}
- */
-export const ALL_BUCKETS = CLINICAL_BUCKETS.concat([OTHER_BUCKET, UNSTATED_BUCKET]);
 
-/**
- * The short label for a bucket, for use on an axis or in a legend.
- * @param {string} bucket A bucket name.
- * @returns {string} The short label, or the bucket itself if it has none.
- */
-export function shortLabel(bucket) {
-  return SHORT_LABELS[bucket] || bucket;
-}
 
 /**
  * The bucket a pick-list answer belongs to.
@@ -90,23 +61,6 @@ export function clinicalBucketOf(answer) {
   return CLINICAL_BUCKETS.includes(value) ? value : OTHER_BUCKET;
 }
 
-/**
- * Counts submissions per clinical bucket.
- * @param {Array<!Object>} submissions Normalised submissions from `toSubmissions`.
- * @returns {Array<{bucket: string, label: string, count: number}>} Buckets, largest first.
- */
-export function clinicalCounts(submissions) {
-  const counts = new Map();
-  (submissions || []).forEach((submission) => {
-    const bucket = clinicalBucketOf(submission.symptomAnswer);
-    counts.set(bucket, (counts.get(bucket) || 0) + 1);
-  });
-  return Array.from(counts.entries())
-    .map(([bucket, count]) => ({ bucket, label: shortLabel(bucket), count }))
-    .sort(
-      (a, b) => b.count - a.count || ALL_BUCKETS.indexOf(a.bucket) - ALL_BUCKETS.indexOf(b.bucket)
-    );
-}
 
 /**
  * Word frequencies across the free-text reason field, for the word cloud.

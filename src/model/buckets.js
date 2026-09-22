@@ -88,31 +88,4 @@ export function bucketOf(isoDate, granularity, rotations) {
 
   return { key: isoDate, label: dayLabel_(isoDate) };
 }
-
-/**
- * Groups dates into buckets, in chronological order.
- *
- * The dates inside each bucket are sorted too, so a caller can read the first and last
- * without re-sorting, whatever order they arrived in.
- * @param {string[]} dates ISO 'yyyy-MM-dd' dates, in any order.
- * @param {string} granularity One of GRANULARITIES' names.
- * @param {Array<{name: string, start: string, end: ?string}>} rotations Rotations, for
- *     the rotational grain.
- * @returns {Array<{key: string, label: string, dates: string[]}>} Buckets, earliest first.
- */
-export function groupDates(dates, granularity, rotations) {
-  const buckets = new Map();
-  (dates || []).forEach((date) => {
-    const bucket = bucketOf(date, granularity, rotations);
-    const existing = buckets.get(bucket.key);
-    if (existing) {
-      existing.dates.push(date);
-      return;
-    }
-    buckets.set(bucket.key, { key: bucket.key, label: bucket.label, dates: [date] });
-  });
-
-  return Array.from(buckets.values())
-    .map((bucket) => ({ ...bucket, dates: bucket.dates.slice().sort() }))
-    .sort((a, b) => a.key.localeCompare(b.key));
-}
+

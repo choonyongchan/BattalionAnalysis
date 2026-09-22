@@ -3,7 +3,7 @@
  *
  * WhatsApp groups carry ordinary chatter alongside the parade states we care
  * about. This module decides, from the message text alone, whether a message is
- * worth relaying, so chatter never reaches the spreadsheet.
+ * worth storing, so chatter never reaches the database.
  *
  * Two gates, in order:
  *   1. Cheap structural gates reject anything too short, and anything that
@@ -21,14 +21,10 @@
  * There used to be a third stage: a score over six layout signals (strength
  * lines, present/total ratios, unit tokens, bracketed rank groups and so on),
  * needing three matches to accept. It is gone. Deciding whether a message is a
- * real parade state is what AiService and Validator do on the other side, and
- * they do it by reading the message rather than by guessing from its shape — so
- * the score was a second, weaker copy of a judgement already being made
- * downstream. What it added was a way to drop a genuine parade state whose
- * layout was merely unusual, with the rejection recorded nowhere. A message
- * that clears the gates but is not a parade state now lands on its own
- * "Parade State Responses" row marked ERROR, with the reason beside it, which
- * is visible and reversible.
+ * real parade state is what `extract` and `validate` (lib/parser/) do, by
+ * reading the message rather than guessing from its shape. A message that
+ * clears the gates but is not a parade state is stored anyway, and its
+ * raw_messages row carries the rejection reason in `error`.
  */
 
 /** @type {number} Minimum non-empty lines a parade state must have. */
@@ -70,13 +66,13 @@ const TIMING_PATTERN = /(?<!\d)(?:[01]\d|2[0-3])[0-5]\d(?!\d)/g;
 const FIRST_PARADE_CUTOFF_HOUR = 12;
 
 /**
- * Counts the non-empty lines in the text.
+ * Returns the lines of the text that contain at least one non-space glyph.
  *
  * @param {string} text Raw message text.
- * @returns {number} Number of lines containing at least one non-space glyph.
+ * @returns {string[]} The non-empty lines, in order.
  */
-function countNonEmptyLines(text) {
-  return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+function nonEmptyLines(text) {
+  return text.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
 /**
@@ -86,22 +82,7 @@ function countNonEmptyLines(text) {
  * @returns {string} The first HEADER_LINES non-empty lines, newline-joined.
  */
 function extractHeader(text) {
-  return text
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length > 0)
-    .slice(0, HEADER_LINES)
-    .join('\n');
-}
-
-/**
- * Reports whether the header carries a first-parade marker.
- *
- * @param {string} header The message header block.
- * @returns {boolean} True when the header contains "FIRST PARADE", "FPS" or a
- *   bare "FP" as a whole token.
- */
-function hasFirstParadeMarker(header) {
-  return HEADER_MARKER_PATTERN.test(header);
+  return nonEmptyLines(text).slice(0, HEADER_LINES).join('\n');
 }
 
 /**
@@ -134,7 +115,7 @@ function hasMorningTiming(header) {
  */
 export function isFirstParade(text) {
   const header = extractHeader(text);
-  return hasFirstParadeMarker(header) || hasMorningTiming(header);
+  return HEADER_MARKER_PATTERN.test(header) || hasMorningTiming(header);
 }
 
 /**
@@ -148,14 +129,14 @@ export function isParadeState(text) {
   if (typeof text !== 'string' || text.trim().length === 0) {
     return { accepted: false, rejectReason: 'empty message' };
   }
-  if (!ANCHOR_PATTERN.test(text) && !hasFirstParadeMarker(extractHeader(text))) {
+  if (!ANCHOR_PATTERN.test(text) && !HEADER_MARKER_PATTERN.test(extractHeader(text))) {
     return {
       accepted: false,
       rejectReason: 'no "parade state" anchor phrase and no first-parade marker in the header',
     };
   }
 
-  const lineCount = countNonEmptyLines(text);
+  const lineCount = nonEmptyLines(text).length;
   if (lineCount < MIN_LINES) {
     return { accepted: false, rejectReason: `too few lines (${lineCount} < ${MIN_LINES})` };
   }

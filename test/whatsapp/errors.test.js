@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { describeError } from '../src/errors.js';
+import { describeError } from '../../whatsapp/src/errors.js';
 // The real class, imported from the root install (whatsapp has no drizzle-orm of
 // its own): proves describeError works against what drizzle-orm actually throws,
 // not just a same-shaped stand-in.

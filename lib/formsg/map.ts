@@ -1,8 +1,4 @@
-/**
- * Turns a decrypted FormSG submission into one `report_sick_formsg` row.
- *
- * NRIC answers resolve to `discard` in `fields.ts` and have no column to land in.
- */
+/** Turns a decrypted FormSG submission into one `report_sick_formsg` row; NRIC answers are discarded. */
 import { companyFromUnitCoy, normaliseName } from '../domain.ts';
 import {
   resolveField,

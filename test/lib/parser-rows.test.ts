@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { buildRows, validate } from '../../lib/parser/rows.ts';
-import type { Extraction, ExtractedPerson } from '../../lib/parser/extract.ts';
+import type { Extraction, ExtractedPerson } from '../../lib/parser/extraction.ts';
 
 /**
  * Builds a minimal valid extraction, overridden per test.

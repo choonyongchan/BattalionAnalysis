@@ -31,17 +31,19 @@ import { startListener } from './listener.js';
 export function createMessageHandler({ config, logger, ingestor }) {
   return async function handleMessage(text, envelope) {
     const messageId = envelope.key?.id || '';
+    // remoteJid is logged so a blank WA_GROUP_ID dry run reveals the group's JID.
+    const remoteJid = envelope.key?.remoteJid;
     const { accepted, rejectReason } = isParadeState(text);
 
     if (!accepted) {
-      logger.debug({ messageId, reason: rejectReason }, 'ignored non-parade-state message');
+      logger.debug({ messageId, remoteJid, reason: rejectReason }, 'ignored non-parade-state message');
       return;
     }
 
     const summary = { messageId, chars: text.length };
 
     if (config.dryRun) {
-      logger.info(summary, 'DRY_RUN: parade state accepted but not stored');
+      logger.info({ ...summary, remoteJid }, 'DRY_RUN: parade state accepted but not stored');
       return;
     }
 
