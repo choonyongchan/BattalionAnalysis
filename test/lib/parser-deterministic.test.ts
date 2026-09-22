@@ -205,6 +205,61 @@ describe('personnel lines', () => {
   test('accepts any duty text under OTHERS, the template catch-all', () => {
     expect(one('2. PTE TAN AH KOW - BAIL REPORTING (180926)', 'Others')).toMatchObject({ duty_type: 'BAIL REPORTING', problems: [] });
   });
+
+  test('reads compassionate leave as a duty', () => {
+    expect(one('1. 7103 PTE TAN AH KOW - COMPASSIONATE (200926-220926)', 'Off/Leave')).toMatchObject({
+      duty_type: 'COMPASSIONATE',
+      start_date: '2026-09-20',
+      problems: [],
+    });
+  });
+
+  test('reads an appointment whose time is still TBC', () => {
+    expect(one('1. 7102 PTE TAN AH KOW - MA (Eczema checks) (260127 TBC) @ SKH', 'MA')).toMatchObject({
+      sub_reason: 'Eczema checks',
+      start_date: '2027-01-26',
+      start_time: null,
+      location: 'SKH',
+      problems: [],
+    });
+  });
+
+  test('reads dates written without brackets at the end of the duty', () => {
+    expect(one('2. 3SG TAN AH KOW - OFF IN LIEU 210926', 'Off/Leave')).toMatchObject({
+      duty_type: 'OFF IN LIEU',
+      start_date: '2026-09-21',
+      end_date: '2026-09-21',
+      problems: [],
+    });
+  });
+
+  test('keeps OTHERS free text whole, reading a date inside it', () => {
+    expect(one('1. REC TAN AH KOW - coming back 150926 morning', 'Others')).toMatchObject({
+      duty_type: 'coming back 150926 morning',
+      start_date: '2026-09-15',
+      problems: [],
+    });
+  });
+
+  test('ends the name at PERM when there is no dash', () => {
+    expect(one('2. PTE TAN AH KOW PERM EX FLEGS, PERM EX STAY IN')).toMatchObject({
+      name: 'TAN AH KOW',
+      is_permanent: true,
+      duty_type: 'EX FLEGS, EX STAY IN',
+      num_days: null,
+      problems: [],
+    });
+  });
+
+  test('rounds a fractional day count up to whole days', () => {
+    expect(one('1.PTE TAN AH KOW 1.5D AL (170926-180926)', 'Off/Leave')).toMatchObject({
+      entry_index: 1,
+      name: 'TAN AH KOW',
+      duty_type: 'AL',
+      num_days: 2,
+      problems: [],
+    });
+  });
 });
 
 describe('lines the parser will not guess at', () => {
@@ -262,6 +317,55 @@ OTHERS: 0`;
     expect(extraction.units[0]).toMatchObject({ officer_present: 0, officer_strength: null, wospec_present: null });
     expect(extraction.units[1]).toMatchObject({ unit_label: 'SIG', total_present: null });
     expect(extraction.personnel[0]).toMatchObject({ sub_reason: 'Fever', start_date: '2026-09-17', in_camp: false });
+  });
+
+  test('reads bare-count blocks and the S/N sub-form nested under REPORT SICK', () => {
+    const cougar = `40 SAR COUGAR COMPANY
+FIRST PARADE STATE
+DATE: 160926 TIME: 0700
+CDO: 2LT TAN AH KOW
+============================
+COMPANY: 38/40
+============================
+COY HQ: 00
+OFFICER: 00/01
+ATT C: 00
+STATUS: 00
+REPORT SICK: 00
+S/N: 00
+MA: 00
+OFF/LEAVE: 00
+OTHERS: 00
+----------------------------------
+Plt 8: 38
+OFFICER: 01/01
+ATT C: 00
+STATUS: 00
+REPORT SICK: 01
+S/N: 01
+  R/N: PTE LIM AH SENG
+  REASON: Cough and Flu
+
+MA: 00
+OFF/LEAVE: 00
+OTHERS: 00`;
+    const { extraction, problems } = parseParadeState(cougar, TODAY);
+    expect(problems).toEqual([]);
+    expect(extraction.rejected).toBe(false);
+    expect(extraction.units.map((u) => [u.unit_label, u.total_present, u.total_strength])).toEqual([
+      ['Company', 38, 40],
+      ['COY HQ', 0, null],
+      ['PLT 8', 38, null],
+    ]);
+    expect(extraction.personnel).toHaveLength(1);
+    expect(extraction.personnel[0]).toMatchObject({
+      unit_label: 'PLT 8',
+      reason_category: 'Report Sick',
+      entry_index: 1,
+      rank: 'PTE',
+      name: 'LIM AH SENG',
+      sub_reason: 'Cough and Flu',
+    });
   });
 
   test.each([

@@ -29,7 +29,7 @@ const RANK_AT_START = new RegExp(String.raw`^(${RANK}|<RANK>)(?=\s|$)`, 'i');
 
 /** A duty is recognised by any of these words; text with none of them is a medical condition. */
 const DUTY_WORD =
-  /\b(MC|LD|LIGHT DUTY|UFD|MA|EXCUSED?|OFF|OIL|LEAVE|AL|HL|HOSPITALI[SZ]ATION|IMT|IPPT|NS ?FIT|TP TEST|EX|GUARD|SDO|DUTY|COURSE|ATTACH\w*|WARDED|REVOKE\w*|ENDORSE\w*|RETURN\w*|STAY[- ]?IN|RMJ|FLEGS|RIB|PERM\w*)\b/i;
+  /\b(MC|LD|LIGHT DUTY|UFD|MA|EXCUSED?|OFF|OIL|LEAVE|AL|HL|COMPASSIONATE|CCL|HOSPITALI[SZ]ATION|IMT|IPPT|NS ?FIT|TP TEST|EX|GUARD|SDO|DUTY|COURSE|ATTACH\w*|WARDED|REVOKE\w*|ENDORSE\w*|RETURN\w*|STAY[- ]?IN|RMJ|FLEGS|RIB|PERM\w*)\b/i;
 
 /** Sections whose lines may state a condition with no duty ("Fever (160926-180926) OUT"). */
 const MEDICAL_SECTIONS = new Set(['Att C', 'Report Sick']);
@@ -46,7 +46,9 @@ const SECTIONS: Record<string, string> = {
 };
 
 const DDMMYY = String.raw`\d{6}`;
-const STAMP = String.raw`${DDMMYY}(?:\s+\d{4})?`;
+/** A date with an optional time; "TBC"/"TBA" is an appointment whose time is not yet known. */
+const STAMP = String.raw`${DDMMYY}(?:\s+(?:\d{4}|TB[CA]))?`;
+const UNKNOWN_TIME = /^TB[CA]$/i;
 const DATE_GROUP = new RegExp(
   String.raw`^(?:SINCE\s+(${DDMMYY})|UNTIL\s+(${DDMMYY})|(${STAMP})(?:\s*-\s*(${STAMP}))?)$`,
   'i',
@@ -64,7 +66,14 @@ const PLACEHOLDER = /^<[^>]*>$/;
 const ROLE_LINE = /^(CDO|CDS|COS|PDS)\s*([^:]*?)\s*:\s*(.*)$/i;
 const TIER_LINE = /^(OFFICERS?|WOSPECS?|ENLISTEES?)\s*:\s*(.*)$/i;
 const SECTION_LINE = /^(ATT\s*C|STATUS|REPORT\s*SICK|MA|OFF\s*\/\s*LEAVE|OTHERS)\s*:\s*(\d*)\s*$/i;
+const ANY_SECTION_LINE = new RegExp(SECTION_LINE.source, 'im');
 const BLOCK_LINE = /^([A-Z][A-Z0-9 +&/]*?)\s*:\s*(\d+\s*\/\s*\d+|<P>\s*\/\s*<S>)$/i;
+/** A block with a bare count ("Plt 7: 39"); only trusted once the body has begun. */
+const BARE_BLOCK_LINE = /^([A-Z][A-Z0-9 +&/]*?)\s*:\s*(\d{1,3})$/i;
+/** The report-sick sub-form some filers nest under REPORT SICK: "S/N: 01", "R/N: PTE TAN", "REASON: Fever". */
+const SUB_FORM_LINE = /^(S\/N|R\s*[/&]\s*N|REASON)\s*:\s*(.*)$/i;
+/** A name with no dash before its status ends where these begin: "(", "2D ", "1.5D ", "PERM". */
+const NAME_END = /\s+-\s*|\s*-\s+|\s*\(|\s+\d+(?:\.\d+)?\s*D\s|\s+(?=PERM(?:ANENT)?\b)/i;
 
 /**
  * Parses a parade-state message without a model.
@@ -82,7 +91,8 @@ export function parseParadeState(rawText: string, today: string): DeterministicR
   if (/\bLAST PARADE STATE\b|\bLPS\b/.test(head)) {
     return sure(rejection('This is a LAST PARADE STATE; only first parade states are ingested.', 'LPS'));
   }
-  if (OLD_LAYOUT.test(text) || /^\s*\[[^\]]+\]\s*[A-Z0-9]/m.test(text)) {
+  // The template's own sections may nest an S/N sub-form; only its absence marks the old layout.
+  if ((OLD_LAYOUT.test(text) && !ANY_SECTION_LINE.test(text)) || /^\s*\[[^\]]+\]\s*[A-Z0-9]/m.test(text)) {
     return sure(rejection('Parade state is in an older free-form layout, not the standard template.'));
   }
   if (start < 0) {
@@ -144,6 +154,7 @@ class BodyParser {
   private readonly problems: string[] = [];
   private unit: ExtractedUnit | null = null;
   private section: string | null = null;
+  private pending: { index?: string; who?: string; reason?: string } | null = null;
 
   /**
    * @param paradeDate The parade date, `yyyy-MM-dd`, that entry years resolve against.
@@ -158,6 +169,10 @@ class BodyParser {
   line(line: string): void {
     if (SEPARATOR_OR_BLANK.test(line)) return;
 
+    const subForm = SUB_FORM_LINE.exec(line);
+    if (subForm && this.section) return this.subFormLine(subForm[1]!, subForm[2]!.trim());
+    this.flushSubForm();
+
     const role = ROLE_LINE.exec(line);
     if (role) {
       this.roster.push(commandMember(role[1]!.toUpperCase(), role[2]!, role[3]!));
@@ -167,18 +182,13 @@ class BodyParser {
     if (tier && this.unit) return this.tier(tier[1]!, tier[2]!, line);
     const section = SECTION_LINE.exec(line);
     if (section) return this.openSection(section[1]!, section[2]!, line);
-    const block = BLOCK_LINE.exec(line);
+    const block = BLOCK_LINE.exec(line) ?? (this.unit ? BARE_BLOCK_LINE.exec(line) : null);
     if (block) return this.openBlock(block[1]!, block[2]!);
 
     if (!this.unit || !this.section) {
       this.problems.push(`Line outside any section: "${line}"`);
     } else if (!/^(NIL|NONE)$/i.test(line)) {
-      const parsed = parseEntry(line, this.paradeDate, {
-        unit_label: this.unit.unit_label,
-        reason_category: this.section,
-      });
-      this.personnel.push(...parsed.entries);
-      this.problems.push(...parsed.problems);
+      this.entry(line);
     }
   }
 
@@ -188,8 +198,54 @@ class BodyParser {
    * @returns Every problem found.
    */
   finish(): string[] {
+    this.flushSubForm();
     if (this.units[0]?.unit_label !== 'Company') this.problems.push('The first strength block is not COMPANY.');
     return this.problems;
+  }
+
+  /**
+   * Parses one personnel line under the current block and section.
+   *
+   * @param line The personnel line.
+   */
+  private entry(line: string): void {
+    const parsed = parseEntry(line, this.paradeDate, {
+      unit_label: this.unit!.unit_label,
+      reason_category: this.section!,
+    });
+    this.personnel.push(...parsed.entries);
+    this.problems.push(...parsed.problems);
+  }
+
+  /**
+   * Collects one line of the "S/N: / R/N: / REASON:" sub-form.
+   *
+   * @param label S/N, R/N (or R & N) or REASON, as written.
+   * @param value Everything after the colon.
+   */
+  private subFormLine(label: string, value: string): void {
+    const key = label.toUpperCase();
+    if (key === 'S/N') {
+      this.flushSubForm();
+      this.pending = { index: value };
+    } else if (key === 'REASON') {
+      this.pending = { ...this.pending, reason: value };
+      this.flushSubForm();
+    } else {
+      this.pending = { ...this.pending, who: value };
+    }
+  }
+
+  /**
+   * Turns a collected sub-form into an ordinary personnel line. A serial number with no
+   * rank and name ("S/N: 00") is an empty form and yields nothing.
+   */
+  private flushSubForm(): void {
+    const form = this.pending;
+    this.pending = null;
+    if (!form?.who) return;
+    const index = form.index && /^\d+$/.test(form.index) ? `${Number(form.index)}. ` : '';
+    this.entry(`${index}${form.who}${form.reason ? ` - ${form.reason}` : ''}`);
   }
 
   /**
@@ -306,8 +362,8 @@ export function parseEntry(
     rest = rest.slice(rankMatch[0].length).trim();
   }
 
-  // The name runs up to a spaced dash, a bracket, or a day count ("2D ...").
-  const end = /\s+-\s*|\s*-\s+|\s*\(|\s+\d+\s*D\s/i.exec(rest);
+  // The name runs up to a spaced dash, a bracket, a day count ("2D ...") or "PERM".
+  const end = NAME_END.exec(rest);
   const name = (end ? rest.slice(0, end.index) : rest).trim().replace(/-$/, '').trim();
   const status = end ? rest.slice(end.index).trim().replace(/^-\s*/, '') : '';
 
@@ -378,15 +434,18 @@ function parseDuty(text: string, paradeDate: string, section: string, flag: (why
   }
   bare = bare.replace(/\s+/g, ' ').trim();
 
-  const days = /^(\d+)\s*D(?:AYS?)?\s+/i.exec(bare) ?? /^(PERM(?:ANENT)?)\s+(\d+)\s*D\s+/i.exec(bare);
+  const days =
+    /^(\d+(?:\.\d+)?)\s*D(?:AYS?)?\s+/i.exec(bare) ?? /^(PERM(?:ANENT)?)\s+(\d+(?:\.\d+)?)\s*D\s+/i.exec(bare);
   if (days) {
-    duty.num_days = Number(days[days.length - 1]);
+    // "1.5D AL" spans two calendar days, and the column holds whole days.
+    duty.num_days = Math.ceil(Number(days[days.length - 1]));
     bare = bare.slice(0, days.index) + bare.slice(days.index + days[0].length);
   }
   if (/\bPERM(ANENT)?\b/i.test(bare)) {
     duty.is_permanent = true;
-    bare = bare.replace(/\bPERM(ANENT)?\b/i, '').trim();
+    bare = bare.replace(/\bPERM(ANENT)?\b\s*/gi, '').trim();
   }
+  if (!duty.start_date && !duty.end_date) bare = takeBareDates(bare, paradeDate, duty, section);
   if (duty.is_permanent) duty.num_days = null;
 
   const rsType = REPORT_SICK_TYPES.find((type) => bare.toUpperCase() === type);
@@ -397,7 +456,7 @@ function parseDuty(text: string, paradeDate: string, section: string, flag: (why
     bare = ''; // an unfilled "<RSI/RSO>": the type is simply unknown
   }
 
-  if (/\d{6}/.test(bare)) flag('Date outside brackets');
+  if (/\d{6}/.test(bare) && section !== FREE_TEXT_SECTION) flag('Date outside brackets');
   if (bare && !DUTY_WORD.test(bare) && section !== FREE_TEXT_SECTION) {
     if (MEDICAL_SECTIONS.has(section)) {
       details.unshift(bare); // a condition with no duty, which the template allows here
@@ -411,6 +470,30 @@ function parseDuty(text: string, paradeDate: string, section: string, flag: (why
     flag('No duty, reason or dates');
   }
   return duty;
+}
+
+/**
+ * Reads dates written without brackets. A trailing date form ("OFF IN LIEU 210926") is taken
+ * off the duty; under OTHERS, a lone date inside the free text ("coming back 150926 morning")
+ * is read but the text is kept as written.
+ *
+ * @param bare The duty text, brackets already removed.
+ * @param paradeDate The parade date, `yyyy-MM-dd`.
+ * @param duty The duty being filled in.
+ * @param section The reason category it sits under.
+ * @returns The duty text left once the dates are taken.
+ */
+function takeBareDates(bare: string, paradeDate: string, duty: Duty, section: string): string {
+  const split = DETAIL_THEN_DATES.exec(bare);
+  const trailing = split ? readDates(split[2]!, paradeDate) : null;
+  if (split && trailing) {
+    Object.assign(duty, trailing);
+    return split[1]!;
+  }
+  const embedded = bare.match(new RegExp(String.raw`\b${DDMMYY}\b`, 'g'));
+  const date = section === FREE_TEXT_SECTION && embedded?.length === 1 ? toIsoDate(embedded[0]!, paradeDate) : null;
+  if (date) Object.assign(duty, { start_date: date, end_date: date });
+  return bare;
 }
 
 /**
@@ -472,8 +555,8 @@ function readDates(text: string, paradeDate: string): Partial<Duty> | null {
     return validDates(result) ? result : null;
   }
 
-  const [startDay, startTime] = from!.split(/\s+/);
-  const [endDay, endTime] = (to ?? from!).split(/\s+/);
+  const [startDay, startTime] = splitStamp(from!);
+  const [endDay, endTime] = splitStamp(to ?? from!);
   const result: Partial<Duty> = {
     start_date: toIsoDate(startDay!, paradeDate),
     end_date: toIsoDate(endDay!, paradeDate),
@@ -481,6 +564,17 @@ function readDates(text: string, paradeDate: string): Partial<Duty> | null {
   };
   if (to && startTime && endTime) result.num_days = 1; // an overnight duty is one duty
   return validDates(result) && (!startTime || result.start_time) ? result : null;
+}
+
+/**
+ * Splits "DDMMYY [HHMM|TBC]" into its day and time.
+ *
+ * @param stamp One date stamp.
+ * @returns The day, and the time or undefined when none (or "TBC"/"TBA") is given.
+ */
+function splitStamp(stamp: string): [string, string | undefined] {
+  const [day, time] = stamp.split(/\s+/);
+  return [day!, time && !UNKNOWN_TIME.test(time) ? time : undefined];
 }
 
 /**
