@@ -3,8 +3,8 @@
  *
  * Every secret and deployment-specific value lives in the repo-root
  * .env.whatsapp, loaded by `bun --env-file=.env.whatsapp` (the `whatsapp`
- * package script). It is separate from .env.local because both define
- * DATABASE_URL: the bridge must use the parade_ingest role, never the owner.
+ * package script). It is separate from .env.local because the bridge holds no
+ * database credentials at all: it only relays text to `api/parade.ts`.
  * Started without that file, the required variables read as missing and
  * `loadConfig` says so by name rather than failing later and vaguely.
  */
@@ -48,25 +48,6 @@ function optionalEnv(env, key, fallback) {
 }
 
 /**
- * Reads an optional positive integer, in milliseconds.
- *
- * @param {!Object<string, string>} env The environment to read from.
- * @param {string} key Name of the variable.
- * @param {number} fallback Value when the variable is absent or blank.
- * @returns {number} The parsed value, or the fallback.
- * @throws {Error} If the variable is set but is not a positive integer.
- */
-function optionalPositiveInt(env, key, fallback) {
-  const raw = optionalEnv(env, key, '');
-  if (raw === '') return fallback;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${key} must be a positive whole number of milliseconds, got "${raw}".`);
-  }
-  return value;
-}
-
-/**
  * Builds the whole configuration, validating it up front.
  *
  * Loading fails fast at start-up rather than at the moment the first parade
@@ -80,14 +61,10 @@ function optionalPositiveInt(env, key, fallback) {
  * every chat, which is how the group's JID is discovered (README step 3), and a
  * live run must never store parade states from the wrong chat.
  *
- * `DATABASE_URL` is read here only to fail fast. `db/index.ts` reads it again
- * from `process.env` when the first query runs.
- *
  * @param {{env?: !Object<string, string>}} [options] `env` defaults to
  *   process.env, which already carries .env.whatsapp.
- * @returns {{groupId: string, databaseUrl: string, openaiApiKey: string,
- *   openaiModel: (string|undefined), parseIntervalMs: number, logLevel: string,
- *   dryRun: boolean, authDir: string}} The resolved configuration.
+ * @returns {{groupId: string, paradeApiUrl: string, ingestSecret: string,
+ *   logLevel: string, dryRun: boolean, authDir: string}} The resolved configuration.
  * @throws {Error} If a required variable is missing or a value is malformed.
  */
 export function loadConfig(options = {}) {
@@ -96,10 +73,8 @@ export function loadConfig(options = {}) {
 
   return {
     groupId: dryRun ? optionalEnv(env, 'WA_GROUP_ID', '') : requireEnv(env, 'WA_GROUP_ID'),
-    databaseUrl: requireEnv(env, 'DATABASE_URL'),
-    openaiApiKey: requireEnv(env, 'OPENAI_API_KEY'),
-    openaiModel: optionalEnv(env, 'OPENAI_MODEL', '') || undefined,
-    parseIntervalMs: optionalPositiveInt(env, 'PARSE_INTERVAL_MS', 300_000),
+    paradeApiUrl: requireEnv(env, 'PARADE_API_URL'),
+    ingestSecret: requireEnv(env, 'PARADE_INGEST_SECRET'),
     logLevel: optionalEnv(env, 'LOG_LEVEL', 'info'),
     dryRun,
     authDir: AUTH_DIR,

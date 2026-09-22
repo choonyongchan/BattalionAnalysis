@@ -1,5 +1,5 @@
 /**
- * The seven pages, in the order a commander reads them.
+ * The eight pages, in the order a commander reads them.
  *
  * One list, used three times: the sidebar renders it, the router matches it, and the
  * narrow-screen top bar takes its label from it. Adding a page means adding a row here
@@ -8,13 +8,15 @@
  * The grouping is the reading order, not a taxonomy. Overview answers "what is the
  * battalion today". The three medical pages answer the same four questions of report
  * sick, MC and status in turn. People is for looking one person or one duty roster up.
- * Settings is what the other seven are reading from.
+ * Parade States and Settings sit at the foot: the first is where a clerk deposits or
+ * corrects a parade state, the second is what the rest are reading from.
  */
 
 import {
   McMaIcon,
   OrbatIcon,
   OverviewIcon,
+  ParadeStatesIcon,
   ReportSickIcon,
   SettingsIcon,
   SoldierIcon,
@@ -26,6 +28,7 @@ import { McMa } from '../pages/McMa.jsx';
 import { Status } from '../pages/Status.jsx';
 import { Soldier } from '../pages/Soldier.jsx';
 import { Orbat } from '../pages/Orbat.jsx';
+import { ParadeStates } from '../pages/ParadeStates.jsx';
 import { Settings } from '../pages/Settings.jsx';
 
 /**
@@ -76,6 +79,13 @@ export const ROUTES = [
     icon: OrbatIcon,
   },
   {
+    path: '/parade-states',
+    component: ParadeStates,
+    label: 'Parade States',
+    group: '',
+    icon: ParadeStatesIcon,
+  },
+  {
     path: '/settings',
     component: Settings,
     label: 'Settings',
@@ -90,8 +100,8 @@ export const DEFAULT_ROUTE = '/overview';
 /**
  * Groups the routes for the sidebar, keeping declaration order.
  *
- * A route with no group name renders as its own ungrouped block at the foot of the rail,
- * which is where Settings belongs: reachable, but not part of the reading order.
+ * Routes with no group name render as one ungrouped block at the foot of the rail, which
+ * is where Parade States and Settings belong: reachable, but not part of the reading order.
  * @returns {!Array<{name: string, routes: !Array<!Object>}>} Groups in sidebar order.
  */
 export function navGroups() {

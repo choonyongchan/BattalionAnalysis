@@ -7,7 +7,6 @@ import { describe, expect, test } from 'bun:test';
 import { loadConfig } from '../../whatsapp/src/config.js';
 import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
 import { createMessageHandler } from '../../whatsapp/src/index.js';
-import { DrizzleQueryError } from '../../node_modules/drizzle-orm/errors.js';
 
 /** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
 const MARKER = 'NRIC S1234568B BODY';
@@ -28,8 +27,8 @@ const GROUP_JID = '120363000000000000@g.us';
 function sampleEnv(overrides = {}) {
   return {
     WA_GROUP_ID: GROUP_JID,
-    DATABASE_URL: 'postgresql://parade_ingest:pw@host/db?sslmode=require',
-    OPENAI_API_KEY: 'sk-test',
+    PARADE_API_URL: 'https://example.vercel.app/api/parade',
+    PARADE_INGEST_SECRET: 'relay-secret',
     ...overrides,
   };
 }
@@ -41,15 +40,13 @@ describe('loadConfig', () => {
   test('reads the required settings', () => {
     const config = loadConfig({ env: sampleEnv() });
     expect(config.groupId).toBe(GROUP_JID);
-    expect(config.databaseUrl).toContain('parade_ingest');
-    expect(config.openaiApiKey).toBe('sk-test');
-    expect(config.openaiModel).toBeUndefined();
-    expect(config.parseIntervalMs).toBe(300_000);
+    expect(config.paradeApiUrl).toBe('https://example.vercel.app/api/parade');
+    expect(config.ingestSecret).toBe('relay-secret');
     expect(config.dryRun).toBe(false);
     expect(config.logLevel).toBe('info');
   });
 
-  test.each(['WA_GROUP_ID', 'DATABASE_URL', 'OPENAI_API_KEY'])('rejects a missing %s', (key) => {
+  test.each(['WA_GROUP_ID', 'PARADE_API_URL', 'PARADE_INGEST_SECRET'])('rejects a missing %s', (key) => {
     const env = sampleEnv();
     delete env[key];
     expect(() => loadConfig({ env })).toThrow(new RegExp(key));
@@ -61,17 +58,7 @@ describe('loadConfig', () => {
   });
 
   test('rejects a blank required setting, not just an absent one', () => {
-    expect(() => loadConfig({ env: sampleEnv({ OPENAI_API_KEY: '   ' }) })).toThrow(/OPENAI_API_KEY/);
-  });
-
-  test('honours OPENAI_MODEL and PARSE_INTERVAL_MS', () => {
-    const config = loadConfig({ env: sampleEnv({ OPENAI_MODEL: 'gpt-x', PARSE_INTERVAL_MS: '60000' }) });
-    expect(config.openaiModel).toBe('gpt-x');
-    expect(config.parseIntervalMs).toBe(60_000);
-  });
-
-  test('rejects a PARSE_INTERVAL_MS that is not a positive number', () => {
-    expect(() => loadConfig({ env: sampleEnv({ PARSE_INTERVAL_MS: 'soon' }) })).toThrow(/PARSE_INTERVAL_MS/);
+    expect(() => loadConfig({ env: sampleEnv({ PARADE_INGEST_SECRET: '   ' }) })).toThrow(/PARADE_INGEST_SECRET/);
   });
 
   test('honours DRY_RUN', () => {
@@ -125,16 +112,13 @@ describe('listener envelope filters', () => {
 });
 
 describe('createMessageHandler', () => {
-  // The existing `/** @type {string} */ const PARADE_STATE = [...]` declaration stays here
-  // exactly as it is today; only the blocks around it change.
-
   /**
    * An ingestor that records what it was given.
    *
    * @param {function(): !Promise<Object>=} impl Replaces the default outcome.
    * @returns {{calls: !Array<!Array<string>>, ingest: function(string, string): !Promise<Object>}}
    */
-  function fakeIngestor(impl = async () => ({ status: 'stored', id: 1 })) {
+  function fakeIngestor(impl = async () => ({ status: 'parsed', id: 1 })) {
     const calls = [];
     return {
       calls,
@@ -175,27 +159,23 @@ describe('createMessageHandler', () => {
     expect(ingestor.calls[0][0]).toContain('PARADE STATE');
   });
 
-  test('logs "stored parade state" for a fresh message', async () => {
+  test.each([
+    ['parsed', 'info', 'parade state stored and parsed'],
+    ['already_parsed', 'info', 'parade state already known'],
+    ['needs_review', 'warn', 'parade state stored; needs correcting on the dashboard'],
+    ['rejected', 'warn', 'parade state rejected by the parser'],
+  ])('logs a %s answer at %s', async (status, level, message) => {
     const logged = [];
-    const capturingLogger = { ...silentLogger, info: (fields, msg) => logged.push(msg) };
-    const ingestor = fakeIngestor(async () => ({ status: 'stored', id: 1 }));
-    const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
+    const capturingLogger = { ...silentLogger, [level]: (fields, msg) => logged.push(msg) };
+    const handle = createMessageHandler({
+      config: { dryRun: false },
+      logger: capturingLogger,
+      ingestor: fakeIngestor(async () => ({ status, id: 1 })),
+    });
 
     await handle(PARADE_STATE, { key: { id: 'MSG1' } });
 
-    expect(logged).toContain('stored parade state');
-  });
-
-  test('logs "parade state already known" for a duplicate or already-processed message', async () => {
-    const logged = [];
-    const capturingLogger = { ...silentLogger, info: (fields, msg) => logged.push(msg) };
-    const ingestor = fakeIngestor(async () => ({ status: 'duplicate', id: 1 }));
-    const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
-
-    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
-
-    expect(logged).toContain('parade state already known');
-    expect(logged).not.toContain('stored parade state');
+    expect(logged).toEqual([message]);
   });
 
   test('never ingests a rejected message', async () => {
@@ -223,12 +203,10 @@ describe('createMessageHandler', () => {
     expect(await handle(PARADE_STATE, { key: { id: 'MSG4' } })).toBeUndefined();
   });
 
-  test('never logs a DrizzleQueryError message or params from a storage failure', async () => {
+  test('never logs the problems or reason the intake quotes back', async () => {
     const logged = [];
-    const capturingLogger = { ...silentLogger, error: (fields, msg) => logged.push([fields, msg]) };
-    const ingestor = fakeIngestor(async () => {
-      throw new DrizzleQueryError('insert into raw_messages (body) values ($1)', [MARKER], new Error('fetch failed'));
-    });
+    const capturingLogger = { ...silentLogger, warn: (fields, msg) => logged.push([fields, msg]) };
+    const ingestor = fakeIngestor(async () => ({ status: 'needs_review', id: 7, problems: [MARKER], reason: MARKER }));
     const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
 
     await handle(PARADE_STATE, { key: { id: 'MSG5' } });

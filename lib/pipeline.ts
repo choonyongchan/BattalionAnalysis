@@ -1,8 +1,12 @@
 /**
- * The single parade-state write path: `recordMessage` stores a WhatsApp message, `parseDue` later
- * extracts (template parser first, model on doubt), validates and replaces its rows.
+ * The single parade-state write path. `ingestMessage` stores a message and parses it in the
+ * same call; `editMessage` and `deleteMessage` are how the dashboard corrects one afterwards.
+ *
+ * Parsing is `lib/parser/deterministic.ts` alone: about a millisecond, no model, so it fits
+ * inside a Vercel function. A message it is unsure of is stored with the reasons and left for
+ * a person to correct, never guessed at.
  */
-import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import {
   commandRosterRows,
   paradeSubmissions,
@@ -13,13 +17,16 @@ import {
 } from '../db/schema.ts';
 import { cleanText, paradeResponseId } from './domain.ts';
 import { parseParadeState } from './parser/deterministic.ts';
-import { ExtractionError, extract } from './parser/extract.ts';
+import type { Extraction } from './parser/extraction.ts';
 import { buildRows, validate } from './parser/rows.ts';
 
-/** Recorded on `parade_submissions.model` when no model was involved. */
-const DETERMINISTIC_MODEL = 'deterministic';
+/** Recorded on `parade_submissions.model`, which predates the parser being rule-based. */
+const PARSER_NAME = 'deterministic';
 
-/** The database handle, as returned by `drizzle(neon(...))`. */
+/** Prefixed to `raw_messages.error` when the parser was unsure, so the list can say so. */
+const NEEDS_REVIEW = 'Needs review: ';
+
+// neon-http's Drizzle handle; typed loosely so tests can pass a fake.
 type Db = any;
 
 /** What happened to a message handed to `recordMessage`. */
@@ -28,17 +35,42 @@ export type RecordOutcome =
   | { status: 'duplicate'; id: number }
   | { status: 'already_processed'; id: number; paradeResponseId: string | null; error: string | null };
 
+/** How one message's text parsed, before anything is written. */
+export type Parsed =
+  | { status: 'parsed'; extraction: Extraction; paradeResponseId: string }
+  | { status: 'rejected'; reason: string }
+  | { status: 'needs_review'; problems: string[] }
+  | { status: 'invalid'; reason: string };
+
+/** What became of a message handed to `ingestMessage` or `editMessage`. */
+export type IngestOutcome =
+  | {
+      status: 'parsed';
+      id: number;
+      paradeResponseId: string;
+      counts: { strength: number; personnel: number; roster: number; sectionCounts: number };
+    }
+  | { status: 'already_parsed'; id: number; paradeResponseId: string }
+  | { status: 'rejected'; id: number; reason: string }
+  | { status: 'needs_review'; id: number; problems: string[] }
+  | { status: 'invalid'; id: number; reason: string }
+  | { status: 'not_found'; id: number };
+
+/** One stored message as the dashboard lists it. Carries no body. */
+export interface MessageSummary {
+  id: number;
+  waMessageId: string;
+  receivedAt: Date;
+  processedAt: Date | null;
+  paradeResponseId: string | null;
+  error: string | null;
+}
+
 /**
  * Stores a relayed message, idempotently.
  *
- * The `wa_message_id` unique constraint does the work that LockService used to: the
- * read-then-append race is settled by the database in one statement rather than by a mutex.
- *
- * A message that exists but has never been parsed is reported as `duplicate`, not `stored` --
- * that status only reports whether this call inserted the row. Either way `parseDue` still
- * picks the row up on its next run, since it selects on `processed_at IS NULL` rather than on
- * what this function reported, so a message stranded by a crashed parse is retried when the
- * bridge resends it.
+ * The `wa_message_id` unique constraint settles a duplicate delivery in one statement rather
+ * than by a lock. `stored` reports only whether this call inserted the row.
  *
  * @param db A read-write database handle.
  * @param message The relayed message.
@@ -81,134 +113,172 @@ export async function recordMessage(
   return { status: 'duplicate', id: existing.id };
 }
 
-/** What happened to one message during a parse run. */
-export interface ParseResult {
-  id: number;
-  waMessageId: string;
-  outcome: 'parsed' | 'rejected' | 'failed';
-  /** Which parser produced the extraction; absent when the model call itself failed. */
-  parser?: 'deterministic' | 'llm';
-  paradeResponseId?: string;
-  reason?: string;
-  counts?: { strength: number; personnel: number; roster: number; sectionCounts: number };
-}
-
-/** What `parseDue` needs from its caller. */
-export interface ParseOptions {
-  apiKey: string;
-  model?: string;
-  limit?: number;
-  fetchImpl?: typeof fetch;
-  /** Overridden in tests so `today` is deterministic. */
-  now?: () => Date;
-}
-
-/** What a parse run did, and what it left behind. */
-export interface ParseRun {
-  results: ParseResult[];
-  /** Messages still unprocessed after the run, beyond the ones attempted (the batch limit). */
-  skipped: number;
-}
-
 /**
- * Parses messages that have not been processed yet.
+ * Parses message text without touching the database.
  *
- * The per-message try/catch is load-bearing: one unparseable message must not stop the
- * queue, or a single bad parade state blocks every company behind it.
- *
- * @param db A read-write database handle.
- * @param options API key, batch limit and test seams.
- * @returns One result per message attempted, and how many were left for the next run.
+ * @param body The message text.
+ * @param today The receipt date, `yyyy-MM-dd`, that two-digit years resolve against.
+ * @returns The extraction and its key, or why there is none.
  */
-export async function parseDue(db: Db, options: ParseOptions): Promise<ParseRun> {
-  const limit = options.limit ?? 20;
-
-  const [backlog] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(rawMessages)
-    .where(isNull(rawMessages.processedAt));
-
-  const due = await db
-    .select({ id: rawMessages.id, waMessageId: rawMessages.waMessageId, body: rawMessages.body })
-    .from(rawMessages)
-    .where(isNull(rawMessages.processedAt))
-    .orderBy(rawMessages.id)
-    .limit(limit);
-
-  const results: ParseResult[] = [];
-
-  for (const message of due) {
-    try {
-      results.push(await parseOne(db, message, options));
-    } catch (error) {
-      // A transient failure is left unprocessed so the next run retries it. A permanent one
-      // is recorded against the message so it stops being retried and stops costing money.
-      const transient = error instanceof ExtractionError && error.transient;
-      const reason = error instanceof Error ? error.message : String(error);
-      if (!transient) await markFailed(db, message.id, reason);
-      results.push({ id: message.id, waMessageId: message.waMessageId, outcome: 'failed', reason });
-    }
-  }
-
-  /*
-   * A transient failure stays unprocessed by design, so it is still in the backlog after the
-   * run. Counting it as skipped as well would double-count it; subtracting only what was
-   * attempted keeps `skipped` meaning "not looked at".
-   */
-  return { results, skipped: Math.max(0, (backlog?.n ?? 0) - results.length) };
-}
-
-/**
- * Extracts one message and writes its rows.
- *
- * @param db A read-write database handle.
- * @param message The stored message.
- * @param options Parse options.
- * @returns What became of it.
- */
-async function parseOne(
-  db: Db,
-  message: { id: number; waMessageId: string; body: string },
-  options: ParseOptions,
-): Promise<ParseResult> {
-  const now = options.now ? options.now() : new Date();
-  const today = now.toISOString().slice(0, 10);
-
-  // The template parser is free and instant; the model only sees messages it is unsure of.
-  const rules = parseParadeState(message.body, today);
-  const parser: ParseResult['parser'] = rules.problems.length === 0 ? 'deterministic' : 'llm';
-  const model = parser === 'deterministic' ? DETERMINISTIC_MODEL : options.model;
-  const extraction =
-    parser === 'deterministic'
-      ? rules.extraction
-      : await extract(message.body, { apiKey: options.apiKey, today, model, fetchImpl: options.fetchImpl });
+export function parseBody(body: string, today: string): Parsed {
+  const { extraction, problems } = parseParadeState(body, today);
+  if (problems.length > 0) return { status: 'needs_review', problems };
 
   const reason = validate(extraction);
   if (reason !== '') {
-    await markFailed(db, message.id, reason);
-    return {
-      id: message.id,
-      waMessageId: message.waMessageId,
-      outcome: extraction.rejected ? 'rejected' : 'failed',
-      parser,
-      reason,
-    };
+    return extraction.rejected ? { status: 'rejected', reason } : { status: 'invalid', reason };
   }
-
-  const key = paradeResponseId(extraction.company!, extraction.date!, extraction.session!);
-  const rows = buildRows(extraction, {
-    paradeResponseId: key,
-    sourceMessageId: message.id,
-    model: model ?? null,
-  });
-
-  await writeSubmission(db, message.id, key, rows);
-
   return {
-    id: message.id,
-    waMessageId: message.waMessageId,
-    outcome: 'parsed',
-    parser,
+    status: 'parsed',
+    extraction,
+    paradeResponseId: paradeResponseId(extraction.company!, extraction.date!, extraction.session!),
+  };
+}
+
+/**
+ * Stores a message and parses it straight away.
+ *
+ * A message already parsed is left alone, so a resend cannot replace a newer parade state
+ * with an older one. A message stored earlier but not parsed (a crash, or a parser that has
+ * since learnt a new rule) is parsed again, which is free.
+ *
+ * @param db A read-write database handle.
+ * @param message The message and its idempotency key.
+ * @param now The current time; injected in tests.
+ * @returns What became of it.
+ */
+export async function ingestMessage(
+  db: Db,
+  message: { waMessageId: string; body: string },
+  now: Date = new Date(),
+): Promise<IngestOutcome> {
+  const recorded = await recordMessage(db, message);
+  if (recorded.status === 'already_processed' && recorded.paradeResponseId) {
+    return { status: 'already_parsed', id: recorded.id, paradeResponseId: recorded.paradeResponseId };
+  }
+  return settle(db, recorded.id, parseBody(cleanText(message.body), isoDay(now)));
+}
+
+/**
+ * Replaces a stored message's text and everything derived from it.
+ *
+ * The new text is parsed before anything is written, and a text that does not parse
+ * changes nothing: the old rows stay until a correct text replaces them. When the new text
+ * names a different company, date or session, the submission under the old key is removed.
+ *
+ * @param db A read-write database handle.
+ * @param id The `raw_messages` id.
+ * @param body The corrected text.
+ * @returns What became of it.
+ */
+export async function editMessage(db: Db, id: number, body: string): Promise<IngestOutcome> {
+  const [row] = await db
+    .select({ receivedAt: rawMessages.receivedAt })
+    .from(rawMessages)
+    .where(eq(rawMessages.id, id));
+  if (!row) return { status: 'not_found', id };
+
+  const text = cleanText(body);
+  // Years resolve against the original receipt date, so an edit reads dates as the first parse did.
+  const parsed = parseBody(text, isoDay(new Date(row.receivedAt)));
+  if (parsed.status !== 'parsed') return withId(id, parsed);
+  return write(db, id, parsed, text);
+}
+
+/**
+ * Deletes a stored message and the submission parsed from it.
+ *
+ * @param db A read-write database handle.
+ * @param id The `raw_messages` id.
+ * @returns False when there was no such message.
+ */
+export async function deleteMessage(db: Db, id: number): Promise<boolean> {
+  const [row] = await db
+    .select({ paradeResponseId: rawMessages.paradeResponseId })
+    .from(rawMessages)
+    .where(eq(rawMessages.id, id));
+  if (!row) return false;
+
+  const statements: unknown[] = [];
+  // The child rows cascade from the submission; the message's own link is only a text copy.
+  if (row.paradeResponseId) {
+    statements.push(db.delete(paradeSubmissions).where(eq(paradeSubmissions.paradeResponseId, row.paradeResponseId)));
+  }
+  statements.push(db.delete(rawMessages).where(eq(rawMessages.id, id)));
+  await db.batch(statements as never);
+  return true;
+}
+
+/**
+ * Lists every stored message, newest first, without its text.
+ *
+ * @param db A database handle.
+ * @returns One summary per message.
+ */
+export async function listMessages(db: Db): Promise<MessageSummary[]> {
+  return db
+    .select({
+      id: rawMessages.id,
+      waMessageId: rawMessages.waMessageId,
+      receivedAt: rawMessages.receivedAt,
+      processedAt: rawMessages.processedAt,
+      paradeResponseId: rawMessages.paradeResponseId,
+      error: rawMessages.error,
+    })
+    .from(rawMessages)
+    .orderBy(desc(rawMessages.id));
+}
+
+/**
+ * Reads one stored message's text, for editing.
+ *
+ * @param db A database handle.
+ * @param id The `raw_messages` id.
+ * @returns The id and text, or null when there is no such message.
+ */
+export async function getMessage(db: Db, id: number): Promise<{ id: number; body: string } | null> {
+  const [row] = await db
+    .select({ id: rawMessages.id, body: rawMessages.body })
+    .from(rawMessages)
+    .where(eq(rawMessages.id, id));
+  return row ?? null;
+}
+
+/**
+ * Writes a parse result against a stored message: rows when it parsed, the reason when not.
+ *
+ * @param db A read-write database handle.
+ * @param id The `raw_messages` id.
+ * @param parsed How its text parsed.
+ * @returns What became of it.
+ */
+async function settle(db: Db, id: number, parsed: Parsed): Promise<IngestOutcome> {
+  if (parsed.status === 'parsed') return write(db, id, parsed);
+  await markFailed(db, id, failureText(parsed));
+  return withId(id, parsed);
+}
+
+/**
+ * Builds a parsed message's rows and writes them.
+ *
+ * @param db A read-write database handle.
+ * @param id The `raw_messages` id.
+ * @param parsed A successful parse.
+ * @param body Replacement text for the message, when editing.
+ * @returns The `parsed` outcome with row counts.
+ */
+async function write(
+  db: Db,
+  id: number,
+  parsed: Extract<Parsed, { status: 'parsed' }>,
+  body?: string,
+): Promise<IngestOutcome> {
+  const key = parsed.paradeResponseId;
+  const rows = buildRows(parsed.extraction, { paradeResponseId: key, sourceMessageId: id, model: PARSER_NAME });
+  await writeSubmission(db, id, key, rows, body);
+  return {
+    status: 'parsed',
+    id,
     paradeResponseId: key,
     counts: {
       strength: rows.strength.length,
@@ -226,23 +296,22 @@ async function parseOne(
  * be known before the first is sent, and none may depend on an earlier `RETURNING`. That is
  * the whole reason `parade_response_id` is a computable natural key.
  *
- * Deleting the parent is enough to clear the children -- they cascade. Under the old
- * spreadsheet the same operation was three independent scans held together by convention.
- *
  * The first statement is the orphan sweep: if this message previously parsed to a different
- * key (a corrected date, say), that earlier submission is removed too. The spreadsheet could
- * only do this when the edit happened to be a single cell; here it is unconditional.
+ * key (a corrected date, say), that earlier submission is removed too. Deleting a parent is
+ * enough to clear its children -- they cascade.
  *
  * @param db A read-write database handle.
  * @param messageId The raw message being parsed.
  * @param key The submission key.
  * @param rows The rows to write.
+ * @param body Replacement text for the message, when editing; the text is left alone otherwise.
  */
 async function writeSubmission(
   db: Db,
   messageId: number,
   key: string,
   rows: ReturnType<typeof buildRows>,
+  body?: string,
 ): Promise<void> {
   const statements: unknown[] = [
     db
@@ -272,7 +341,7 @@ async function writeSubmission(
   statements.push(
     db
       .update(rawMessages)
-      .set({ paradeResponseId: key, error: null, processedAt: sql`now()` })
+      .set({ paradeResponseId: key, error: null, processedAt: sql`now()`, ...(body === undefined ? {} : { body }) })
       .where(eq(rawMessages.id, messageId)),
   );
 
@@ -280,15 +349,46 @@ async function writeSubmission(
 }
 
 /**
- * Records a permanent failure against a message so it is not retried.
+ * Records why a message produced no rows, so it is not retried and the list can show why.
  *
  * @param db A read-write database handle.
- * @param messageId The message that failed.
- * @param reason The reason, written verbatim for whoever investigates.
+ * @param messageId The message.
+ * @param reason The reason, written verbatim for whoever corrects it.
  */
 async function markFailed(db: Db, messageId: number, reason: string): Promise<void> {
   await db
     .update(rawMessages)
     .set({ error: reason.slice(0, 2000), processedAt: sql`now()` })
     .where(eq(rawMessages.id, messageId));
+}
+
+/**
+ * The `raw_messages.error` text for a parse that produced no rows.
+ *
+ * @param parsed An unsuccessful parse.
+ * @returns The text.
+ */
+function failureText(parsed: Exclude<Parsed, { status: 'parsed' }>): string {
+  return parsed.status === 'needs_review' ? NEEDS_REVIEW + parsed.problems.join(' | ') : parsed.reason;
+}
+
+/**
+ * Attaches a message id to an unsuccessful parse.
+ *
+ * @param id The `raw_messages` id.
+ * @param parsed An unsuccessful parse.
+ * @returns The outcome.
+ */
+function withId(id: number, parsed: Exclude<Parsed, { status: 'parsed' }>): IngestOutcome {
+  return { id, ...parsed };
+}
+
+/**
+ * The UTC calendar day of a time, as `yyyy-MM-dd`.
+ *
+ * @param time The time.
+ * @returns The day.
+ */
+function isoDay(time: Date): string {
+  return time.toISOString().slice(0, 10);
 }

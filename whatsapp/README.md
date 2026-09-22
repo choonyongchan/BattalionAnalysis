@@ -1,23 +1,22 @@
 # WhatsApp parade-state runner
 
-Watches a WhatsApp group for first parade states, discards everything else, and stores and parses the accepted
-messages itself — no relay, no Apps Script, no Vercel Function in the loop.
+Watches a WhatsApp group for first parade states, discards everything else, and relays each accepted message to
+the Vercel intake, which stores and parses it.
 
 ```
-WhatsApp group ─► first-parade check ─► recordMessage ─► parseDue ─► parade_submissions, strength_rows, ...
-   (Baileys)         (signature.js)      (lib/pipeline.ts, on this Bun process, against Neon)
+WhatsApp group ─► first-parade check ─► POST /api/parade ─► recordMessage ─► parseBody ─► parade_submissions, ...
+   (Baileys)         (signature.js)       (ingest.js)          (lib/pipeline.ts, on Vercel, against Neon)
 ```
 
-`recordMessage` stores the text idempotently and returns as soon as it is durable; `parseDue` does the extraction
-and runs behind it, on a drain loop described under *Setup* and *Running it permanently on Windows* below. Storing
-and parsing are split because one extraction takes 74–126 seconds, so a slow model delays a row, it never blocks
-the socket that is still listening for the next message.
+The runner holds no database credentials and no API key: only the intake URL and `PARADE_INGEST_SECRET`. A
+network failure or a 5xx is retried three times (2 s, then 4 s apart); a 200 or 422 is final. A message that
+still could not be delivered is logged as `relay failed; deposit this parade state on the dashboard`, and a clerk
+pastes it on the dashboard's Parade States page.
 
-**History: this used to relay through Apps Script, and briefly through a Vercel Function plus a cron drain.**
-Parsing moved onto this long-running process because 74–126 seconds is past the Vercel Hobby plan's 60-second
-function cap, and Hobby also refuses the sub-daily cron that would otherwise have swept a backlog. The Vercel
-webhook and cron drain this replaced (`api/whatsapp.ts`, `api/parse-due.ts`) have been deleted. The Apps Script project and its Google Form
-fallback predate both and are fully decommissioned.
+**History.** This relayed through Apps Script, then briefly through a Vercel Function plus a cron drain, then
+stored and parsed on this process because the OpenAI extraction took 74–126 seconds, past Vercel Hobby's
+60-second cap. The rule-based parser (`lib/parser/deterministic.ts`) takes about a millisecond, so parsing moved
+back behind a Vercel Function and the model is gone.
 
 ## Why Baileys
 
@@ -50,17 +49,14 @@ bun install
 cp .env.whatsapp.example .env.whatsapp
 ```
 
-Its settings live in `.env.whatsapp`, not `.env.local`: both define `DATABASE_URL`, and the runner must use the
-`parade_ingest` role, never the owner. `bun run whatsapp` loads only `.env.whatsapp` (`--env-file`), and the
-supervisor starts the bridge with `whatsapp/` as its working directory so Bun cannot auto-load `.env.local`.
+Its settings live in `.env.whatsapp`, not `.env.local`, so the runner never sees the owner's `DATABASE_URL`.
+`bun run whatsapp` loads only `.env.whatsapp` (`--env-file`), and the supervisor starts the bridge with
+`whatsapp/` as its working directory so Bun cannot auto-load `.env.local`.
 
-**1. Point at Neon.** From the repo root, run `bun --env-file=.env.local scripts/apply-grants.ts db/grants-ingest.sql`
-once to create the `parade_ingest` role, then put the connection string it prints — **not** the
-owner's — into `DATABASE_URL` in `.env.whatsapp`. That role can only store raw messages and write parsed rows.
+**1. Point at the intake.** Set `PARADE_API_URL` to the deployed route, e.g. `https://40sar.vercel.app/api/parade`.
 
-**2. Add the OpenAI key.** Set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to whatever
-`lib/parser/extract.ts` picks; `PARSE_INTERVAL_MS` (default 300000) is optional too — it only controls how often
-leftovers are swept, since a new message is parsed as soon as it arrives.
+**2. Share a secret.** Generate a long random value, put it in `PARADE_INGEST_SECRET` here and in the same
+variable on Vercel, then redeploy.
 
 **3. Pair WhatsApp and find the group.** Leave `WA_GROUP_ID` blank, set `LOG_LEVEL=debug` and `DRY_RUN=1`, then:
 
@@ -183,16 +179,12 @@ run `bun test ./test/whatsapp/`.
 
 ## Idempotency
 
-The runner keeps **no** local record of what it has stored. Dedup lives in Neon, on the `wa_message_id` unique
-constraint on `raw_messages`: `recordMessage` inserts on conflict-do-nothing, so an insert that hits the
-constraint tells the caller a row already exists rather than raising.
+The runner keeps **no** local record of what it has relayed. Dedup lives in Neon, on the `wa_message_id` unique
+constraint on `raw_messages`, behind the intake: Baileys redelivers a message after a reconnect, and a process
+restart has no memory of what it sent before it died, so both are harmless.
 
-That is where the dedup has to be, not in-process — Baileys itself redelivers a message after a reconnect, and a
-process restart has no memory of what it stored before it died. A message that exists but was never parsed comes
-back from `recordMessage` as `duplicate`, not `stored` — that status only reports whether this call inserted the
-row, and either way `parseDue` picks the row up on the next drain, since it selects on `processed_at IS NULL`
-rather than on what `recordMessage` reported. That is how a row stranded by a crashed parse gets picked up again
-instead of being silently skipped.
+A resend of a message that already parsed comes back `already_parsed` and changes nothing. A resend of one that
+failed to parse is parsed again, which picks up any rule the parser has learnt since.
 
 ## Layout
 
@@ -202,14 +194,14 @@ instead of being silently skipped.
 | `src/index.js` | Wiring and the message handler |
 | `src/signature.js` | First-parade-state detection |
 | `src/listener.js` | Baileys socket, single-socket reconnect, envelope filtering |
-| `src/ingest.js` | Calls `recordMessage` / `parseDue` (`../../lib/pipeline.ts`) and runs the single-flight drain loop |
+| `src/ingest.js` | Relays a message to `api/parade.ts`, retrying network failures and 5xx |
 | `src/config.js` | `.env.whatsapp` validation |
 | `src/logger.js` | pino logger factory |
 | `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run whatsapp:reset-auth`) |
 | `../test/whatsapp/` | `bun test ./test/whatsapp/` — signature suite plus the non-network modules |
 
 `auth/` and the root `.env.whatsapp` hold live credentials and are git-ignored. `src/appsScriptClient.js`, which relayed accepted
-messages to the retired Apps Script web app, was deleted when storage and parsing moved into `src/ingest.js`.
+messages to the retired Apps Script web app, was deleted long ago; `src/ingest.js` now relays to Vercel instead.
 
 ## Troubleshooting
 
@@ -221,7 +213,7 @@ messages to the retired Apps Script web app, was deleted when storage and parsin
 | Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the runner, `bun run whatsapp:reset-auth`, `bun run whatsapp`, re-scan |
 | Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun run whatsapp` |
 | `Missing required environment variable ...` at start-up | `.env.whatsapp` is missing a required key, or the process was started some way other than `bun run whatsapp` (which passes `--env-file=.env.whatsapp`) |
-| `parse run failed; will retry on the next drain` in the log | `parseDue` threw — usually `DATABASE_URL` unreachable or the OpenAI call failed. The message stays unparsed and the next drain (on `PARSE_INTERVAL_MS`, or the next incoming message) retries it |
-| A message is stored but never parses | A 401/429/outage does not throw out of `parseDue` — it only shows up as `failed: N` in the `parse run finished` log, and the row's `raw_messages.error` stays empty since a transient failure is never written there. Check `OPENAI_API_KEY` is valid and has quota, and that `OPENAI_MODEL` (if set) names a real model |
+| `relay failed; deposit this parade state on the dashboard` | Three attempts failed. `intake answered 401` means `PARADE_INGEST_SECRET` differs from Vercel's; `intake unreachable` or `5xx` means Vercel or the network was down. Paste the parade state on the dashboard's Parade States page |
+| `parade state stored; needs correcting on the dashboard` | The parser was unsure of a line. Open Parade States on the dashboard; the row shows what to fix, and Edit re-parses it |
 | A real parade state was rejected | Run with `LOG_LEVEL=debug`; the reason names the failing gate |
 | A first parade state was rejected as "not a first parade state" | Its header has no `FIRST PARADE` marker and no timing before 12:00 — check the timing is in the first 5 non-empty lines |

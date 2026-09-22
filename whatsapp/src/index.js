@@ -1,12 +1,10 @@
 /**
  * Entry point for the WhatsApp parade-state ingestor.
  *
- * Pipeline: WhatsApp group message -> first-parade check -> stored in Neon ->
- * parsed on this machine into parade-state rows. See ingest.js for why parsing
- * happens here and not on Vercel.
+ * Pipeline: WhatsApp group message -> first-parade check -> POST to the Vercel
+ * intake (`api/parade.ts`), which stores and parses it. See ingest.js.
  */
 
-import { getDb } from '../../db/index.ts';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { describeError } from './errors.js';
@@ -14,18 +12,27 @@ import { createIngestor } from './ingest.js';
 import { isParadeState } from './signature.js';
 import { startListener } from './listener.js';
 
+/** @type {!Object<string, string>} The log line for each intake answer. */
+const OUTCOME_MESSAGES = {
+  parsed: 'parade state stored and parsed',
+  already_parsed: 'parade state already known',
+  rejected: 'parade state rejected by the parser',
+  needs_review: 'parade state stored; needs correcting on the dashboard',
+  invalid: 'parade state stored; needs correcting on the dashboard',
+};
+
 /**
  * Builds the handler invoked for every message in the watched group.
  *
- * There is no local record of what has already been stored. Dedup is the
- * `wa_message_id` unique constraint in Neon, so a resend after a restart is
- * harmless, and it is how a message whose parse never finished gets retried.
+ * There is no local record of what has already been relayed. Dedup is the
+ * `wa_message_id` unique constraint behind the intake, so a resend after a
+ * restart is harmless.
  *
  * @param {Object} deps Handler dependencies.
  * @param {Object} deps.config Resolved configuration from loadConfig().
  * @param {import('pino').Logger} deps.logger Logger for status output.
  * @param {{ingest: function(string, string): !Promise<Object>}} deps.ingestor
- *   From createIngestor().
+ *   From createIngestor(); resolves with the intake's answer.
  * @returns {function(string, Object): Promise<void>} The message handler.
  */
 export function createMessageHandler({ config, logger, ingestor }) {
@@ -49,15 +56,13 @@ export function createMessageHandler({ config, logger, ingestor }) {
 
     try {
       const outcome = await ingestor.ingest(text, messageId);
-      // The message, not just the status, since a resend after a crash is expected and
-      // "already known" reads very differently from "stored" at a glance in the log.
-      const message = outcome.status === 'stored' ? 'stored parade state' : 'parade state already known';
-      logger.info({ ...summary, status: outcome.status, id: outcome.id }, message);
+      // Status, id and key only: a rejection reason or a parser problem can quote a
+      // personnel line, and the message holds names.
+      const message = OUTCOME_MESSAGES[outcome.status] || 'intake answered';
+      const level = outcome.status === 'parsed' || outcome.status === 'already_parsed' ? 'info' : 'warn';
+      logger[level]({ ...summary, status: outcome.status, id: outcome.id, paradeResponseId: outcome.paradeResponseId }, message);
     } catch (err) {
-      // describeError, not err.message: recordMessage's insert failing wraps in
-      // drizzle-orm's DrizzleQueryError, whose message quotes the query params -- here,
-      // the parade-state body itself.
-      logger.error({ ...summary, err: describeError(err) }, 'store failed; will retry if the message is resent');
+      logger.error({ ...summary, err: describeError(err) }, 'relay failed; deposit this parade state on the dashboard');
     }
   };
 }
@@ -70,22 +75,9 @@ export function createMessageHandler({ config, logger, ingestor }) {
 async function main() {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
-  const ingestor = createIngestor({
-    db: getDb(),
-    apiKey: config.openaiApiKey,
-    model: config.openaiModel,
-    logger,
-  });
+  const ingestor = createIngestor({ url: config.paradeApiUrl, secret: config.ingestSecret });
 
   logger.info({ groupId: config.groupId, dryRun: config.dryRun }, 'starting WhatsApp parade-state ingestor');
-
-  // Anything stored but left unparsed by a previous crash is picked up now, and
-  // transient failures (a model timeout) are swept on the interval. unref() so
-  // the timer never keeps a dying process alive for the supervisor to wait on.
-  if (!config.dryRun) {
-    ingestor.drain();
-    setInterval(() => ingestor.drain(), config.parseIntervalMs).unref();
-  }
 
   await startListener({
     authDir: config.authDir,

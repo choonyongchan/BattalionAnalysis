@@ -12,9 +12,11 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 - [ ] Point the FormSG webhook at `/api/formsg` (replaces Plumber); submit a test response and check `report_sick_formsg`.
 - [ ] Watch real submissions for a day, then turn Plumber off.
 
-## WhatsApp → local runner
-- [ ] Create the `parade_ingest` role (`scripts/apply-grants.ts db/grants-ingest.sql`).
-- [ ] Live-verify on the runner laptop: dry run → live → crash recovery.
+## Parade states → Vercel intake (`api/parade.ts`)
+- [ ] Set `PARADE_INGEST_SECRET` and `DASHBOARD_PASSWORD` (same value as the Apps Script property) on Vercel; redeploy.
+- [ ] On the runner laptop, replace `.env.whatsapp`'s `DATABASE_URL` / `OPENAI_*` / `PARSE_INTERVAL_MS` with `PARADE_API_URL` and `PARADE_INGEST_SECRET`.
+- [ ] Open Parade States on the deployed dashboard: list loads, deposit a test state, edit it, delete it.
+- [ ] Live-verify on the runner laptop: dry run → live → relay a real parade state.
 - [ ] Run alongside the Apps Script relay for a few days and compare rows before switching it off.
 
 ## Dashboard → Neon

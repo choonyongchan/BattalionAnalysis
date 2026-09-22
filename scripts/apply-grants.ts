@@ -4,7 +4,7 @@
  * Generates a fresh hex password for `:'password'`, runs each `--> statement-breakpoint`
  * chunk, and prints the role's connection string. Re-running rotates the password.
  *
- * Usage:  bun --env-file=.env.local scripts/apply-grants.ts db/grants-ingest.sql
+ * Usage:  bun --env-file=.env.local scripts/apply-grants.ts db/grants-<name>.sql
  */
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';

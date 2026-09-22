@@ -1,131 +1,102 @@
 /**
- * Stores accepted parade states in Neon and parses them, on this machine.
+ * Relays accepted parade states to the Vercel intake, `api/parade.ts`.
  *
- * This replaced a relay to Apps Script and, briefly, to a Vercel route plus a
- * cron drain. Parsing moved here because one extraction takes 74-126 seconds.
- * That is past Vercel Hobby's 60-second function cap, and Hobby also refuses
- * sub-daily crons. A long-running process has neither limit.
+ * Parsing used to run here because the OpenAI extraction took 74-126 seconds, past Vercel
+ * Hobby's 60-second cap. The rule-based parser takes about a millisecond, so storing and
+ * parsing now happen in one request on Vercel, and this process only forwards text. It
+ * holds no database credentials.
  *
- * Every write still goes through lib/pipeline.ts: `recordMessage` stores the
- * text idempotently on the WhatsApp message id, and `parseDue` extracts and
- * replaces rows. Nothing here touches a table directly.
- *
- * Storing and parsing stay split, as they were on Vercel. `ingest` returns once
- * the text is durable, and the parse runs behind it. A crash mid-parse
- * therefore loses nothing: the row stays unprocessed and the next drain,
- * including the one at start-up, picks it up.
+ * The intake is idempotent on the WhatsApp message id, so a retry after a timeout whose
+ * request did land is harmless.
  */
 
-import { describeError } from './errors.js';
-import { parseDue, recordMessage } from '../../lib/pipeline.ts';
+/** @type {number} Attempts per message before giving up. */
+const MAX_ATTEMPTS = 3;
 
-/**
- * Counts a parse run's results by outcome, for logging.
- *
- * Counts only. A result's reason can quote the message, and the message holds
- * names and NRICs, so none of it goes to the log.
- *
- * @param {{results: !Array<{outcome: string, parser: (string|undefined)}>, skipped: number}} run
- *   What `parseDue` returned.
- * @returns {{parsed: number, rejected: number, failed: number, skipped: number, llm: number}}
- *   The tally; `llm` counts messages the template parser handed to the model.
- */
-export function tallyRun(run) {
-  const tally = { parsed: 0, rejected: 0, failed: 0, skipped: run.skipped, llm: 0 };
-  for (const result of run.results) {
-    tally[result.outcome] += 1;
-    if (result.parser === 'llm') tally.llm += 1;
+/** @type {number} Delay before the second attempt; doubled for each one after. */
+const RETRY_BASE_MS = 2_000;
+
+/** @type {number} How long one request may take before it counts as failed. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Raised when the intake could not be reached, or kept failing, on every attempt. */
+export class RelayError extends Error {
+  /**
+   * @param {string} message What went wrong, without the message text.
+   */
+  constructor(message) {
+    super(message);
+    this.name = 'RelayError';
   }
-  return tally;
 }
 
 /**
- * Builds the ingestor the message handler and the drain timer share.
- *
- * `drain` is single-flight. A call made while a run is in progress does not
- * start a second one. It marks that more work may have arrived, and the running
- * drain goes round once more before it finishes. Two overlapping `parseDue`
- * runs would select the same rows and pay twice for each extraction.
+ * Builds the relay the message handler calls.
  *
  * @param {Object} deps Dependencies.
- * @param {*} deps.db A read-write Drizzle handle, from `getDb()`.
- * @param {string} deps.apiKey OpenAI API key.
- * @param {string=} deps.model OpenAI model override.
- * @param {import('pino').Logger} deps.logger Logger for outcomes.
- * @param {typeof recordMessage=} deps.record Injected in tests.
- * @param {typeof parseDue=} deps.parse Injected in tests.
- * @returns {{ingest: function(string, string): !Promise<Object>,
- *   drain: function(): !Promise<void>}} The ingestor.
+ * @param {string} deps.url The intake URL, e.g. https://40sar.vercel.app/api/parade.
+ * @param {string} deps.secret `PARADE_INGEST_SECRET`, sent as a bearer token.
+ * @param {typeof fetch=} deps.fetchImpl Injected in tests.
+ * @param {function(number): !Promise<void>=} deps.sleep Injected in tests.
+ * @returns {{ingest: function(string, string): !Promise<!Object>}} The relay. `ingest`
+ *   resolves with the intake's JSON answer (`status` is parsed, already_parsed, rejected,
+ *   needs_review or invalid).
  */
-export function createIngestor({ db, apiKey, model, logger, record = recordMessage, parse = parseDue }) {
-  /** @type {?Promise<void>} The drain in progress, if any. */
-  let running = null;
-  /** @type {boolean} Whether another pass is needed after the current one. */
-  let again = false;
-
+export function createIngestor({
+  url,
+  secret,
+  fetchImpl = fetch,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
   /**
-   * Runs parse passes until nothing new has arrived and no pass-over-pass progress
-   * remains to be made on the backlog.
-   *
-   * A backlog (`skipped > 0`) alone is not reason enough to go again: extract.ts treats
-   * a 401, a 429 and an outage as transient, so those rows stay unprocessed and
-   * `skipped` stays positive on every pass. With more than one pass' worth of backlog,
-   * looping on `skipped > 0` alone retries the same rows forever. Requiring that the
-   * pass also parsed or rejected at least one row tells transient backlog (no progress,
-   * stop and let the next drain retry) apart from a real one (progress, keep going).
-   *
-   * @returns {!Promise<void>} Resolves when the queue is drained, the backlog stops
-   *   shrinking, or a pass fails.
-   */
-  async function loop() {
-    try {
-      let more = true;
-      while (more) {
-        again = false;
-        const run = await parse(db, { apiKey, model });
-        const tally = tallyRun(run);
-        if (run.results.length > 0) logger.info(tally, 'parse run finished');
-        more = again || (run.skipped > 0 && tally.parsed + tally.rejected > 0);
-      }
-    } catch (err) {
-      // Swallowed deliberately: an unreachable database must not take down the
-      // listener. The messages stay unprocessed and the next drain retries them.
-      //
-      // describeError, not err.message: a markFailed insert failing mid-write wraps in
-      // drizzle-orm's DrizzleQueryError, whose message quotes the query params -- here,
-      // the rejection reason, which can quote the parade-state body.
-      logger.error({ err: describeError(err) }, 'parse run failed; will retry on the next drain');
-    } finally {
-      running = null;
-    }
-  }
-
-  /**
-   * Drains the parse queue, or asks the drain already in progress to go again.
-   *
-   * @returns {!Promise<void>} Resolves when the drain covering this call ends.
-   */
-  function drain() {
-    if (running) {
-      again = true;
-      return running;
-    }
-    running = loop();
-    return running;
-  }
-
-  /**
-   * Stores one message, then starts a drain without waiting for it.
+   * Sends one message, once.
    *
    * @param {string} text The parade-state text.
    * @param {string} messageId The Baileys message id.
-   * @returns {!Promise<Object>} The `recordMessage` outcome.
+   * @returns {!Promise<{retry: boolean, outcome: (Object|undefined), reason: string}>}
+   *   The answer, or whether the failure is worth another attempt.
    */
-  async function ingest(text, messageId) {
-    const outcome = await record(db, { waMessageId: messageId, body: text, source: 'whatsapp' });
-    if (outcome.status !== 'already_processed') drain();
-    return outcome;
+  async function attempt(text, messageId) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ waMessageId: messageId, body: text }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      return { retry: true, reason: `intake unreachable: ${err.name}` };
+    }
+    if (response.status >= 500) return { retry: true, reason: `intake answered ${response.status}` };
+
+    const outcome = await response.json().catch(() => null);
+    // 200 (parsed) and 422 (a person must correct it) are both final answers from the parser.
+    if (response.ok || response.status === 422) {
+      if (outcome && typeof outcome.status === 'string') return { retry: false, outcome, reason: '' };
+    }
+    return { retry: false, reason: `intake answered ${response.status}` };
   }
 
-  return { ingest, drain };
+  /**
+   * Relays one message, retrying network failures and 5xx answers.
+   *
+   * @param {string} text The parade-state text.
+   * @param {string} messageId The Baileys message id.
+   * @returns {!Promise<!Object>} The intake's answer.
+   * @throws {RelayError} When no attempt produced a final answer.
+   */
+  async function ingest(text, messageId) {
+    let reason = '';
+    for (let n = 1; n <= MAX_ATTEMPTS; n += 1) {
+      const result = await attempt(text, messageId);
+      if (result.outcome) return result.outcome;
+      reason = result.reason;
+      if (!result.retry) break;
+      if (n < MAX_ATTEMPTS) await sleep(RETRY_BASE_MS * 2 ** (n - 1));
+    }
+    throw new RelayError(reason);
+  }
+
+  return { ingest };
 }

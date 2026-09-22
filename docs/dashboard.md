@@ -215,8 +215,9 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
 
 - **No NRIC.** `SingPass Validated NRIC` and `Masked NRIC` are never requested from the
   FormSG tab.
-- **No writes.** The feed only reads; nothing the dashboard does can change the sheet, and
-  a test asserts the read path leaves every cell untouched.
+- **No writes to the sheet.** The feed only reads; nothing the dashboard does can change
+  the sheet, and a test asserts the read path leaves every cell untouched. The one page that
+  writes, Parade States, writes to Neon through `/api/parade` (see below).
 - **No stored password.** It is held in the page's memory for the life of the tab — not in
   `localStorage`, not in `sessionStorage`, not in a cookie — so a reload asks again and
   closing the tab ends the session.
@@ -234,3 +235,23 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
   the masthead describe a single parade and ignore the range, and the parade-date
   selector's options narrow to the dates inside it — so a "today" figure never sits
   under a span the reader has to remember.
+
+## Parade States
+
+`src/pages/ParadeStates.jsx`, at `#/parade-states`. A clerk pastes a parade state WhatsApp
+missed and presses Deposit; below it, every stored message (WhatsApp or manual) is listed
+newest first with its key, status, source and receipt time, and can be edited or deleted.
+
+- **Where it writes.** `/api/parade` on the same Vercel deployment (`src/data/parade.js`), with
+  the unlock password as a bearer token. Vercel's `DASHBOARD_PASSWORD` must equal the Apps
+  Script property of the same name, or the page says the intake did not accept the password.
+- **Statuses.** Parsed (rows exist), Needs review (the parser doubted a line; the reasons are
+  shown under the status), Rejected (a last parade state, or not a parade state), Pending
+  (stored, never parsed). Rules in `src/model/paradeMessages.js`.
+- **Edit** loads the stored text into the form. Saving re-parses it; if it parses, the text
+  and every row derived from it are replaced together, and if not, nothing changes and the
+  reasons are shown. **Delete** asks once more inline, then removes the message and its rows.
+- **Not yet.** The charts still read the Apps Script feed, so a deposit shows on this page at
+  once but reaches the other pages only after the dashboard moves to Neon.
+- **Local development.** `bun run dev` serves no `/api`, so the page says it could not reach
+  the intake. Use `vercel dev`, or a deployed preview.

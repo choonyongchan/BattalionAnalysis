@@ -4,8 +4,8 @@
  * Three button grammars, and no fourth. DESIGN.md's rule is that the radius carries the
  * meaning, so they are kept distinct on purpose:
  *
- *   --primary   a full pill, Action Blue. The one action on a screen. Login, and nowhere
- *               else so far — a dashboard that reads and never writes has few actions.
+ *   --primary   a full pill, Action Blue. The one action on a screen: Login, and Deposit
+ *               on Parade States.
  *   --quiet     an 8px rect, no fill. Session and view controls: lock, theme, chart or
  *               table, open the rail.
  *   --toggle    a pill in a segmented group. Choices between views of the same data:
@@ -54,6 +54,12 @@
   color: var(--ink);
 }
 
+/* The confirming half of a two-step delete: still a quiet rect, but it says what it destroys. */
+.button--danger {
+  color: var(--critical);
+  font-weight: 600;
+}
+
 /* A segmented group: one choice at a time, all options visible. */
 .toggle {
   display: inline-flex;
@@ -96,6 +102,18 @@
 .field--pill {
   border-radius: var(--radius-pill);
   padding: 0 var(--space-lg);
+}
+
+/* Pasted parade states: multi-line, and the same shape as every other field. */
+.field--area {
+  display: block;
+  width: 100%;
+  min-height: 280px;
+  padding: var(--space-sm) var(--space-md);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
 }
 
 select.field {

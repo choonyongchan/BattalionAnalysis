@@ -74,6 +74,17 @@ function load_(failStatus, forgetOnFail) {
 }
 
 /**
+ * The `Authorization` header for `/api/parade`, carrying the held password.
+ *
+ * A header, not the URL, for the same reason the feed sends it in the body: a query string
+ * lands in history and logs. The value is built on each call and never stored.
+ * @returns {!Object<string, string>} The header.
+ */
+export function authHeader() {
+  return { Authorization: 'Bearer ' + password };
+}
+
+/**
  * Forgets the password and everything loaded with it.
  * @returns {void}
  */
