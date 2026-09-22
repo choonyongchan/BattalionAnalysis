@@ -3,9 +3,8 @@
  *
  * The one page that writes. It talks to `/api/parade` on Vercel, which parses with the same
  * rule-based parser the WhatsApp relay's messages go through, so a deposited parade state is
- * indistinguishable from a relayed one except for its source. Everything else on the
- * dashboard still reads the Apps Script feed, so a deposit shows here at once but reaches
- * the charts only when they move to Neon.
+ * indistinguishable from a relayed one except for its source. The charts read the same
+ * tables through `/api/dashboard`, so a deposit reaches them on the next refresh.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';

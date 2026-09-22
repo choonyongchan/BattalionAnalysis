@@ -7,8 +7,8 @@
  * a wrong password is not left sitting in memory waiting to be retried by something else.
  *
  * There is no password check in this file, and there must not be one. The check happens
- * in `src/dashboard/DashboardFeed.js`, where the caller cannot see or skip it. A check
- * here would be decoration.
+ * in `api/dashboard.ts` and `api/parade.ts`, where the caller cannot see or skip it. A
+ * check here would be decoration.
  */
 
 import { loadAll } from '../data/feed.js';
@@ -36,7 +36,7 @@ export function unlock(typed) {
 }
 
 /**
- * Re-reads the spreadsheet with the password already held.
+ * Re-reads the data with the password already held.
  * @returns {!Promise<boolean>} True once fresh data is loaded.
  */
 export function refresh() {
@@ -49,7 +49,7 @@ export function refresh() {
  * The two callers differ only in what a failure means. A wrong password on the login
  * screen is 'locked' — the viewer is where they started, and the password is discarded so
  * it is not left in memory to be retried by something else. A failure while already
- * unlocked is 'error': the password was right, the network or the feed was not, and
+ * unlocked is 'error': the password was right, the network or the server was not, and
  * throwing the viewer back to the login screen would lose the data they still have.
  * @param {string} failStatus Status to fall to when the load fails.
  * @param {boolean} forgetOnFail Whether a failure discards the held password.
@@ -76,8 +76,7 @@ function load_(failStatus, forgetOnFail) {
 /**
  * The `Authorization` header for `/api/parade`, carrying the held password.
  *
- * A header, not the URL, for the same reason the feed sends it in the body: a query string
- * lands in history and logs. The value is built on each call and never stored.
+ * A header, not the URL: a query string lands in history and logs. The value is built on each call and never stored.
  * @returns {!Object<string, string>} The header.
  */
 export function authHeader() {

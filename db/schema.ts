@@ -2,6 +2,8 @@
  * Drizzle schema for the Neon database: the source of truth for tables, enums and migrations.
  *
  * Two write paths: `lib/pipeline.ts` (WhatsApp parade states) and `api/formsg.ts` (report sick).
+ * `public_holidays` and `rotations` are dashboard settings, maintained by SQL (seeded by
+ * `scripts/import-sheet.ts`). The dashboard reads everything through `api/dashboard.ts`.
  * NRIC is deliberately absent; identity is `name_key`. Do not add NRIC columns.
  */
 import { sql } from 'drizzle-orm';
@@ -221,5 +223,26 @@ export const reportSickFormsg = pgTable(
   },
   (t) => [
     check('report_sick_formsg_mc_days_sane', sql`${t.mcDays} is null or ${t.mcDays} between 0 and 180`),
+  ],
+);
+
+/** A public holiday the dashboard marks on its charts; a blank name falls back to the Singapore map. */
+export const publicHolidays = pgTable('public_holidays', {
+  date: date('date', { mode: 'string' }).primaryKey(),
+  name: text('name'),
+});
+
+/** One rotation window the dashboard groups by. */
+export const rotations = pgTable(
+  'rotations',
+  {
+    id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
+    name: text('name').notNull(),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    endDate: date('end_date', { mode: 'string' }).notNull(),
+  },
+  (t) => [
+    uniqueIndex('rotations_natural_key').on(t.name, t.startDate),
+    check('rotations_ordered', sql`${t.startDate} <= ${t.endDate}`),
   ],
 );

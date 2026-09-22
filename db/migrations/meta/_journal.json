@@ -8,6 +8,13 @@
       "when": 1790001011033,
       "tag": "0000_flashy_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790051591004,
+      "tag": "0001_dashboard_settings",
+      "breakpoints": true
     }
   ]
 }

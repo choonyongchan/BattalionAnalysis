@@ -5,7 +5,7 @@
  * as a value Sheets coerced the write into. What must never reach here is a
  * locale-formatted string like `22/06/2026`, which means June in Singapore and is
  * unparseable elsewhere, or a UTC rendering of a local midnight, which slides the date
- * back a day. `DashboardFeed.toJsonValue_` closes both off on the Apps Script side;
+ * back a day. `lib/dashboard.ts` closes both off on the server (ISO dates, `sgtDateTime`);
  * `toIsoDate` reads the result, and still accepts a Sheets serial so the function stays
  * correct for any caller that has one.
  *

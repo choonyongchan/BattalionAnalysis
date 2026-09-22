@@ -5,20 +5,21 @@ codebase exploration, broad refactors, or architecture-impacting changes, and up
 whenever architecture or ownership boundaries change.
 
 The Apps Script + Google Sheets implementation is retired and deleted (`legacy/`, the
-`node:vm` harness and its tests); read it from git history if you need it. The deployed
-Apps Script web app still serves the dashboard feed until the dashboard moves to Neon.
+`node:vm` harness and its tests); read it from git history if you need it. Nothing reads
+the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 
 ## Layout
 
 | Path | Runtime | Owns |
 |---|---|---|
-| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`), migrations. Only tables something writes; dashboard tables and a read-only role arrive with the dashboard's move to Neon |
-| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `http.ts`, `domain.ts` |
+| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `public_holidays` and `rotations` are dashboard settings maintained by SQL |
+| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `domain.ts` |
 | `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
+| `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
 | `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
-| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: read-only over the Apps Script feed, except the Parade States page, which writes through `api/parade.ts`. See `docs/dashboard.md` |
-| `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql) |
+| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Parade States page writes through `api/parade.ts`. See `docs/dashboard.md` |
+| `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql), `import-sheet.ts` (one-time, idempotent import of the Sheet's CSV exports) |
 
 ## How parade states are parsed
 
@@ -70,7 +71,10 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
   `GET /api/parade?id=`, one message at a time, to a caller holding the dashboard password, so
   a clerk can correct it; the list and every chart never carry it. Nothing logs a body, a parser
   problem or a rejection reason, since all three can quote a personnel line.
-  `test/dashboard/schema.test.js` guards what the current sheet-backed dashboard requests.
+  The dashboard's read connects as `dashboard_read`, which cannot select `body`, and
+  `lib/dashboard.ts` builds every tab from the header arrays in `src/data/tabs.js`, so a column
+  leaves the database only if the dashboard asks for it; `test/dashboard/schema.test.js` and
+  `test/lib/dashboard.test.ts` guard that no NRIC or body header is asked for.
 - **Read what the message says; derive nothing.** The parser records only stated values; the
   one sanctioned exception is the permanent-status `num_days` sentinel. See `lib/parser/rows.ts`.
 - **Fail closed on missing configuration.** A route with an unset secret refuses every request
@@ -86,7 +90,7 @@ Layers, dependency direction strictly downward:
 | `pages/` | one file per page; `pages/shared/` for the three category pages | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
 | `app/` | shell, router, signals (`state.js`), password lifecycle (`auth.js`) | `data/`, `theme/` |
-| `data/` | the feed `fetch` and the headers asked of each tab (`feed.js`, `tabs.js`); the `/api/parade` calls (`parade.js`), which take the auth header from the page | `model/` |
+| `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the `/api/parade` calls (`parade.js`), which take the auth header from the page | `model/` |
 | `model/` | every number and rule; pure functions, no DOM, no network | other `model/` files |
 
 `model/` is the only layer under test and the only place a wrong number can come from. Every

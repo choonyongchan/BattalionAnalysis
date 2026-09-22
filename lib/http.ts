@@ -1,4 +1,5 @@
 /** Small helpers for the Web-standard `(Request) => Response` routes in `api/`. */
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 /** The JSON content type, written once so a typo cannot make one route answer as text. */
 const JSON_TYPE = 'application/json; charset=utf-8';
@@ -79,4 +80,26 @@ export function serverError(error: unknown, context: string): Response {
   const message = error instanceof Error ? error.stack || error.message : String(error);
   console.error(`[${context}] ${reference}: ${message}`);
   return json(500, { error: 'Internal error.', reference });
+}
+
+/**
+ * Compares two secrets in constant time, whatever their lengths.
+ *
+ * @param given What the caller sent.
+ * @param expected The configured secret.
+ * @returns Whether they match.
+ */
+export function sameSecret(given: string, expected: string): boolean {
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/**
+ * Reads the token from an `Authorization: Bearer <token>` header.
+ *
+ * @param request The incoming request.
+ * @returns The token, or null when the header is absent or not a bearer token.
+ */
+export function bearerToken(request: Request): string | null {
+  return /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? null;
 }

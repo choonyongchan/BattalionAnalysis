@@ -14,9 +14,9 @@
  * Status codes are chosen for the relay, which retries a 5xx and nothing else: a message that
  * parsed, or that never will without a person correcting it, answers 2xx or 4xx.
  */
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
-import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
+import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
 import {
   deleteMessage,
   editMessage,
@@ -63,18 +63,6 @@ function reply(status: number, body: unknown): Response {
 }
 
 /**
- * Compares two secrets in constant time, whatever their lengths.
- *
- * @param given What the caller sent.
- * @param expected The configured secret.
- * @returns Whether they match.
- */
-function sameSecret(given: string, expected: string): boolean {
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(given), digest(expected));
-}
-
-/**
  * Identifies the caller from its bearer token.
  *
  * An unset secret matches nothing, so a deployment missing one fails closed for that caller.
@@ -84,7 +72,7 @@ function sameSecret(given: string, expected: string): boolean {
  * @returns The caller, or null when the token matches no configured secret.
  */
 function callerOf(request: Request, deps: Deps): Caller | null {
-  const token = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1];
+  const token = bearerToken(request);
   if (!token) return null;
   if (deps.dashboardPassword && sameSecret(token, deps.dashboardPassword)) return 'dashboard';
   if (deps.ingestSecret && sameSecret(token, deps.ingestSecret)) return 'relay';

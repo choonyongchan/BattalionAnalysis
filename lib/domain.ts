@@ -114,9 +114,9 @@ export function paradeResponseId(company: string, isoDate: string, session: stri
 }
 
 /** Numbered platoon blocks: `PL 7`, `PLT 3`, `PLATOON 1`, `PL2`. */
-const PLATOON_LABEL = /^(?:PL|PLT|PLATOON)\s*\d+$/;
+export const PLATOON_LABEL = /^(?:PL|PLT|PLATOON)\s*\d+$/;
 /** Headquarters blocks: `COY HQ`, `HQ`. */
-const HQ_LABEL = /^(?:COY\s*)?HQ$/;
+export const HQ_LABEL = /^(?:COY\s*)?HQ$/;
 
 /**
  * Classifies a unit block label so that totals are never summed across levels.

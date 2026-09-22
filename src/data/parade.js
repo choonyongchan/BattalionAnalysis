@@ -1,7 +1,7 @@
 /**
  * The Parade States page's calls to `/api/parade`, the Vercel intake.
  *
- * Unlike the feed, this is same-origin, so it sends ordinary JSON and the password as a
+ * Same-origin, like `/api/dashboard`, so it sends ordinary JSON and the password as a
  * bearer header. The intake checks it against `DASHBOARD_PASSWORD`, which must be set on
  * Vercel to the same password the dashboard unlocks with.
  *

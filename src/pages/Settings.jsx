@@ -1,43 +1,36 @@
 /**
  * What the dashboard is reading, and how much of the battalion it covers.
  *
- * Read-only, and deliberately so: the dashboard never writes to the spreadsheet
+ * Read-only, and deliberately so: the dashboard reads Neon as a role that cannot write
  * (`docs/architecture_patterns.md`), so a wrong holiday or an overlapping rotation is
- * fixed in Sheets, not here. This page's job is to make a problem visible, name the exact
- * header row to paste when a tab is missing, and link out to fix it.
+ * fixed in the database with SQL, not here. This page's job is to make a problem visible
+ * and name the exact table and columns to fill when a settings table is empty.
  */
 
 import { dataset } from '../app/state.js';
 import { Banner, Card, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { SPREADSHEET_URL } from '../data/config.js';
-import { HOLIDAY_HEADERS, ROTATION_HEADERS, TABS } from '../data/tabs.js';
+import { TABS } from '../data/tabs.js';
 import { toHolidays } from '../model/calendarMarks.js';
 import { dataQuality } from '../model/quality.js';
 import { rotationIssues, rotationSpan, toRotations } from '../model/rotations.js';
 import { weekdayOf } from '../model/dates.js';
 
 /**
- * The "create this tab" panel shown when an optional tab is absent.
- * @param {{tabName: string, headers: string[]}} props The tab's name and header row.
+ * The panel shown when a settings table has no rows: which table to fill, and how.
+ * @param {{tabName: string, table: string, example: string}} props The panel title, the
+ *     Neon table, and an example INSERT.
  * @returns {!preact.VNode} The panel.
  */
-function MissingTabPanel({ tabName, headers }) {
+function EmptySettingsPanel({ tabName, table, example }) {
   return (
     <Card title={tabName}>
       <Banner tone="warning">
-        This tab does not exist yet. Create a tab named exactly <strong>{tabName}</strong>{' '}
-        with this header row, then reload the dashboard:
+        The <strong>{table}</strong> table has no rows yet. Add them in the Neon SQL editor as
+        the database owner, then reload the dashboard:
       </Banner>
-      <p class="fine">{headers.join(' | ')}</p>
-      {SPREADSHEET_URL ? (
-        <p>
-          <a href={SPREADSHEET_URL} target="_blank" rel="noreferrer">
-            Open the spreadsheet
-          </a>
-        </p>
-      ) : null}
+      <p class="fine">{example}</p>
     </Card>
   );
 }
@@ -225,12 +218,20 @@ export function Settings() {
         {data.available.holidays ? (
           <HolidaysPanel rows={data.holidays} />
         ) : (
-          <MissingTabPanel tabName={TABS.HOLIDAYS} headers={HOLIDAY_HEADERS} />
+          <EmptySettingsPanel
+            tabName={TABS.HOLIDAYS}
+            table="public_holidays"
+            example="INSERT INTO public_holidays (date, name) VALUES ('2026-08-09', 'National Day');"
+          />
         )}
         {data.available.rotations ? (
           <RotationsPanel rows={data.rotations} />
         ) : (
-          <MissingTabPanel tabName={TABS.ROTATIONS} headers={ROTATION_HEADERS} />
+          <EmptySettingsPanel
+            tabName={TABS.ROTATIONS}
+            table="rotations"
+            example="INSERT INTO rotations (name, start_date, end_date) VALUES ('Rotation 1', '2026-07-01', '2026-09-30');"
+          />
         )}
       </div>
 

@@ -1,6 +1,6 @@
 # Battalion Personnel Dashboard
 
-A dashboard over the spreadsheet the parade-state and FormSG pipelines write to.
+A dashboard over the Neon database the parade-state and FormSG pipelines write to.
 
 ## What it is for
 
@@ -31,41 +31,36 @@ all six companies, and the two sources cover different spans — parade state fr
 cards. Each panel prints its own coverage as a fraction with both parts, and the Settings
 page collects them all in one place.
 
-## How it reads the sheet
+## How it reads the data
 
-The spreadsheet **stays private**. Nothing is published to the web, no tab is shared by
-link, and no battalion data is committed to this repo or passes through the deploy
-workflow.
+The data **stays private**. Nothing is published, and no battalion data is committed to
+this repo or passes through the deploy workflow.
 
-Instead the page asks the Apps Script web app this project already runs — the same `/exec`
-URL that receives parade states and report-sick submissions, with a third route:
+The page asks one Vercel Function on the same deployment for everything it charts:
 
 ```
-browser  --POST { password }-->  /exec?route=dashboard  --reads-->  private spreadsheet
+browser  --GET, Authorization: Bearer <password>-->  /api/dashboard  --SELECT as dashboard_read-->  Neon
 ```
 
-The web app is deployed as *execute as me*, so it opens the sheet as its owner. The
-password is checked **there**, in `src/dashboard/DashboardFeed.js`, before a single row is
-read. That is the part that matters: a wrong password returns `unauthorised` and no data.
+The password is checked **there**, in [`api/dashboard.ts`](../api/dashboard.ts), against
+`DASHBOARD_PASSWORD` before a single row is read. A wrong password gets a 401 and no data.
+A password checked in the browser instead would be decoration: the page's JavaScript is
+public, so anyone could read past the check.
 
-A password checked in the browser instead would be decoration. The page's JavaScript is
-public, so anyone could read past the check — and the sheet would have to be published for
-the data to be reachable at all, at which point the URL alone is enough for anybody.
+The route connects as `dashboard_read` ([`db/grants-dashboard.sql`](../db/grants-dashboard.sql)),
+a role that can only `SELECT` the tables the dashboard charts and cannot read
+`raw_messages.body` at all. [`lib/dashboard.ts`](../lib/dashboard.ts) answers with the tabs the
+retired Google Sheet held, under the same names and headers, so everything in `model/`
+reads it unchanged.
 
 **Anyone who knows the password can see everything.** There is no per-person identity, no
 record of who looked, and no way to revoke one viewer: removing someone means changing the
-password for everyone. That is the trade for having no accounts to manage. If you later
-want per-person access instead, the sheet's own sharing list can do it — that is a
-different design, not a setting.
+password for everyone. That is the trade for having no accounts to manage.
 
 ## One-time setup
 
-Two steps. No Google Cloud project, no OAuth consent screen, no test-user list.
-
-**1. Set the password on the Apps Script side.**
-
-Pick a long random passphrase — this is the only thing standing in front of the data, and
-it is typed rarely and pasted into a chat once, so length costs you nothing:
+**1. Pick the password.** A long random passphrase: it is the only thing in front of the
+data, and the route has no lockout, so length is the whole defence.
 
 ```bash
 openssl rand -base64 24                       # Git Bash / macOS / Linux
@@ -79,65 +74,57 @@ $b = New-Object byte[] 24
 Both draw from the OS cryptographic generator. `Get-Random` does not — do not use it
 for this.
 
-In the Apps Script editor: **Project Settings → Script properties → Add script property**,
-name `DASHBOARD_PASSWORD`, value the passphrase. Save.
+**2. Create the read-only role.** After `bun run db:migrate`:
 
-The check fails closed, so until this property exists the route rejects every request —
-including an empty password. There is no window where the dashboard is open.
-
-**2. Point the dashboard at the web app.**
-
-Redeploy the web app (**Deploy → Manage deployments → edit → Deploy**) so the new route
-goes live; `clasp push` alone is not enough. Keep the same deployment so Plumber and the
-WhatsApp bridge keep working — their URLs do not change.
-
-Copy the `/exec` URL, append `?route=dashboard`, and put it in `FEED_URL` in
-[`src/data/config.js`](src/data/config.js):
-
-```js
-export const FEED_URL = 'https://script.google.com/macros/s/AKfy…/exec?route=dashboard';
+```bash
+bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql
 ```
 
-That URL is not a secret — the endpoint refuses to answer without the password — so it is
-fine in a public repo. The password is never in this repo, in `config.js`, or in the page.
+It prints `dashboard_read`'s connection string. Re-running rotates its password.
 
-**3. Optionally, create the two settings tabs.**
+**3. Set both on Vercel** (Project Settings → Environment Variables), then redeploy:
+`DASHBOARD_PASSWORD` (the passphrase) and `DASHBOARD_DATABASE_URL` (the printed string).
+The route fails closed: until both exist it answers 503 to everyone, including an empty
+password.
 
-`Public Holidays` (headers `date | name`) and `Rotations` (headers `name | start_date |
-end_date`) are read by the dashboard and written by nothing. Create them by hand; until
-you do, the dashboard reports them as missing on its Settings page, draws no holiday
-lines, and offers no rotational grouping. Everything else works without them.
+**4. Import the Sheet history once.** Download each tab of the old spreadsheet as CSV
+(File → Download → CSV) into one folder outside the repo, then:
+
+```bash
+bun --env-file=.env.local scripts/import-sheet.ts <folder> --dry-run   # counts only
+bun --env-file=.env.local scripts/import-sheet.ts <folder>             # writes
+```
+
+The dry run reports rows read and rejected per tab, by CSV row number; check the rejections
+before writing. Parade states already in Neon win, and re-running inserts nothing new. The
+message-body and NRIC columns are never read.
+
+**5. Holidays and rotations.** `public_holidays (date, name)` and `rotations (name,
+start_date, end_date)` are seeded by the import and maintained afterwards with SQL in the
+Neon console. Until they have rows, the Settings page says so, no holiday lines are drawn,
+and there is no rotational grouping. Everything else works without them.
 
 **Then share the password with the CO, S1 and S3.** Not by anything that keeps a searchable
 copy forever if you can help it.
 
 ### Rotating it
 
-Change the script property. Every open dashboard keeps working until its tab is reloaded,
-and no redeploy is needed.
-
-### If someone starts guessing
-
-Ten wrong passwords in fifteen minutes and the route stops answering — including to the
-right password, so the guessing cannot continue and you find out. It clears itself after
-fifteen minutes. This is a speed bump, not a lock: the real defence is the length of the
-passphrase.
+Change `DASHBOARD_PASSWORD` on Vercel and redeploy. Open dashboards keep their data until
+reloaded, then ask for the new one.
 
 ## Running it locally
 
 ```
-cd dashboard
 bun install
-bun run dev                      # then open the URL it prints
+vercel dev                       # serves the page and /api together; needs .env.local
 ```
 
 ```
-bun test ./test/                 # from the repo root: model layer, feed, and router
+bun test                         # from the repo root: model layer, routes, and importer
 ```
 
-The feed is reachable from `localhost` without any extra configuration, because the Apps
-Script web app is not origin-restricted — so `bun run dev` gives you the real data as soon
-as you type the password.
+`bun run dev` serves only the page, with no `/api`, so it cannot log in; use `vercel dev`
+with `DASHBOARD_PASSWORD` and `DASHBOARD_DATABASE_URL` in `.env.local`, or a preview deploy.
 
 ### Why there is a build step now
 
@@ -173,7 +160,7 @@ src/
     auth.js           the password's whole life, from typed to forgotten
   theme/              tokens.css (both themes) · base · controls · shell · components
     useTheme.js       light / dark / system, persisted, and the charts' re-tint trigger
-  data/               config.js (feed URL) · feed.js (the one POST)
+  data/               feed.js (the one GET to /api/dashboard) · parade.js (/api/parade)
     tabs.js           what the dashboard asks each tab for
     records.js        raw values -> typed records, resolved by header name
   model/              every number and every rule. Pure, no DOM, no network, all tested
@@ -187,13 +174,12 @@ number can come from, and the reason a page can be rewritten without re-deriving
 metric. A page that computes something itself instead of asking `model/` for it is the
 defect that layering exists to prevent.
 
-The server half is [`src/dashboard/DashboardFeed.js`](../src/dashboard/DashboardFeed.js),
-routed from [`src/WebApp.js`](../src/WebApp.js).
+The server half is [`api/dashboard.ts`](../api/dashboard.ts), which reads through
+[`lib/dashboard.ts`](../lib/dashboard.ts).
 
-Browser tests are in [`test/dashboard/`](../test/dashboard), outside this directory because
-everything in `dashboard/` is published. The feed's tests are
-[`test/dashboard.feed.test.js`](../test/dashboard.feed.test.js), alongside the other Apps
-Script tests.
+Browser tests are in [`test/dashboard/`](../test/dashboard); the read route's are
+[`test/api/dashboard.test.ts`](../test/api/dashboard.test.ts) and
+[`test/lib/dashboard.test.ts`](../test/lib/dashboard.test.ts).
 
 ## Three things worth knowing before reading the numbers
 
@@ -213,11 +199,10 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
 
 ## What is deliberately not here
 
-- **No NRIC.** `SingPass Validated NRIC` and `Masked NRIC` are never requested from the
-  FormSG tab.
-- **No writes to the sheet.** The feed only reads; nothing the dashboard does can change
-  the sheet, and a test asserts the read path leaves every cell untouched. The one page that
-  writes, Parade States, writes to Neon through `/api/parade` (see below).
+- **No NRIC.** Neon has no NRIC column, and `SingPass Validated NRIC` and `Masked NRIC` are
+  never requested.
+- **No writes from the charts.** `/api/dashboard` connects as a role that can only read. The
+  one page that writes, Parade States, writes through `/api/parade` (see below).
 - **No stored password.** It is held in the page's memory for the life of the tab — not in
   `localStorage`, not in `sessionStorage`, not in a cookie — so a reload asks again and
   closing the tab ends the session.
@@ -227,7 +212,7 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
   conversation, not a number. A weighted score (Bradford Factor) was built and then
   removed: it needed a paragraph beside every table explaining what it must not be used
   for, which is a poor trade for a ranking two plain columns already give you.
-- **No session filter.** Every parade state in the sheet is a first parade, so a control
+- **No session filter.** Every parade state stored is a first parade, so a control
   offering one option is furniture.
 - **Date range, scoped to the aggregates only.** The range control (a two-click month
   grid, plus Last 7 days / Last 14 days / This month / All) bounds every trend, rate and
@@ -243,15 +228,13 @@ missed and presses Deposit; below it, every stored message (WhatsApp or manual) 
 newest first with its key, status, source and receipt time, and can be edited or deleted.
 
 - **Where it writes.** `/api/parade` on the same Vercel deployment (`src/data/parade.js`), with
-  the unlock password as a bearer token. Vercel's `DASHBOARD_PASSWORD` must equal the Apps
-  Script property of the same name, or the page says the intake did not accept the password.
+  the unlock password as a bearer token, checked against the same `DASHBOARD_PASSWORD`.
 - **Statuses.** Parsed (rows exist), Needs review (the parser doubted a line; the reasons are
   shown under the status), Rejected (a last parade state, or not a parade state), Pending
   (stored, never parsed). Rules in `src/model/paradeMessages.js`.
 - **Edit** loads the stored text into the form. Saving re-parses it; if it parses, the text
   and every row derived from it are replaced together, and if not, nothing changes and the
   reasons are shown. **Delete** asks once more inline, then removes the message and its rows.
-- **Not yet.** The charts still read the Apps Script feed, so a deposit shows on this page at
-  once but reaches the other pages only after the dashboard moves to Neon.
-- **Local development.** `bun run dev` serves no `/api`, so the page says it could not reach
-  the intake. Use `vercel dev`, or a deployed preview.
+- **Charts.** They read the same tables, so a deposit reaches them on the next refresh.
+- **Local development.** `bun run dev` serves no `/api`, so neither login nor this page can
+  reach the server. Use `vercel dev`, or a deployed preview.

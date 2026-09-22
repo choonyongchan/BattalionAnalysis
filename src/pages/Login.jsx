@@ -8,9 +8,9 @@
  * The field is cleared as soon as its value is captured. A typed password left sitting in
  * an input is one screenshot or one shoulder away from being shared.
  *
- * The wait after the field is submitted is long — the feed wakes an Apps Script
- * deployment and reads every tab through it — so the screen spends most of its life in
- * the loading state, and that state is given as much care as the field.
+ * The wait after the field is submitted is usually a second or two, but a cold start
+ * wakes both the Vercel function and the Neon database, so the loading state is still
+ * given a shape rather than a frozen button.
  */
 
 import { useRef, useState } from 'preact/hooks';
@@ -20,7 +20,7 @@ import { loadError, status } from '../app/state.js';
 import { LoadingProgress } from '../components/LoadingProgress.jsx';
 
 /** @type {number} The wait the bar is paced against, in seconds. */
-const EXPECTED_SECONDS = 30;
+const EXPECTED_SECONDS = 5;
 
 /**
  * What the screen says while it waits, and from which second.
@@ -31,10 +31,9 @@ const EXPECTED_SECONDS = 30;
  */
 const STAGES = [
   { at: 0, label: 'Sending the password' },
-  { at: 3, label: 'Waking the spreadsheet feed' },
-  { at: 10, label: 'Reading the spreadsheet' },
-  { at: 20, label: 'Still reading the rows' },
-  { at: 32, label: 'Nothing has gone wrong — the spreadsheet is just slow today' },
+  { at: 1, label: 'Reading parade states and report-sick submissions' },
+  { at: 4, label: 'Waking the database' },
+  { at: 12, label: 'Nothing has gone wrong — the database is just slow to wake' },
 ];
 
 /**
@@ -109,10 +108,10 @@ export function Login() {
 
         <p class="login__note">
           {busy
-            ? 'The first read wakes the spreadsheet, which is the slow part. Leave this ' +
-              'page open — it will open by itself.'
-            : 'The spreadsheet stays private. The password is checked on the server that ' +
-              'holds the data, so a wrong one returns no rows at all.'}
+            ? 'The first read after a quiet spell wakes the database. Leave this page ' +
+              'open — it will open by itself.'
+            : 'The data stays private. The password is checked on the server that holds ' +
+              'it, so a wrong one returns no rows at all.'}
         </p>
       </div>
     </main>

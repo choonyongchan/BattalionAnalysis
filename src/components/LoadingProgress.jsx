@@ -1,14 +1,13 @@
 /**
  * The bar shown while one slow request is in flight.
  *
- * The first read wakes an Apps Script deployment and pulls every tab of the spreadsheet
- * through it, which takes around half a minute. A disabled button and nothing else reads
- * as a hung page, so the wait is given a shape: a bar that keeps moving, a line of text
+ * The first read after a quiet spell wakes the Vercel function and the Neon database, which
+ * can take several seconds. A disabled button and nothing else reads as a hung page, so the wait is given a shape: a bar that keeps moving, a line of text
  * that changes, and an elapsed count next to the figure the wait is measured against.
  *
  * Two decisions here are deliberate and should survive a refactor:
  *
- * - **The progress is an estimate, and the bar never fills.** The feed is one POST with
+ * - **The progress is an estimate, and the bar never fills.** The read is one GET with
  *   no progress events, so there is nothing real to report; the fill eases along
  *   `1 - e^(-t/tau)` toward a ceiling below 100%. A bar that reaches the end and then sits
  *   there is the exact failure this component exists to prevent, and it can only be

@@ -1,9 +1,11 @@
 /**
- * What the dashboard requires of each spreadsheet tab.
+ * What the dashboard requires of each tab.
  *
- * The Apps Script parser that wrote these tabs is retired (see git history for `legacy/`),
- * so their layout is frozen. Nothing here defines layout — it names the subset of headers
- * the dashboard actually reads, so a tab it cannot understand fails loudly with the missing header
+ * The data lives in Neon now; `lib/dashboard.ts` answers with the tabs the retired Google
+ * Sheet held, under the same names and headers, so everything in `model/` reads it
+ * unchanged. `lib/dashboard.ts` builds each tab from the header arrays here, so they are
+ * also the server's list of what may leave the database. Nothing here defines layout — it
+ * names the subset of headers the dashboard actually reads, so a tab it cannot understand fails loudly with the missing header
  * named rather than silently charting the wrong column.
  *
  * Columns are resolved by header name at read time, so a column added or reordered
@@ -15,7 +17,7 @@
  * Names of the tabs the dashboard reads.
  *
  * `SUBMISSIONS` is the raw parade-state intake, read through a *column projection*: the
- * feed returns only `Timestamp` and `parade_response_id` from it. The message body is
+ * server returns only `Timestamp` and `parade_response_id` from it. The message body is
  * free text a duty commander typed, and it routinely contains NRICs — it must never
  * cross the boundary. See `FORBIDDEN_HEADERS`.
  * @type {!Object<string, string>}
@@ -130,8 +132,8 @@ export const FORBIDDEN_HEADERS = ['SingPass Validated NRIC', 'Masked NRIC'];
  * Parade State Responses headers the dashboard must never request.
  *
  * The message body is free text a duty commander typed. Observed messages contain NRICs,
- * full names and diagnoses in one blob, so it is projected away on the Apps Script side
- * and named here so a test can prove it never came back.
+ * full names and diagnoses in one blob, so the server never selects it (and its read-only
+ * role cannot) and it is named here so a test can prove it is never requested.
  * @type {string[]}
  */
 export const FORBIDDEN_SUBMISSION_HEADERS = ['Drop your Parade State here'];

@@ -13,15 +13,21 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 - [ ] Watch real submissions for a day, then turn Plumber off.
 
 ## Parade states → Vercel intake (`api/parade.ts`)
-- [ ] Set `PARADE_INGEST_SECRET` and `DASHBOARD_PASSWORD` (same value as the Apps Script property) on Vercel; redeploy.
+- [ ] Set `PARADE_INGEST_SECRET` and `DASHBOARD_PASSWORD` on Vercel; redeploy.
 - [ ] On the runner laptop, replace `.env.whatsapp`'s `DATABASE_URL` / `OPENAI_*` / `PARSE_INTERVAL_MS` with `PARADE_API_URL` and `PARADE_INGEST_SECRET`.
 - [ ] Open Parade States on the deployed dashboard: list loads, deposit a test state, edit it, delete it.
 - [ ] Live-verify on the runner laptop: dry run → live → relay a real parade state.
 - [ ] Run alongside the Apps Script relay for a few days and compare rows before switching it off.
 
 ## Dashboard → Neon
-- [ ] Read API on Vercel behind `DASHBOARD_PASSWORD`, using a read-only role (needs a grants file; `db/grants.sql` does not exist yet).
-- [ ] Repoint `src/data/feed.js` / `src/data/config.js` at it and remove the Apps Script feed URL.
+- [x] Read API `api/dashboard.ts` behind `DASHBOARD_PASSWORD`, as the read-only `dashboard_read` role (`db/grants-dashboard.sql`).
+- [x] `src/data/feed.js` reads it; the Apps Script feed URL and `src/data/config.js` are gone.
+- [ ] `bun run db:migrate` (adds `public_holidays`, `rotations`).
+- [ ] `bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql`; check as `dashboard_read` that `select body from raw_messages` fails.
+- [ ] Set `DASHBOARD_DATABASE_URL` on Vercel; redeploy.
+- [ ] Export every Sheet tab to CSV (outside the repo); `scripts/import-sheet.ts <dir> --dry-run`, review rejections, then run it for real; rerun to confirm 0 inserted.
+- [ ] Compare a few dates on the deployed dashboard against the Sheet (strength, MC/MA, report sick, ORBAT, holidays, rotations).
+- [ ] Retire the Apps Script web app deployment.
 
 ## Cleanup
 - [ ] Drop `WHATSAPP_INGEST_TOKEN`, `CRON_SECRET`, `OPENAI_API_KEY` from Vercel env vars.
