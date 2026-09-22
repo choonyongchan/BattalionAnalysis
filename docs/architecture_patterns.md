@@ -33,16 +33,20 @@ Parade States page ────────────────────�
                                   recordMessage ─► parseBody ─► writeSubmission (one db.batch)
 ```
 
-Parsing is `lib/parser/deterministic.ts` alone: a rule-based reader of the standard template
-(`parade-state-example/parade_state_template.txt`) that takes about a millisecond, which is what
-lets parsing run inside a Vercel function. (It used to run on the laptop because the OpenAI
-extractor it replaced took 74–126 s, past Hobby's 60 s cap. There is no model any more.) The
-parser returns `problems`, one for every line or header it cannot read with certainty (an
-unknown duty word outside OTHERS, unreadable dates, a line outside any section, a missing
-company or date). Any problem at all means no rows: the message is stored with
-`error = 'Needs review: …'`, the intake answers 422 with the problems, and a person corrects the
-text on the Parade States page. The parser never stores a guess. A new filing habit that trips
-it is fixed by teaching it one more rule, with a synthetic case in
+Parsing is `lib/parser/deterministic.ts` first: a rule-based reader of the standard template
+(`parade-state-example/parade_state_template.txt`) that takes about a millisecond. It returns
+`problems`, one for every line or header it cannot read with certainty (an unknown duty word
+outside OTHERS, unreadable dates, a line outside any section, a missing company or date); the
+rules never store a guess. Any problem at all hands the whole message to the model fallback,
+`OpenAiParser` in `lib/parser/llm.ts` (prompt in `prompt.ts`, Structured Outputs schema in
+`schema.ts`): `gpt-5.6-luna` (`OPENAI_MODEL` overrides) on the standard service tier, not flex,
+because the call runs inside the intake request. `api/parade.ts` builds it from `OPENAI_API_KEY`
+and gets `maxDuration: 300` in `vercel.json`; the relay waits as long. The model's extraction goes
+through the same `validate`, and `parade_submissions.model` records which parser wrote the rows
+(`deterministic` or the model id). With no key configured, or when the model call fails, no rows
+are written: the message is stored with `error = 'Needs review: …'`, the intake answers 422 with
+the problems, and a person corrects the text on the Parade States page. A filing habit that
+keeps reaching the model is worth teaching the rules, with a synthetic case in
 `test/lib/parser-deterministic.test.ts`.
 
 A resend of a message that already parsed is left alone (`already_parsed`), so it cannot

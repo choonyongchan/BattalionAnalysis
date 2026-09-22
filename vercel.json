@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "bun install --frozen-lockfile"
+  "installCommand": "bun install --frozen-lockfile",
+  "functions": {
+    "api/parade.ts": { "maxDuration": 300 }
+  }
 }

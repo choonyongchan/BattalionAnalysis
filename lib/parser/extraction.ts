@@ -1,6 +1,6 @@
 /**
- * The shape a parsed parade state takes between `deterministic.ts`, which produces it, and
- * `rows.ts`, which validates it and turns it into table rows.
+ * The shape a parsed parade state takes between the parsers that produce it (`deterministic.ts`,
+ * or `llm.ts` when the rules are unsure) and `rows.ts`, which validates it and turns it into rows.
  */
 
 /** A unit strength block as parsed. */

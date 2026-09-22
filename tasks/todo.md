@@ -30,7 +30,7 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 - [ ] Retire the Apps Script web app deployment.
 
 ## Cleanup
-- [ ] Drop `WHATSAPP_INGEST_TOKEN`, `CRON_SECRET`, `OPENAI_API_KEY` from Vercel env vars.
+- [ ] Drop `WHATSAPP_INGEST_TOKEN`, `CRON_SECRET` from Vercel env vars. Keep `OPENAI_API_KEY`: the parser's model fallback (`lib/parser/llm.ts`) needs it.
 - [ ] Turn off Plumber; archive the Google Sheet read-only.
 - [ ] Delete stale branches `cleanup/over-engineering-audit`, `dashboard-revamp`, remote `perm-status-num-days-sentinel`.
 

@@ -16,6 +16,7 @@
  */
 import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
+import { OpenAiParser } from '../lib/parser/llm.ts';
 import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
 import {
   deleteMessage,
@@ -223,10 +224,12 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
  */
 function route(request: Request): Promise<Response> {
   const db = getDb();
+  // Null when OPENAI_API_KEY is unset: doubtful messages then wait for review, as before.
+  const model = OpenAiParser.fromEnv();
   return handle(request, {
     store: {
-      ingest: (message) => ingestMessage(db, message),
-      edit: (id, body) => editMessage(db, id, body),
+      ingest: (message) => ingestMessage(db, message, new Date(), model),
+      edit: (id, body) => editMessage(db, id, body, model),
       remove: (id) => deleteMessage(db, id),
       list: () => listMessages(db),
       get: (id) => getMessage(db, id),

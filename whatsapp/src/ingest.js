@@ -1,10 +1,9 @@
 /**
  * Relays accepted parade states to the Vercel intake, `api/parade.ts`.
  *
- * Parsing used to run here because the OpenAI extraction took 74-126 seconds, past Vercel
- * Hobby's 60-second cap. The rule-based parser takes about a millisecond, so storing and
- * parsing now happen in one request on Vercel, and this process only forwards text. It
- * holds no database credentials.
+ * Storing and parsing happen in one request on Vercel, and this process only forwards text.
+ * It holds no database credentials. Most messages parse by rule in about a millisecond; one
+ * the rules doubt goes to the OpenAI fallback, which can take minutes.
  *
  * The intake is idempotent on the WhatsApp message id, so a retry after a timeout whose
  * request did land is harmless.
@@ -16,8 +15,11 @@ const MAX_ATTEMPTS = 3;
 /** @type {number} Delay before the second attempt; doubled for each one after. */
 const RETRY_BASE_MS = 2_000;
 
-/** @type {number} How long one request may take before it counts as failed. */
-const REQUEST_TIMEOUT_MS = 30_000;
+/**
+ * @type {number} How long one request may take before it counts as failed: the intake's
+ * 300 s function limit (`vercel.json`), so a slow model fallback is not cut off and re-sent.
+ */
+const REQUEST_TIMEOUT_MS = 300_000;
 
 /** Raised when the intake could not be reached, or kept failing, on every attempt. */
 export class RelayError extends Error {

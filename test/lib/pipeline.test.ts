@@ -3,7 +3,9 @@
  * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { describe, expect, test } from 'bun:test';
-import { deleteMessage, editMessage, ingestMessage, parseBody } from '../../lib/pipeline.ts';
+import { parseParadeState } from '../../lib/parser/deterministic.ts';
+import type { Extraction } from '../../lib/parser/extraction.ts';
+import { deleteMessage, editMessage, ingestMessage, parseBody, type ModelParser } from '../../lib/pipeline.ts';
 
 const NOW = new Date('2026-09-18T00:00:00Z');
 
@@ -73,22 +75,72 @@ function fakeDb(answers: Answers = {}) {
   return { db, updates, batches };
 }
 
+/**
+ * Builds a fake model fallback that answers with `answer`, or fails when it is an Error.
+ *
+ * @param answer The extraction to return, or the error to throw.
+ * @returns The fake and the texts it was asked to read.
+ */
+function fakeModel(answer: Extraction | Error) {
+  const calls: string[] = [];
+  const model: ModelParser = {
+    model: 'gpt-test',
+    parse: async (text) => {
+      calls.push(text);
+      if (answer instanceof Error) throw answer;
+      return answer;
+    },
+  };
+  return { model, calls };
+}
+
 describe('parseBody', () => {
-  test('a template message parses to its natural key', () => {
-    expect(parseBody(GOOD, '2026-09-18')).toMatchObject({
+  test('a template message parses to its natural key', async () => {
+    expect(await parseBody(GOOD, '2026-09-18')).toMatchObject({
       status: 'parsed',
       paradeResponseId: 'Archer_2026-09-18_FPS',
+      parser: 'deterministic',
     });
   });
 
-  test('a line the parser doubts needs review, with the reason', () => {
-    const parsed = parseBody(DOUBTFUL, '2026-09-18');
+  test('a line the parser doubts needs review, with the reason', async () => {
+    const parsed = await parseBody(DOUBTFUL, '2026-09-18');
     expect(parsed.status).toBe('needs_review');
     expect(parsed.status === 'needs_review' && parsed.problems.join()).toContain('SOMETHING UNHEARD OF');
   });
 
-  test('a last parade state is rejected', () => {
-    expect(parseBody(LAST, '2026-09-18').status).toBe('rejected');
+  test('a last parade state is rejected', async () => {
+    expect((await parseBody(LAST, '2026-09-18')).status).toBe('rejected');
+  });
+
+  test('the model is not asked when the rules are sure', async () => {
+    const { model, calls } = fakeModel(new Error('should not be called'));
+    expect((await parseBody(GOOD, '2026-09-18', model)).status).toBe('parsed');
+    expect(calls).toEqual([]);
+  });
+
+  test('a doubtful message is read by the model, and the rows say so', async () => {
+    const { model, calls } = fakeModel(parseParadeState(GOOD, '2026-09-18').extraction);
+    expect(await parseBody(DOUBTFUL, '2026-09-18', model)).toMatchObject({
+      status: 'parsed',
+      paradeResponseId: 'Archer_2026-09-18_FPS',
+      parser: 'gpt-test',
+    });
+    expect(calls).toEqual([DOUBTFUL]);
+  });
+
+  test('a failed model call leaves the message for review, with both reasons', async () => {
+    const { model } = fakeModel(new Error('Model API returned HTTP 500'));
+    const parsed = await parseBody(DOUBTFUL, '2026-09-18', model);
+    expect(parsed.status).toBe('needs_review');
+    const problems = parsed.status === 'needs_review' ? parsed.problems.join(' | ') : '';
+    expect(problems).toContain('SOMETHING UNHEARD OF');
+    expect(problems).toContain('Model fallback failed: Model API returned HTTP 500');
+  });
+
+  test('a model extraction still has to pass validation', async () => {
+    const { model } = fakeModel({ ...parseParadeState(GOOD, '2026-09-18').extraction, company: null });
+    expect((await parseBody(DOUBTFUL, '2026-09-18', model)).status).toBe('invalid');
   });
 });
 
@@ -120,6 +172,16 @@ describe('ingestMessage', () => {
     });
 
     expect((await ingestMessage(db, { waMessageId: 'wa-5', body: GOOD }, NOW)).status).toBe('parsed');
+    expect(batches).toHaveLength(1);
+  });
+
+  test('writes a doubtful message the model read, under the model name', async () => {
+    const { db, batches } = fakeDb({ inserted: [{ id: 6 }] });
+    const { model } = fakeModel(parseParadeState(GOOD, '2026-09-18').extraction);
+
+    const outcome = await ingestMessage(db, { waMessageId: 'wa-6', body: DOUBTFUL }, NOW, model);
+
+    expect(outcome.status).toBe('parsed');
     expect(batches).toHaveLength(1);
   });
 
