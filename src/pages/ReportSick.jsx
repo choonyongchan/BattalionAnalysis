@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'preact/hooks';
-import { Card, Coverage } from '../components/Card.jsx';
+import { Card } from '../components/Card.jsx';
 import { Segmented } from '../components/Segmented.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
@@ -19,11 +19,9 @@ import {
   REPORT_SICK_TYPES,
   reportSickTypeOf,
   submissionCounts,
-  submissionCountByCompany,
   submissionTrend,
   topSubmitters,
 } from '../model/formsg.js';
-import { rankUnits } from '../model/leaderboards.js';
 import { episodeCounts } from '../model/metrics.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { isWeekend } from '../model/dates.js';
@@ -37,6 +35,7 @@ import {
   ReasonsOverTime,
   SoldierLookup,
   TrendSection,
+  UnitRankings,
   episodeCells,
   useCategory,
 } from './shared/category.jsx';
@@ -45,67 +44,25 @@ import {
 const DUTY = DUTY_CLASS.REPORT_SICK;
 
 /**
- * The report-sick rankings: who reports sick most through the form, how the FormSG count
- * falls across companies, and how the parade-state count falls across platoons. The
- * platoon table reads the parade state because it names each soldier's platoon outright,
- * where FormSG only lets it be inferred from the 4D.
- * @param {{submissions: Array<!Object>, data: !Object}} props FormSG submissions already
- *     restricted to the range, and the scoped dataset.
- * @returns {!preact.VNode} The three cards.
+ * The FormSG leaderboard: who reports sick most through the form.
+ * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
+ * @returns {!preact.VNode} The card.
  */
-function ReportedSickRankings({ submissions, data }) {
+function ReportedSickTop({ submissions }) {
   const top = topSubmitters(submissions, 10);
-  const companies = submissionCountByCompany(submissions);
-  const platoons = rankUnits(data.personnel, data.strength, DUTY, 'platoon');
-
   return (
-    <>
-      <Card title="Top 10 by Reported Sick (FormSG)">
-        <DataTable
-          columns={[
-            { key: 'rank', label: '#', numeric: true },
-            { key: 'name', label: 'Name' },
-            { key: 'company', label: 'Company' },
-            { key: 'count', label: 'Count', numeric: true },
-          ]}
-          rows={top.map((row, index) => ({ ...row, rank: index + 1, count: fmtInt(row.count) }))}
-          rowKey={(row) => row.key}
-        />
-      </Card>
-      <div class="grid-2">
-        <Card title="Companies, by Count">
-          <DataTable
-            columns={[
-              { key: 'company', label: 'Company' },
-              { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
-            ]}
-            rows={companies.map((row) => ({
-              company: row.company,
-              count: fmtInt(row.count),
-              countRaw: row.count,
-            }))}
-            rowKey={(row) => row.company}
-          />
-        </Card>
-        <Card title="Platoons, by Count">
-          <DataTable
-            columns={[
-              { key: 'company', label: 'Company' },
-              { key: 'platoon', label: 'Platoon' },
-              { key: 'count', label: 'Reporting Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
-            ]}
-            rows={platoons.map((row) => ({
-              company: row.company,
-              platoon: row.platoon,
-              count: fmtInt(row.count),
-              countRaw: row.count,
-            }))}
-            rowKey={(row) => row.company + ' ' + row.platoon}
-          />
-          <Coverage>Counts are parade-state reporting-sick soldier-days in the selected range.</Coverage>
-        </Card>
-      </div>
-    </>
+    <Card title="Top 10 by Reported Sick (FormSG)">
+      <DataTable
+        columns={[
+          { key: 'rank', label: '#', numeric: true },
+          { key: 'name', label: 'Name' },
+          { key: 'company', label: 'Company' },
+          { key: 'count', label: 'Count', numeric: true },
+        ]}
+        rows={top.map((row, index) => ({ ...row, rank: index + 1, count: fmtInt(row.count) }))}
+        rowKey={(row) => row.key}
+      />
+    </Card>
   );
 }
 
@@ -225,7 +182,12 @@ export function ReportSick() {
       <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
         <Histogram bins={hourBins(ranged)} />
       </ChartCard>
-      <ReportedSickRankings submissions={ranged} data={data} />
+      <ReportedSickTop submissions={ranged} />
+      <UnitRankings
+        range={range}
+        dutyClass={DUTY}
+        labels={{ count: 'Number of Report Sick', soldiers: 'Unique Personnel Reporting Sick' }}
+      />
       <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
     </CategoryPage>
   );

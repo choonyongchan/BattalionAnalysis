@@ -49,7 +49,11 @@ export function Status() {
         range={range}
       />
       <EpisodeLeaderboard range={range} dutyClass={DUTY} metric="status" />
-      <UnitRankings data={data} dutyClass={DUTY} />
+      <UnitRankings
+        range={range}
+        dutyClass={DUTY}
+        labels={{ count: 'Number of Status', soldiers: 'Unique Personnel on Status' }}
+      />
       <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
     </CategoryPage>
   );

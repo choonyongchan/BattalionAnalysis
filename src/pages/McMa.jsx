@@ -55,7 +55,11 @@ export function McMa() {
       <LocationsCard personnel={data.personnel} />
       <LongMcCard episodes={episodes} range={range} />
       <EpisodeLeaderboard range={range} dutyClass={DUTY} metric="days" />
-      <UnitRankings data={data} dutyClass={DUTY} />
+      <UnitRankings
+        range={range}
+        dutyClass={DUTY}
+        labels={{ count: 'Number of MC/MA', soldiers: 'Unique Personnel on MC/MA' }}
+      />
       <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
     </CategoryPage>
   );

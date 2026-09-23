@@ -434,13 +434,26 @@ export function EpisodeLeaderboard({ range, dutyClass, metric }) {
 }
 
 /**
- * The company and platoon count rankings, side by side.
- * @param {{data: !Object, dutyClass: (string|!Array<string>)}} props The scoped dataset and duty class.
+ * The company and platoon rankings, side by side: episodes in range, and the distinct
+ * soldiers behind them.
+ * @param {{range: !Object, dutyClass: (string|!Array<string>), labels: {count: string,
+ *     soldiers: string}}} props The range, the duty class, and the two column headings.
  * @returns {!preact.VNode} The cards.
  */
-export function UnitRankings({ data, dutyClass }) {
-  const companies = rankUnits(data.personnel, data.strength, dutyClass, 'company');
-  const platoons = rankUnits(data.personnel, data.strength, dutyClass, 'platoon');
+export function UnitRankings({ range, dutyClass, labels }) {
+  const companies = rankUnits(range.episodes, dutyClass, 'company');
+  const platoons = rankUnits(range.episodes, dutyClass, 'platoon');
+  const countColumns = [
+    { key: 'count', label: labels.count, numeric: true, sortable: true, sortValue: (r) => r.countRaw },
+    { key: 'soldiers', label: labels.soldiers, numeric: true, sortable: true, sortValue: (r) => r.soldiersRaw },
+  ];
+  const toRow = (row) => ({
+    ...row,
+    count: fmtInt(row.count),
+    countRaw: row.count,
+    soldiers: fmtInt(row.soldiers),
+    soldiersRaw: row.soldiers,
+  });
 
   return (
     <div class="grid-2">
@@ -449,11 +462,8 @@ export function UnitRankings({ data, dutyClass }) {
           <EmptyState>No data in range.</EmptyState>
         ) : (
           <DataTable
-            columns={[
-              { key: 'company', label: 'Company' },
-              { key: 'count', label: 'Count', numeric: true },
-            ]}
-            rows={companies.map((row) => ({ ...row, count: fmtInt(row.count) }))}
+            columns={[{ key: 'company', label: 'Company' }, ...countColumns]}
+            rows={companies.map(toRow)}
             rowKey={(row) => row.company}
           />
         )}
@@ -463,12 +473,8 @@ export function UnitRankings({ data, dutyClass }) {
           <EmptyState>No data in range.</EmptyState>
         ) : (
           <DataTable
-            columns={[
-              { key: 'company', label: 'Company' },
-              { key: 'platoon', label: 'Platoon' },
-              { key: 'count', label: 'Count', numeric: true },
-            ]}
-            rows={platoons.map((row) => ({ ...row, count: fmtInt(row.count) }))}
+            columns={[{ key: 'company', label: 'Company' }, { key: 'platoon', label: 'Platoon' }, ...countColumns]}
+            rows={platoons.map(toRow)}
             rowKey={(row) => row.company + row.platoon}
           />
         )}

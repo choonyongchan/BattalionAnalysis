@@ -1,12 +1,12 @@
 /**
  * Tests for the leaderboards and unit rankings.
  *
- * Unit rankings use raw counts, so a larger count should rank first.
+ * Unit rankings count episodes and the distinct soldiers behind them.
  */
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
+import { PERSONNEL_HEADERS } from '../../src/data/tabs.js';
 import { buildEpisodes } from '../../src/model/episodes.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
 import {
@@ -27,19 +27,6 @@ function personnelRows(specs) {
     ...specs.map((spec) => PERSONNEL_HEADERS.map((header) => (header in spec ? spec[header] : ''))),
   ];
   return toRecords(values, PERSONNEL_HEADERS, 'Personnel Data');
-}
-
-/**
- * Builds Strength Data records from column-keyed row specs.
- * @param {Array<!Object>} specs Partial records; unlisted headers read as ''.
- * @returns {Array<!Object>} Normalised records.
- */
-function strengthRows(specs) {
-  const values = [
-    STRENGTH_HEADERS.slice(),
-    ...specs.map((spec) => STRENGTH_HEADERS.map((header) => (header in spec ? spec[header] : ''))),
-  ];
-  return toRecords(values, STRENGTH_HEADERS, 'Strength Data');
 }
 
 describe('topByCount', () => {
@@ -123,22 +110,26 @@ describe('topByStatusCount', () => {
 });
 
 describe('rankUnits', () => {
-  test('a large unit with a larger count outranks a small unit', () => {
-    const strength = strengthRows([
-      { date: '2026-07-20', session: 'FPS', company: 'Small', platoon: '1', unit_type: 'PLATOON', total_strength: 10 },
-      { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', unit_type: 'PLATOON', total_strength: 200 },
+  // Two episodes for 1101 (separate days), one for 1102, all Att C in Big 1; one in Small 1.
+  const episodes = buildEpisodes(
+    personnelRows([
+      { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', four_d: '1101', reason_category: 'Att C' },
+      { date: '2026-07-24', session: 'FPS', company: 'Big', platoon: '1', four_d: '1101', reason_category: 'Att C' },
+      { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', four_d: '1102', reason_category: 'Att C' },
+      { date: '2026-07-20', session: 'FPS', company: 'Small', platoon: '1', four_d: '1201', reason_category: 'Att C' },
+    ])
+  );
+
+  test('ranks companies by episode count and counts each soldier once', () => {
+    const ranked = rankUnits(episodes, DUTY_CLASS.ATT_C, 'company');
+    expect(ranked.map((row) => [row.company, row.count, row.soldiers])).toEqual([
+      ['Big', 3, 2],
+      ['Small', 1, 1],
     ]);
-    const personnel = personnelRows([
-      // Small: 5 of 10 absent -> 50%.
-      ...['1101', '1102', '1103', '1104', '1105'].map((fourD) => ({
-        date: '2026-07-20', session: 'FPS', company: 'Small', platoon: '1', four_d: fourD, reason_category: 'Att C',
-      })),
-      // Big: 10 of 200 absent -> 5%, but a bigger raw count.
-      ...Array.from({ length: 10 }, (_, i) => ({
-        date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', four_d: 'B' + i, reason_category: 'Att C',
-      })),
-    ]);
-    const ranked = rankUnits(personnel, strength, DUTY_CLASS.ATT_C, 'company');
-    expect(ranked[0].company).toBe('Big');
+  });
+
+  test('splits by platoon at the platoon level', () => {
+    const ranked = rankUnits(episodes, DUTY_CLASS.ATT_C, 'platoon');
+    expect(ranked[0]).toMatchObject({ company: 'Big', platoon: '1', count: 3, soldiers: 2 });
   });
 });

@@ -12,10 +12,9 @@
 
 import { platoonOf } from './platoon.js';
 import { isPermanentStatus } from './statusBuckets.js';
-import { classify, isDuty } from './classify.js';
-import { identityOf } from './identity.js';
+import { isDuty } from './classify.js';
 import { leaderboard } from './metrics.js';
-import { toIsoDate, toText } from './values.js';
+import { toText } from './values.js';
 
 /**
  * Resolves a leaderboard row's platoon through the 4D-inference rule.
@@ -147,36 +146,39 @@ export function topByStatusCount(episodes, limit) {
 }
 
 /**
- * Companies or platoons ranked by absence count, highest first.
+ * Companies or platoons ranked by episode count, with the number of distinct soldiers
+ * behind those episodes.
  *
- * A thin pass-through to `metrics.companyRates` / `unitRates`, which already rank on
- * `per100` rather than the raw count — kept here so a page reads one ranking function
- * regardless of level instead of branching between two metrics-layer names.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Unused; retained for the shared caller shape.
+ * A platoon left blank is inferred from the 4D through `platoon.js`, as the leaderboards do.
+ * @param {Array<!Object>} episodes Episodes from `buildEpisodes`, already restricted to the range.
  * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {string} level 'company' or 'platoon'.
- * @returns {Array<!Object>} Units ranked by count, highest first.
+ * @returns {Array<{company: string, platoon: (string|undefined), count: number,
+ *     soldiers: number}>} Units ranked by episode count, then by soldiers, highest first.
  */
-export function rankUnits(personnelRows, _strengthRows, dutyClass, level) {
-  const counts = new Map();
-  personnelRows
-    .filter((row) => isDuty(dutyClass, classify(row)))
-    .forEach((row) => {
-      const identity = identityOf(row);
-      const unit = toText(row.company);
-      const platoon = platoonOf(row).platoon;
-      if (identity.key === '' || unit === '') return;
+export function rankUnits(episodes, dutyClass, level) {
+  const units = new Map();
+  episodes
+    .filter((episode) => isDuty(dutyClass, episode.dutyClass))
+    .forEach((episode) => {
+      const unit = toText(episode.company);
+      if (episode.key === '' || unit === '') return;
+      const platoon = platoonOf({ platoon: episode.platoon, four_d: episode.fourD }).platoon;
       const key = level === 'platoon' ? unit + '\u0000' + platoon : unit;
-      const soldiers = counts.get(key) || new Set();
-      soldiers.add(identity.key + '@' + (toIsoDate(row.date) || ''));
-      counts.set(key, soldiers);
+      const entry = units.get(key) || { count: 0, soldiers: new Set() };
+      entry.count += 1;
+      entry.soldiers.add(episode.key);
+      units.set(key, entry);
     });
 
-  return Array.from(counts, ([key, soldiers]) => {
+  return Array.from(units, ([key, entry]) => {
     const [company, platoon] = key.split('\u0000');
-    return { company, platoon, days: soldiers.size, count: soldiers.size };
+    return { company, platoon, count: entry.count, soldiers: entry.soldiers.size };
   }).sort(
-    (a, b) => b.count - a.count || a.company.localeCompare(b.company) || (a.platoon || '').localeCompare(b.platoon || '')
+    (a, b) =>
+      b.count - a.count ||
+      b.soldiers - a.soldiers ||
+      a.company.localeCompare(b.company) ||
+      (a.platoon || '').localeCompare(b.platoon || '')
   );
 }
