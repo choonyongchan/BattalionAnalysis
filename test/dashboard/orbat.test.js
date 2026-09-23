@@ -27,7 +27,7 @@ function rosterRows(specs) {
 describe('rosterOn', () => {
   test('a fully filed company returns all seven roles, filed', () => {
     const rows = rosterRows(
-      ['CDO', 'CDS', 'COS', 'PDS1', 'PDS2', 'PDS3', 'PDS4'].map((role) => ({
+      ['CDO', 'CDS', 'COS', 'PDSHQ', 'PDS1', 'PDS2', 'PDS3'].map((role) => ({
         parade_response_id: 'Archer_2026-07-22_FPS',
         date: '2026-07-22',
         session: 'FPS',
@@ -84,7 +84,39 @@ describe('orbatTree', () => {
     const tree = orbatTree(rows, '2026-07-22', { company: 'Archer' });
     const cds = tree.children[0].children[0];
     expect(cds.role).toBe('CDS');
-    expect(cds.children.map((child) => child.role)).toEqual(['COS', 'PDS1', 'PDS2', 'PDS3', 'PDS4']);
+    expect(cds.children.map((child) => child.role)).toEqual(['COS', 'PDSHQ', 'PDS1', 'PDS2', 'PDS3']);
+  });
+
+  test("each company's PDS slots follow its own platoon numbering", () => {
+    const tree = orbatTree(rosterRows([]), '2026-07-22');
+    const pdsOf = (name) => {
+      const node = orbatTree(
+        rosterRows([{ parade_response_id: name + '_1', date: '2026-07-22', session: 'FPS', company: name, role: 'CDO', rank: 'CPT', name: 'X' }]),
+        '2026-07-22',
+        { company: name }
+      );
+      return node.children[0].children[0].children.map((child) => child.role).slice(1);
+    };
+    expect(tree.children).toHaveLength(5);
+    expect(pdsOf('Archer')).toEqual(['PDSHQ', 'PDS1', 'PDS2', 'PDS3']);
+    expect(pdsOf('Braves')).toEqual(['PDSHQ', 'PDS4', 'PDS5', 'PDS6']);
+    expect(pdsOf('Cougar')).toEqual(['PDSHQ', 'PDS7', 'PDS8', 'PDS9']);
+    expect(pdsOf('Stallion')).toEqual(['PDSHQ', 'PDSPNR', 'PDSMTR', 'PDSSCR', 'PDSSIG']);
+    expect(pdsOf('Hercules')).toEqual(['PDSHQ', 'PDSSIG', 'PDSOPR+ASA', 'PDSMED']);
+  });
+
+  test('a Cougar PDS 8 and a Coy HQ PDS land in their slots', () => {
+    const base = { parade_response_id: 'Cougar_2026-07-22_FPS', date: '2026-07-22', session: 'FPS', company: 'Cougar' };
+    const roster = rosterOn(
+      rosterRows([
+        { ...base, role: 'PDS8', rank: '3SG', name: 'EIGHT' },
+        { ...base, role: 'PDSCOYHQ', rank: '2SG', name: 'HQ' },
+      ]),
+      '2026-07-22',
+      'Cougar'
+    );
+    expect(roster.find((entry) => entry.role === 'PDS8')).toMatchObject({ filed: true, name: 'EIGHT' });
+    expect(roster.find((entry) => entry.role === 'PDSHQ')).toMatchObject({ filed: true, name: 'HQ' });
   });
 
   test('the battalion tree contains all five companies, including ones that filed nothing', () => {
@@ -120,15 +152,15 @@ describe('vacant appointments', () => {
   test('a role filed as vacant is filed, vacant, and reads Vacant in the tree', () => {
     const rows = rosterRows([
       { ...base, role: 'CDO', rank: 'CPT', name: 'TAN' },
-      { ...base, role: 'PDS3', vacant: true },
+      { ...base, role: 'PDSMED', vacant: true },
     ]);
     const roster = rosterOn(rows, '2026-09-22', 'Hercules');
-    expect(roster.find((entry) => entry.role === 'PDS3')).toMatchObject({ filed: true, vacant: true });
+    expect(roster.find((entry) => entry.role === 'PDSMED')).toMatchObject({ filed: true, vacant: true });
     expect(roster.find((entry) => entry.role === 'CDO').vacant).toBe(false);
 
     const tree = orbatTree(rows, '2026-09-22', { company: 'Hercules' });
     const cds = tree.children[0].children[0];
-    expect(cds.children.find((node) => node.role === 'PDS3').name).toBe('Vacant');
+    expect(cds.children.find((node) => node.role === 'PDSMED').name).toBe('Vacant');
   });
 
   test('vacanciesOn lists every vacant chair, a named sub-unit included, from the latest submission', () => {

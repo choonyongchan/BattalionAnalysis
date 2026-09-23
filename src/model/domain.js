@@ -43,10 +43,35 @@ export const UNIT_TYPE_COMPANY = 'Company';
 export const REASON_CATEGORIES = ['Att C', 'Status', 'Off/Leave', 'Report Sick', 'MA', 'Others'];
 
 /**
- * The command roles a Command Roster row may carry, in ORBAT order.
+ * The company-level command roles every company files, in ORBAT order.
  * @type {string[]}
  */
-export const COMMAND_ROLES = ['CDO', 'CDS', 'COS', 'PDS1', 'PDS2', 'PDS3', 'PDS4'];
+export const COMMAND_ROLES = ['CDO', 'CDS', 'COS'];
+
+/**
+ * Each company's sub-units, in ORBAT order, as they follow `PDS` in a roster role.
+ *
+ * Numbering runs on across the rifle companies (Archer 1-3, Braves 4-6, Cougar 7-9), and
+ * the support companies name theirs, so each company's PDS appointments differ.
+ * @type {!Object<string, string[]>}
+ */
+export const COMPANY_SUBUNITS = {
+  Archer: ['HQ', '1', '2', '3'],
+  Braves: ['HQ', '4', '5', '6'],
+  Cougar: ['HQ', '7', '8', '9'],
+  Stallion: ['HQ', 'PNR', 'MTR', 'SCR', 'SIG'],
+  Hercules: ['HQ', 'SIG', 'OPR+ASA', 'MED'],
+};
+
+/**
+ * The roster roles one company files, in ORBAT order: the command roles, then a PDS per
+ * sub-unit.
+ * @param {string} company Company name.
+ * @returns {string[]} Roles such as `CDO`, `PDSHQ`, `PDS7` or `PDSOPR+ASA`.
+ */
+export function commandRolesOf(company) {
+  return [...COMMAND_ROLES, ...(COMPANY_SUBUNITS[company] || []).map((unit) => 'PDS' + unit)];
+}
 
 /**
  * `num_days` sentinel a permanent status carries: "no expiry", not a duration.

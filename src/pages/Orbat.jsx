@@ -6,8 +6,8 @@
  * the date sits in the same bar beside it.
  *
  * Drawn as a structured roster — one card per company, the chain of command indented
- * beneath its CDO — rather than a node-and-link tree. Every company has the same seven
- * roles in the same shape, so a tree's lines say nothing a reader does not already know,
+ * beneath its CDO — rather than a node-and-link tree. Every company has the same shape —
+ * CDO, CDS, COS, then a PDS for Coy HQ and each of its platoons — so a tree's lines say nothing a reader does not already know,
  * while its nodes squeeze a rank and a forty-character name into a label. Cards read as
  * a list, side by side, and a gap in one company's chain stands out against the others.
  *
@@ -17,8 +17,8 @@
  * nothing is the finding, not a reason to hide it.
  *
  * A role filed as `-` reads "Vacant" in the warning colour, distinct from one not filed at
- * all, and the coverage line lists every vacant chair — including a named sub-unit's PDS
- * such as Hercules' PDSMED, which the four-platoon tree has no slot for.
+ * all, and the coverage line lists every vacant chair — including any PDS the company's
+ * sub-unit list in `COMPANY_SUBUNITS` has no slot for.
  */
 
 import { useMemo, useState } from 'preact/hooks';

@@ -77,7 +77,7 @@ export function platoonOf(unitLabel: string | null | undefined): string {
 }
 
 /**
- * The roster role the dashboard reads: `CDO`, `CDS`, `COS`, or `PDS1`–`PDS4`.
+ * The roster role the dashboard reads: `CDO`, `CDS`, `COS`, or `PDS` + sub-unit (`PDS7`, `PDSSIG`).
  *
  * @param roleKind The appointment.
  * @param unitLabel The PDS's sub-unit, e.g. `1` or `SIG`; ignored for other roles.

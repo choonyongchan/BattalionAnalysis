@@ -1,6 +1,7 @@
 /**
  * The duty tree for one company on one day: CDO at the top, CDS below, COS supporting
- * CDS, and PDS1 through PDS4 under CDS.
+ * CDS, and a PDS per sub-unit under CDS — Coy HQ first, then the company's own platoons
+ * as `COMPANY_SUBUNITS` lists them (Archer 1-3, Stallion PNR/MTR/SCR/SIG, and so on).
  *
  * Coverage in the real data is poor, and this module says so rather than drawing a
  * confident empty tree: Archer files a roster on 32 days, Stallion 29, Hercules 33 but
@@ -15,7 +16,7 @@
  * Every function here is pure.
  */
 
-import { COMMAND_ROLES, COMPANIES } from './domain.js';
+import { COMMAND_ROLES, COMPANIES, commandRolesOf } from './domain.js';
 import { toIsoDate, toText } from './values.js';
 
 /** @type {string} What an unfilled role's node reads. */
@@ -26,6 +27,16 @@ const VACANT = 'Vacant';
 
 /** @type {string} The leaf label for a company with no roster on the date. */
 const NO_ROSTER_LABEL = 'No roster filed';
+
+/**
+ * A roster role in the form `commandRolesOf` lists, so `PDS COY HQ` and `PDS HQ` meet.
+ * @param {*} role Raw role cell, e.g. `PDS7` or `PDSCOYHQ`.
+ * @returns {string} The role, upper-cased, spaces dropped, Coy HQ read as `PDSHQ`.
+ */
+function canonicalRole_(role) {
+  const text = toText(role).toUpperCase().replace(/\s+/g, '');
+  return text === 'PDSCOYHQ' ? 'PDSHQ' : text;
+}
 
 /**
  * The roster rows for one company's parade, keeping only the latest submission.
@@ -63,20 +74,21 @@ function latestRosterRows_(rows, isoDate, company, session) {
  * @param {string} company Company name.
  * @param {string=} session Parade session; defaults to 'FPS'.
  * @returns {Array<{role: string, rank: string, name: string, filed: boolean,
- *     vacant: boolean}>} One entry per role in COMMAND_ROLES order; a role filed as `-`
- *     is filed and vacant.
+ *     vacant: boolean}>} One entry per role in `commandRolesOf(company)` order; a role
+ *     filed as `-` is filed and vacant.
  */
 export function rosterOn(rows, isoDate, company, session) {
   const targetSession = session || 'FPS';
+  const roles = commandRolesOf(company);
   const byRole = new Map();
   latestRosterRows_(rows, isoDate, company, targetSession).forEach((row) => {
-    const role = toText(row.role);
-    if (COMMAND_ROLES.includes(role)) {
+    const role = canonicalRole_(row.role);
+    if (roles.includes(role)) {
       byRole.set(role, { rank: toText(row.rank), name: toText(row.name), vacant: isVacant_(row) });
     }
   });
 
-  return COMMAND_ROLES.map((role) => {
+  return roles.map((role) => {
     const filled = byRole.get(role);
     return filled
       ? { role, rank: filled.rank, name: filled.name, filed: true, vacant: filled.vacant }
@@ -100,8 +112,8 @@ function isVacant_(row) {
  * Every appointment filed vacant on one parade, battalion-wide.
  *
  * Read from the latest submission per company, like the tree, but across every PDS
- * sub-unit a company names — Hercules' `PDSMED` included — rather than only PDS1 to PDS4,
- * so a vacant chair outside the four platoons is still counted.
+ * sub-unit a company names, even one `COMPANY_SUBUNITS` does not list, so a vacant chair
+ * outside the tree is still counted.
  * @param {Array<!Object>} rows Normalised Command Roster records.
  * @param {string} isoDate Parade date.
  * @param {string=} session Parade session; defaults to 'FPS'.
@@ -113,7 +125,7 @@ export function vacanciesOn(rows, isoDate, session) {
   return COMPANIES.flatMap((company) =>
     latestRosterRows_(rows, isoDate, company, targetSession)
       .filter(isVacant_)
-      .map((row) => ({ company, role: toText(row.role) }))
+      .map((row) => ({ company, role: canonicalRole_(row.role) }))
   );
 }
 
@@ -138,7 +150,7 @@ function roleNode_(entry, children) {
 
 /**
  * The command tree for one company's parade: CDO over CDS, COS beside CDS supporting it,
- * PDS1 through PDS4 under CDS.
+ * the company's PDS appointments under CDS.
  * @param {Array<!Object>} rows Normalised Command Roster records.
  * @param {string} isoDate Parade date.
  * @param {string} company Company name.
@@ -149,7 +161,9 @@ function companyTree_(rows, isoDate, company, session) {
   const roster = rosterOn(rows, isoDate, company, session);
   const byRole = new Map(roster.map((entry) => [entry.role, entry]));
 
-  const platoons = ['PDS1', 'PDS2', 'PDS3', 'PDS4'].map((role) => roleNode_(byRole.get(role)));
+  const platoons = roster
+    .filter((entry) => !COMMAND_ROLES.includes(entry.role))
+    .map((entry) => roleNode_(entry));
   const cos = roleNode_(byRole.get('COS'));
   const cds = roleNode_(byRole.get('CDS'), [cos, ...platoons]);
   const cdo = roleNode_(byRole.get('CDO'), [cds]);
@@ -190,7 +204,7 @@ export function orbatTree(rows, isoDate, options) {
 }
 
 /**
- * Which companies filed a roster on a date, and how many of the seven roles.
+ * Which companies filed a roster on a date, and how many of their roles.
  * @param {Array<!Object>} rows Normalised Command Roster records.
  * @param {string} isoDate Parade date.
  * @param {string=} session Parade session; defaults to 'FPS'.
