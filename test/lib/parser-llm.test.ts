@@ -49,14 +49,14 @@ function completion(content: string, finish_reason = 'stop'): Response {
 }
 
 describe('OpenAiParser', () => {
-  test('asks gpt-5.6-luna on the standard tier with the strict schema, and returns its extraction', async () => {
+  test('asks gpt-6-luna on the standard tier with the strict schema, and returns its extraction', async () => {
     const { impl, bodies } = fakeFetch(completion(JSON.stringify(EXTRACTION)));
     const parser = new OpenAiParser({ apiKey: 'sk-test', fetchImpl: impl });
 
     expect(await parser.parse('40 SAR ARCHER COMPANY', TODAY)).toEqual(EXTRACTION as never);
     expect(parser.model).toBe(DEFAULT_MODEL);
-    expect(DEFAULT_MODEL).toBe('gpt-5.6-luna');
-    expect(bodies[0]).toMatchObject({ model: 'gpt-5.6-luna', response_format: { type: 'json_schema' } });
+    expect(DEFAULT_MODEL).toBe('gpt-6-luna');
+    expect(bodies[0]).toMatchObject({ model: 'gpt-6-luna', response_format: { type: 'json_schema' } });
     expect(bodies[0]).not.toHaveProperty('service_tier');
     expect(JSON.stringify(bodies[0]!.messages)).toContain('40 SAR ARCHER COMPANY');
   });
@@ -83,7 +83,7 @@ describe('OpenAiParser', () => {
 
   test('is built from the environment only when a key is set', () => {
     expect(OpenAiParser.fromEnv({})).toBeNull();
-    expect(OpenAiParser.fromEnv({ OPENAI_API_KEY: 'sk-test' })?.model).toBe('gpt-5.6-luna');
+    expect(OpenAiParser.fromEnv({ OPENAI_API_KEY: 'sk-test' })?.model).toBe('gpt-6-luna');
     expect(OpenAiParser.fromEnv({ OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'gpt-other' })?.model).toBe('gpt-other');
   });
 });

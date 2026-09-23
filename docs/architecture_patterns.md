@@ -18,7 +18,7 @@ the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 | `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
 | `api/session.ts` | Vercel Function | The dashboard's login: POST the password once for an `HttpOnly`, 12-hour session cookie (`lib/session.ts`); DELETE ends it. The only route the password is sent to |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
-| `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
+| `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`), or in the background via `bun run whatsapp:service install` (a SYSTEM scheduled task) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
 | `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Deposit page writes through `api/parade.ts`. See `docs/dashboard.md` |
 | `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql), `import-sheet.ts` (one-time, idempotent import of the Sheet's CSV exports) |
 
@@ -40,7 +40,7 @@ Parsing is `lib/parser/deterministic.ts` first: a rule-based reader of the stand
 outside OTHERS, unreadable dates, a line outside any section, a missing company or date); the
 rules never store a guess. Any problem at all hands the whole message to the model fallback,
 `OpenAiParser` in `lib/parser/llm.ts` (prompt in `prompt.ts`, Structured Outputs schema in
-`schema.ts`): `gpt-5.6-luna` (`OPENAI_MODEL` overrides) on the standard service tier, not flex,
+`schema.ts`): `gpt-6-luna` (`OPENAI_MODEL` overrides) on the standard service tier, not flex,
 because the call runs inside the intake request. `api/parade.ts` builds it from `OPENAI_API_KEY`
 and gets `maxDuration: 300` in `vercel.json`; the relay waits as long. The model's extraction goes
 through the same `validate`, and `parade_submissions.model` records which parser wrote the rows

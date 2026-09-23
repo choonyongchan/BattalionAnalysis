@@ -13,7 +13,7 @@ import { buildResponseSchema } from './schema.ts';
 const CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
 
 /** The model, overridable by env; whichever is used is recorded on `parade_submissions.model`. */
-export const DEFAULT_MODEL = 'gpt-5.6-luna';
+export const DEFAULT_MODEL = 'gpt-6-luna';
 
 /** How many times to call before giving up. A truncated or empty reply may not recur. */
 const MAX_ATTEMPTS = 2;
