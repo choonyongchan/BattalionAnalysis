@@ -10,7 +10,7 @@
  * The tab is optional; the feed returns `[]` when it does not exist, and every function
  * here accepts that without throwing.
  *
- * The point of this module is absence, not presence: `filingsOn` always returns all six
+ * The point of this module is absence, not presence: `filingsOn` always returns all five
  * companies, because a chart built only from who filed cannot show who did not.
  *
  * Every function here is pure.

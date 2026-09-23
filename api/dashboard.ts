@@ -1,7 +1,7 @@
 /**
  * The dashboard's read route: every tab it charts, from Neon.
  *
- *   GET    all tabs    dashboard password (`Authorization: Bearer <password>`)
+ *   GET    all tabs    a dashboard session cookie, or the password as a bearer token
  *
  * Answers `{ ok: true, generatedAt, tabs }`, the shape the Apps Script feed answered, built by
  * `lib/dashboard.ts#loadTabs`. It connects as the read-only `dashboard_read` role
@@ -11,6 +11,7 @@
 import { getDb } from '../db/index.ts';
 import { loadTabs, type Tabs } from '../lib/dashboard.ts';
 import { bearerToken, json, methodNotAllowed, sameSecret, serverError } from '../lib/http.ts';
+import { hasSession } from '../lib/session.ts';
 
 /** What `handle` needs. */
 export interface Deps {
@@ -19,7 +20,7 @@ export interface Deps {
   dashboardPassword: string | undefined;
   /** Whether a read-only connection string is configured. */
   hasDatabase: boolean;
-  /** The clock, injected so tests can pin `generatedAt`. */
+  /** The clock, injected so tests can pin `generatedAt` and a session's expiry. */
   now?: () => Date;
 }
 
@@ -38,6 +39,26 @@ function reply(status: number, body: unknown): Response {
 }
 
 /**
+ * Whether the caller may read.
+ *
+ * Two ways in, one secret behind both. The dashboard sends a session cookie issued by
+ * `api/session.ts`, which is what keeps the password out of the page; a script or a test
+ * sends the password itself as a bearer token. A read is safe cross-site — it changes
+ * nothing and `SameSite=Strict` keeps the cookie at home — so there is no origin check
+ * here, unlike the write route.
+ *
+ * @param request The incoming request.
+ * @param deps The configured password and the clock.
+ * @returns Whether the request is authorised.
+ */
+function authorised(request: Request, deps: Deps): boolean {
+  const now = (deps.now ?? (() => new Date()))().getTime();
+  if (hasSession(request, deps.dashboardPassword, now)) return true;
+  const token = bearerToken(request);
+  return Boolean(token && deps.dashboardPassword && sameSecret(token, deps.dashboardPassword));
+}
+
+/**
  * Routes one request.
  *
  * Fails closed: with no password or no read-only connection configured it refuses everything.
@@ -51,8 +72,7 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (!deps.dashboardPassword || !deps.hasDatabase) {
     return reply(503, { ok: false, error: 'not_configured' });
   }
-  const token = bearerToken(request);
-  if (!token || !sameSecret(token, deps.dashboardPassword)) {
+  if (!authorised(request, deps)) {
     return reply(401, { ok: false, error: 'unauthorised' });
   }
   try {

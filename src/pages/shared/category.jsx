@@ -39,6 +39,7 @@ import { topByCount, topByDays, topByStatusCount, rankUnits } from '../../model/
 import { topLabelsOverTime } from '../../model/reasonTrend.js';
 import { locationCounts, locationCoverage } from '../../model/locations.js';
 import { toText } from '../../model/values.js';
+import { isDuty } from '../../model/classify.js';
 
 /** @type {number} Days an Att C episode must exceed to count as long-term MC. */
 const LONG_MC_MIN_DAYS = 13;
@@ -123,7 +124,7 @@ export function CategoryPage({ title, range, children }) {
 
 /**
  * Episodes, soldiers and episodes per soldier for one duty class, over the range.
- * @param {{range: !Object, dutyClass: string, labels?: {episodes?: string,
+ * @param {{range: !Object, dutyClass: (string|!Array<string>), labels?: {episodes?: string,
  *     soldiers?: string, perSoldier?: string}}} props The range, the duty class, and
  *     optional tile labels.
  * @returns {!preact.VNode} The tile row.
@@ -194,7 +195,7 @@ export function TrendSection({ title, coverage, trendFn, range }) {
 
 /**
  * The parade-state rate trend of one duty class.
- * @param {{title: string, data: !Object, dutyClass: string, range: !Object}} props The
+ * @param {{title: string, data: !Object, dutyClass: (string|!Array<string>), range: !Object}} props The
  *     card title, the scoped dataset, the duty class, and the range.
  * @returns {!preact.VNode} The card.
  */
@@ -212,15 +213,15 @@ export function DutyTrend({ title, data, dutyClass, range }) {
 }
 
 /**
- * Counts episodes of one duty class per company x platoon for the heatmap grid.
+ * Counts episodes of one duty class — or several — per company x platoon for the heatmap grid.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
- * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to keep, from DUTY_CLASS.
  * @returns {Array<{row: string, column: string, value: number}>} Non-empty cells only.
  */
 export function episodeCells(episodes, dutyClass) {
   const counts = new Map();
   episodes
-    .filter((episode) => episode.dutyClass === dutyClass)
+    .filter((episode) => isDuty(dutyClass, episode.dutyClass))
     .forEach((episode) => {
       const key = episode.company + '\u0000' + (episode.platoon || UNASSIGNED);
       counts.set(key, (counts.get(key) || 0) + 1);
@@ -366,7 +367,7 @@ export function LongMcCard({ episodes, range }) {
 
 /**
  * The top-10 soldiers for one duty class over the range.
- * @param {{range: !Object, dutyClass: string, metric: string}} props The range, the duty
+ * @param {{range: !Object, dutyClass: (string|!Array<string>), metric: string}} props The range, the duty
  *     class, and 'count', 'days' or 'status' (a key of LEADERBOARDS).
  * @returns {!preact.VNode} The card.
  */
@@ -381,7 +382,7 @@ export function EpisodeLeaderboard({ range, dutyClass, metric }) {
 
 /**
  * The company and platoon rate rankings, side by side.
- * @param {{data: !Object, dutyClass: string}} props The scoped dataset and duty class.
+ * @param {{data: !Object, dutyClass: (string|!Array<string>)}} props The scoped dataset and duty class.
  * @returns {!preact.VNode} The cards.
  */
 export function UnitRankings({ data, dutyClass }) {
@@ -426,7 +427,7 @@ export function UnitRankings({ data, dutyClass }) {
 
 /**
  * Soldier search, and the picked soldier's episodes of this duty class.
- * @param {{index: !Object, episodes: Array<!Object>, dutyClass: string}} props The soldier
+ * @param {{index: !Object, episodes: Array<!Object>, dutyClass: (string|!Array<string>)}} props The soldier
  *     index, all episodes, and the duty class to list.
  * @returns {!preact.VNode} The search card, plus the history card once a soldier is picked.
  */
@@ -434,7 +435,7 @@ export function SoldierLookup({ index, episodes, dutyClass }) {
   const [soldierKey, setSoldierKey] = useState(null);
   const rows = soldierKey
     ? episodes
-        .filter((episode) => episode.key === soldierKey && episode.dutyClass === dutyClass)
+        .filter((episode) => episode.key === soldierKey && isDuty(dutyClass, episode.dutyClass))
         .sort((a, b) => toText(b.startDate).localeCompare(toText(a.startDate)))
     : [];
 

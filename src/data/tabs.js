@@ -34,6 +34,9 @@ export const TABS = {
 
 /**
  * Headers read from "Strength Data".
+ *
+ * The six rank-tier columns split `total_*` into officers, WOSpecs and enlistees. They are
+ * blank where a parade state did not state the split, which is a gap, never a zero.
  * @type {string[]}
  */
 export const STRENGTH_HEADERS = [
@@ -45,6 +48,12 @@ export const STRENGTH_HEADERS = [
   'unit_type',
   'total_strength',
   'total_present',
+  'officer_strength',
+  'officer_present',
+  'wospec_strength',
+  'wospec_present',
+  'enlistee_strength',
+  'enlistee_present',
 ];
 
 /**
@@ -76,9 +85,10 @@ export const PERSONNEL_HEADERS = [
  *
  * `parade_response_id` is read here, unlike before: two company-days in the observed data
  * carry two submissions, and the id is what distinguishes them so the later one can win.
+ * `vacant` is true for an appointment the parade state filed as `-`: vacant, not unfiled.
  * @type {string[]}
  */
-export const ROSTER_HEADERS = ['parade_response_id', 'date', 'session', 'company', 'role', 'rank', 'name'];
+export const ROSTER_HEADERS = ['parade_response_id', 'date', 'session', 'company', 'role', 'rank', 'name', 'vacant'];
 
 /**
  * Headers read from "Report Sick FormSG Responses".

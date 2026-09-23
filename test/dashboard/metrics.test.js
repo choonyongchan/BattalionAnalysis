@@ -18,7 +18,7 @@ import {
   longMcTrend,
   unitRates,
 } from '../../src/model/metrics.js';
-import { DUTY_CLASS } from '../../src/model/classify.js';
+import { DUTY_CLASS, MC_MA } from '../../src/model/classify.js';
 import { UNASSIGNED } from '../../src/model/domain.js';
 import { buildEpisodes } from '../../src/model/episodes.js';
 import { toRecords } from '../../src/data/records.js';
@@ -70,7 +70,9 @@ describe('company rates', () => {
   test('a big company with more absence can still have the lower rate', () => {
     const strengthRows = toRecords(
       strengthValues([
+        { date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
         { date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: '1', unit_type: 'PLATOON', total_strength: 100 },
+        { date: '2026-06-22', session: 'FPS', company: 'Hercules', platoon: 'Company', unit_type: 'Company', total_strength: 10 },
         { date: '2026-06-22', session: 'FPS', company: 'Hercules', platoon: '1', unit_type: 'PLATOON', total_strength: 10 },
       ]),
       STRENGTH_HEADERS,
@@ -99,6 +101,75 @@ describe('company rates', () => {
     expect(braves.per100).toBeLessThan(hercules.per100);
     // Sorted by rate, so the worst company is first regardless of its size.
     expect(rates[0].company).toBe('Hercules');
+  });
+
+  test('a company that files no platoon breakdown is still rated, and does not skew the rest', () => {
+    // Hercules files one line, which is what it does in the observed data. Both companies
+    // are at exactly 10 absences per 100 strength, so neither is an outlier and the
+    // battalion baseline is 10% — reading Hercules' absences against Archer's strength
+    // would double that baseline and score Archer as an outlier for being average.
+    const strengthRows = toRecords(
+      strengthValues([
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', platoon: '1', unit_type: 'PLATOON', total_strength: 50 },
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', platoon: '2', unit_type: 'PLATOON', total_strength: 50 },
+        { date: '2026-06-22', session: 'FPS', company: 'Hercules', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
+      ]),
+      STRENGTH_HEADERS,
+      TABS.STRENGTH
+    );
+    const absentees = (company) =>
+      Array.from({ length: 10 }, (_, index) => ({
+        date: '2026-06-22', session: 'FPS', company, platoon: '1',
+        four_d: company + index, name: company + index,
+        reason_category: 'Att C', reason: 'MC',
+      }));
+    const personnelRows = toRecords(
+      personnelValues([...absentees('Archer'), ...absentees('Hercules')]),
+      PERSONNEL_HEADERS,
+      TABS.PERSONNEL
+    );
+
+    const rates = companyRates(personnelRows, strengthRows, DUTY_CLASS.ATT_C);
+    const archer = rates.filter((row) => row.company === 'Archer')[0];
+    const hercules = rates.filter((row) => row.company === 'Hercules')[0];
+
+    expect(hercules.paxDays).toBe(100);
+    expect(hercules.per100).toBe(10);
+    expect(archer.paxDays).toBe(100);
+    expect(archer.per100).toBe(10);
+    // Both sit on the battalion rate, so neither is flagged and neither z-score is extreme.
+    expect(archer.z).toBeCloseTo(0, 6);
+    expect(hercules.z).toBeCloseTo(0, 6);
+    expect(rates.some((row) => row.isOutlier)).toBe(false);
+  });
+
+  test('rows naming no soldier are counted as unattributable, not as one phantom soldier', () => {
+    const strengthRows = toRecords(
+      strengthValues([
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 50 },
+      ]),
+      STRENGTH_HEADERS,
+      TABS.STRENGTH
+    );
+    const personnelRows = toRecords(
+      personnelValues(
+        [0, 1, 2].map(() => ({
+          date: '2026-06-22', session: 'FPS', company: 'Archer', platoon: '1',
+          four_d: '', name: '', reason_category: 'Att C', reason: 'MC',
+        }))
+      ),
+      PERSONNEL_HEADERS,
+      TABS.PERSONNEL
+    );
+
+    const archer = companyRates(personnelRows, strengthRows, DUTY_CLASS.ATT_C)[0];
+    // `dutyCountsOn` reports these as `unattributable` and counts none of them as a
+    // soldier; the rate table has to agree rather than fold all three into the one
+    // soldier whose identity key is ''.
+    expect(archer.days).toBe(0);
+    expect(archer.people).toBe(0);
+    expect(archer.unattributable).toBe(3);
   });
 });
 
@@ -190,6 +261,16 @@ describe('episode counts split volume from headcount', () => {
     );
     expect(counts.byCompany).toEqual([{ key: 'Braves', episodes: 2, soldiers: 1 }]);
     expect(counts.total).toEqual({ episodes: 2, soldiers: 1, perSoldier: 2 });
+  });
+
+  test('MC and MA together count both, as the MC / MA page and the Overview tile do', () => {
+    const episodes = episodesOf([
+      { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+      { date: '2026-06-03', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'MA', start_date: '2026-06-03', end_date: '2026-06-03', reason: 'Dental' },
+      { date: '2026-06-04', session: 'FPS', company: 'Braves', platoon: '2', four_d: 'B', name: 'B', reason_category: 'MA', start_date: '2026-06-04', end_date: '2026-06-04', reason: 'Physio' },
+    ]);
+    expect(episodeCounts(episodes, DUTY_CLASS.ATT_C).total.episodes).toBe(1);
+    expect(episodeCounts(episodes, MC_MA).total).toEqual({ episodes: 3, soldiers: 2, perSoldier: 1.5 });
   });
 
   test('two soldiers in one company are two episodes and two soldiers', () => {

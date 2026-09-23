@@ -3,25 +3,31 @@
  * is trending.
  *
  * Two clocks run on this page and they answer different questions. `selectedDate` names
- * one parade — the timeline and the tile row describe that single day and ignore the
+ * one parade — the filing chips and the tile row describe that single day and ignore the
  * range entirely, because "today's strength" should never sit under a span a reader has
  * to remember is active. `dateFrom`/`dateTo` bound every trend and the Sankey; null on
  * both means "all data", the long-standing default. `company` narrows every panel on the
  * page to one company, or `ALL` for the whole battalion — applied once, upstream, by
  * `scopeDataset`, so each rate is still a company's own numerator over its own
  * denominator.
+ *
+ * The selected parade also anchors the one forward-looking section: presence by rank tier,
+ * then projected % present over the next week from the dates each absence states
+ * (`model/projection.js`), and the list of who is due back when.
  */
 
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { company, dataset, dateFrom, dateTo, selectedDate } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
+import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { Segmented, SCOPE_OPTIONS } from '../components/Segmented.jsx';
 import { PageControls } from '../components/PageControls.jsx';
+import { FilingChips } from '../components/FilingChips.jsx';
 import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../format.js';
-import { ChartCard, Line, Sankey, Timeline } from '../charts/index.js';
+import { ChartCard, Line, Sankey } from '../charts/index.js';
 import { COMPANIES } from '../model/domain.js';
-import { DUTY_CLASS } from '../model/classify.js';
+import { DUTY_CLASS, MC_MA } from '../model/classify.js';
 import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../model/calendarMarks.js';
 import { datesPresent, battalionStrength, dutyCountsOn } from '../model/metrics.js';
@@ -29,34 +35,13 @@ import { eachDay } from '../model/dateRange.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions, submissionTrend } from '../model/formsg.js';
 import { filingsOn, toFilings } from '../model/submissions.js';
-import { dutyTrend, presentTrend } from '../model/strength.js';
+import { dutyTrend, presentTrend, tierPresence } from '../model/strength.js';
+import { DEFAULT_PROJECTION_DAYS, projectedStrength, returnsToDuty } from '../model/projection.js';
+import { addDays } from '../model/dates.js';
 import { reportSickFlow } from '../model/sankey.js';
 
 /** @type {string} Session every "today" figure and trend describes. */
 const SESSION = 'FPS';
-
-/**
- * Sums two same-shaped trends series-by-series, matching series by name.
- * @param {{dates: string[], series: Array<{name: string, values: number[]}>}} a One trend.
- * @param {{dates: string[], series: Array<{name: string, values: number[]}>}} b The other.
- * @returns {{dates: string[], series: Array<{name: string, values: number[]}>}} The sum.
- */
-function combineTrends(a, b) {
-  return {
-    dates: a.dates,
-    series: a.series.map((seriesA) => {
-      const seriesB = b.series.find((entry) => entry.name === seriesA.name) || { values: [] };
-      return {
-        name: seriesA.name,
-        values: seriesA.values.map((value, index) => {
-          const other = seriesB.values[index];
-          if (value === null && other === null) return null;
-          return (value || 0) + (other || 0);
-        }),
-      };
-    }),
-  };
-}
 
 /**
  * Counts distinct soldiers reporting sick on one parade (`Report Sick` category), for the
@@ -140,10 +125,15 @@ export function Overview() {
   // do not shrink when a company that filed on fewer days is picked.
   const paradeDates = useMemo(() => datesPresent(full.strength), [full.strength]);
 
+  // Follow the newest parade: on first open, and when a background refresh brings a new
+  // day while the viewer was looking at the latest one. A date picked by hand stays put.
+  const latestSeen = useRef(null);
   useEffect(() => {
-    if (!selectedDate.value && paradeDates.length > 0) {
-      selectedDate.value = paradeDates[paradeDates.length - 1];
+    const latest = paradeDates[paradeDates.length - 1] || null;
+    if (!selectedDate.value || selectedDate.value === latestSeen.current) {
+      selectedDate.value = latest;
     }
+    latestSeen.current = latest;
   }, [paradeDates]);
 
   const today = selectedDate.value || paradeDates[paradeDates.length - 1] || null;
@@ -206,11 +196,11 @@ export function Overview() {
 
       <PageControls min={paradeDates[0] || today} max={paradeDates[paradeDates.length - 1] || today} />
 
-      <Card title="Today's First Parade State" note="One dot per company, at its filing time">
-        <Timeline
-          entries={filingEntries}
-          deadline={{ minutes: 8 * 60, label: '08:00' }}
-        />
+      <Card
+        title="Today's First Parade State"
+        note="Lit in the company's colour once its first parade state reaches the database; the time is when it was received"
+      >
+        <FilingChips entries={filingEntries} />
       </Card>
 
       <TileRow>
@@ -221,11 +211,21 @@ export function Overview() {
         <Tile label="Reported sick" value={fmtInt(reportedSickToday)} foot="FormSG" />
         <Tile
           label="MC / MA"
-          value={fmtInt(countOf(duty, DUTY_CLASS.ATT_C) + countOf(duty, DUTY_CLASS.MA))}
+          value={fmtInt(MC_MA.reduce((sum, dutyClass) => sum + countOf(duty, dutyClass), 0))}
         />
         <Tile label="On status" value={fmtInt(countOf(duty, DUTY_CLASS.STATUS))} />
       </TileRow>
       <Coverage>{coverageLine}</Coverage>
+
+      <TierCard strength={data.strength} date={today} scoped={Boolean(scopedCompany)} />
+
+      <div class="band">
+        <h2 class="pagehead__title" style="font-size:21px">
+          Next {DEFAULT_PROJECTION_DAYS} Days
+        </h2>
+      </div>
+
+      <ProjectionCards data={data} date={today} holidays={holidays} />
 
       <div class="band">
         <h2 class="pagehead__title" style="font-size:21px">
@@ -273,15 +273,10 @@ export function Overview() {
         coverage={trendCoverage}
         unit="per 100"
         trendFn={(scope) => {
-          const mc = dutyTrend(data.personnel, data.strength, DUTY_CLASS.ATT_C, trendDates, {
+          const trend = dutyTrend(data.personnel, data.strength, MC_MA, trendDates, {
             scope,
             session: SESSION,
           });
-          const ma = dutyTrend(data.personnel, data.strength, DUTY_CLASS.MA, trendDates, {
-            scope,
-            session: SESSION,
-          });
-          const trend = combineTrends(mc, ma);
           return { ...trend, weekends, holidays: rangeHolidays };
         }}
       />
@@ -347,6 +342,119 @@ function SankeyCard({ personnel, episodes, submissions, from, to }) {
           ? ' A status outcome naming several restrictions is counted under each — the Status branch\'s outflow can exceed its inflow.'
           : ''}
       </Coverage>
+    </>
+  );
+}
+
+/**
+ * Formats one tier cell: the percentage present, then present over strength.
+ * @param {{strength: ?number, present: ?number, percent: ?number}} tier A tier total.
+ * @returns {string} e.g. '91% (111/122)', or '—' when the tier was not stated.
+ */
+function tierCell(tier) {
+  if (tier.strength === null) {
+    return '—';
+  }
+  return fmtPercent(tier.percent / 100) + ' (' + fmtInt(tier.present) + '/' + fmtInt(tier.strength) + ')';
+}
+
+/**
+ * Presence by rank tier on one parade: a row per company that filed, under a battalion row.
+ * @param {{strength: Array<!Object>, date: string, scoped: boolean}} props The scoped
+ *     Strength Data, the parade date, and whether one company is selected (no battalion row).
+ * @returns {!preact.VNode} The card.
+ */
+function TierCard({ strength, date, scoped }) {
+  const tiers = tierPresence(strength, date, SESSION);
+  const rows = [
+    ...(scoped ? [] : [{ unit: 'Battalion', tiers: tiers.battalion }]),
+    ...tiers.byCompany.map((entry) => ({ unit: entry.company, tiers: entry.tiers })),
+  ];
+
+  return (
+    <Card title="Presence by Rank" note="Officers, WOSpecs and enlistees present, as the parade state splits them">
+      {tiers.byCompany.length === 0 ? (
+        <EmptyState>No parade state filed for {fmtDate(date)}.</EmptyState>
+      ) : (
+        <DataTable
+          columns={[
+            { key: 'unit', label: 'Unit' },
+            { key: 'officer', label: 'Officers', numeric: true },
+            { key: 'wospec', label: 'WOSpecs', numeric: true },
+            { key: 'enlistee', label: 'Enlistees', numeric: true },
+          ]}
+          rows={rows.map((row) => ({
+            unit: row.unit,
+            ...Object.fromEntries(row.tiers.map((tier) => [tier.key, tierCell(tier)])),
+          }))}
+          rowKey={(row) => row.unit}
+        />
+      )}
+      {tiers.companiesWithoutSplit.length > 0 ? (
+        <Coverage>No rank split stated by {tiers.companiesWithoutSplit.join(', ')}.</Coverage>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * The forward view: projected % present over the coming days, and who is due back when.
+ * @param {{data: !Object, date: string, holidays: Array<!Object>}} props The scoped
+ *     dataset, the parade the projection starts from, and the public holidays.
+ * @returns {!preact.VNode} The two cards.
+ */
+function ProjectionCards({ data, date, holidays }) {
+  const end = addDays(date, DEFAULT_PROJECTION_DAYS);
+  const weekends = weekendBands(date, end);
+  const windowHolidays = holidaysIn(holidays, date, end);
+  const base = projectedStrength(data.personnel, data.strength, date, { session: SESSION });
+  const returns = returnsToDuty(data.personnel, date, SESSION);
+
+  const coverage =
+    'Projected from the parade state for ' +
+    fmtDate(date) +
+    ' (' +
+    fmtFraction(base.companiesReporting.length, COMPANIES.length) +
+    ' companies) using the dates each MC and leave states; MA, others and status do not keep a soldier off parade, and nobody new is assumed to fall sick. ' +
+    (base.openEnded > 0
+      ? fmtInt(base.openEnded) + ' on MC or leave with no return date are held out for the whole week.'
+      : 'Every MC and leave states a return date.');
+
+  return (
+    <>
+      <TrendCard
+        title="Projected % present"
+        coverage={coverage}
+        unit="%"
+        trendFn={(scope) => ({
+          ...projectedStrength(data.personnel, data.strength, date, { session: SESSION, scope }),
+          weekends,
+          holidays: windowHolidays,
+        })}
+      />
+      <Card title="Returning to Duty" note="Everyone on MC or leave on this parade, soonest back first">
+        {returns.length === 0 ? (
+          <EmptyState>Nobody is listed on MC or leave on {fmtDate(date)}.</EmptyState>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Name' },
+              { key: 'company', label: 'Company' },
+              { key: 'platoon', label: 'Platoon' },
+              { key: 'category', label: 'Category' },
+              { key: 'from', label: 'From' },
+              { key: 'back', label: 'Back on' },
+            ]}
+            rows={returns.map((row) => ({
+              ...row,
+              name: (row.rank + ' ' + row.name).trim(),
+              from: fmtDate(row.from),
+              back: row.backOn ? fmtDate(row.backOn) : 'Not stated',
+            }))}
+            rowKey={(row) => row.company + row.key}
+          />
+        )}
+      </Card>
     </>
   );
 }

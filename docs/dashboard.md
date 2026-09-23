@@ -8,10 +8,10 @@ Seven pages, in the order a commander reads them:
 
 | Page | Answers |
 |---|---|
-| **Overview** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? |
+| **Overview** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? Are my officers there? How many will I have next week, and who is back when? |
 | **Report sick** · **MC / MA** · **Status** | Is it getting worse? Which company? Which platoon? Who, most often? |
 | **Soldier** | How often has this man been out, and how long was each episode? |
-| **ORBAT** | Who is on duty today, from the CDO down? |
+| **ORBAT** | Who is on duty today, from the CDO down, and which chairs were filed vacant? |
 | **Settings** | What is the dashboard reading, and how much of the battalion does it cover? |
 
 The three medical pages are one layout asked three times. That is deliberate: the layout
@@ -39,11 +39,14 @@ this repo or passes through the deploy workflow.
 The page asks one Vercel Function on the same deployment for everything it charts:
 
 ```
-browser  --GET, Authorization: Bearer <password>-->  /api/dashboard  --SELECT as dashboard_read-->  Neon
+browser  --POST password-->  /api/session  --Set-Cookie: session (HttpOnly, 12h)-->  browser
+browser  --GET, session cookie-->  /api/dashboard  --SELECT as dashboard_read-->  Neon
 ```
 
-The password is checked **there**, in [`api/dashboard.ts`](../api/dashboard.ts), against
-`DASHBOARD_PASSWORD` before a single row is read. A wrong password gets a 401 and no data.
+The password is checked **there**, in [`api/session.ts`](../api/session.ts), against
+`DASHBOARD_PASSWORD` before any session is issued, and
+[`api/dashboard.ts`](../api/dashboard.ts) checks the session before a single row is read.
+A wrong password gets a 401, no cookie and no data.
 A password checked in the browser instead would be decoration: the page's JavaScript is
 public, so anyone could read past the check.
 
@@ -109,8 +112,9 @@ copy forever if you can help it.
 
 ### Rotating it
 
-Change `DASHBOARD_PASSWORD` on Vercel and redeploy. Open dashboards keep their data until
-reloaded, then ask for the new one.
+Change `DASHBOARD_PASSWORD` on Vercel and redeploy. Every open session was signed with the
+old password, so all of them stop verifying at once: each dashboard is refused on its next
+background refresh, within a minute, and asks for the new password.
 
 ## Running it locally
 
@@ -197,15 +201,45 @@ their own date range. The dashboard shows the stated figure, records which sourc
 duration came from, and flags the disagreement — it does not quietly pick a winner. See
 `ParserRows`' header for why deriving the count would be wrong exactly where it fires.
 
+## Looking ahead
+
+The Overview's **Next 7 Days** section is the one forward-looking view. It starts from the
+selected parade's reported present strength and moves it by the dates each MC and leave line
+states: a soldier is back the day after his end date, and an absence booked ahead takes him
+away from its start date. Only MC (`Att C`) and `Off/Leave` count. MA is a timed appointment
+later the same day, so the soldier is on parade; counting MA and Others put 51 soldiers off
+parade on 22 Sep 26 against the 28 the strength figures reported, while MC and leave gave 23.
+An absence with no end date is held out for the week and counted in the coverage line. Nobody
+new is assumed to fall sick, so the line is a floor on what the next parades will show, not
+a forecast of illness. Back-tested from 21 Sep 26, it gave 93.6% for 22 Sep; the parade
+reported 93.4%. The rules are in `src/model/projection.js`.
+
+**Presence by Rank** splits the day's presence into officers, WOSpecs and enlistees from the
+strength block's own split, so a company at 90% missing half its officers shows it.
+
 ## What is deliberately not here
 
 - **No NRIC.** Neon has no NRIC column, and `SingPass Validated NRIC` and `Masked NRIC` are
   never requested.
 - **No writes from the charts.** `/api/dashboard` connects as a role that can only read. The
-  one page that writes, Parade States, writes through `/api/parade` (see below).
-- **No stored password.** It is held in the page's memory for the life of the tab — not in
-  `localStorage`, not in `sessionStorage`, not in a cookie — so a reload asks again and
-  closing the tab ends the session.
+  one page that writes, Deposit, writes through `/api/parade` (see below).
+- **No stored password.** The password is sent once, to `/api/session`, and what comes
+  back is a signed, 12-hour session token in an `HttpOnly`, `Secure`, `SameSite=Strict`
+  cookie. Nothing in the page can read it — not injected script, not the person at the
+  keyboard — and the password itself is never written to `localStorage`, `sessionStorage`
+  or a cookie. A refresh therefore does not ask again, while the standing risk is only
+  that an unlocked browser can open the dashboard until the session expires. **Lock**
+  ends it at the server, and rotating `DASHBOARD_PASSWORD` ends every open session,
+  because the token is signed with it.
+- **No per-viewer identity.** The token names nobody: there are still no accounts, no
+  record of who looked, and no way to revoke one viewer.
+  While open, the page re-reads `/api/dashboard` every minute the tab is visible and as
+  soon as a hidden tab is shown again, swapping the data in without leaving the page. That
+  read is also where an ended session is noticed: the login screen returns.
+- **No FormSG doctor outcome.** `report_sick_formsg.outcome`, `mc_days` and the five
+  status columns are mapped at ingest but arrive blank on every submission (0 of 39 in
+  Sep 26): soldiers file the form before they see the MO. Nothing charts them until the form
+  collects the outcome, and `genuine` is never charted, for the reason below.
 - **No inference about intent.** The leaderboards rank by episode count and days lost.
   They report what was recorded and nothing else — a soldier managing a chronic condition
   and a soldier avoiding training appear the same way, and the difference is a
@@ -214,21 +248,25 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
   for, which is a poor trade for a ranking two plain columns already give you.
 - **No session filter.** Every parade state stored is a first parade, so a control
   offering one option is furniture.
-- **Date range, scoped to the aggregates only.** The range control (a two-click month
-  grid, plus Last 7 days / Last 14 days / This month / All) bounds every trend, rate and
+- **Date range, scoped to the aggregates only.** The range control is one calendar
+  button in the page bar, beside the company switch (All plus the five companies, one
+  segmented row). Its popover holds the quick ranges (This week / Last week / This month /
+  Last month / All) beside a two-click month grid; closed, it shows only the committed
+  range. It bounds every trend, rate and
   leaderboard so they all cover one named span; it defaults to All. The Today view and
   the masthead describe a single parade and ignore the range, and the parade-date
   selector's options narrow to the dates inside it — so a "today" figure never sits
   under a span the reader has to remember.
 
-## Parade States
+## Deposit
 
-`src/pages/ParadeStates.jsx`, at `#/parade-states`. A clerk pastes a parade state WhatsApp
+`src/pages/Deposit.jsx`, at `#/deposit`. A clerk pastes a parade state WhatsApp
 missed and presses Deposit; below it, every stored message (WhatsApp or manual) is listed
 newest first with its key, status, source and receipt time, and can be edited or deleted.
 
 - **Where it writes.** `/api/parade` on the same Vercel deployment (`src/data/parade.js`), with
-  the unlock password as a bearer token, checked against the same `DASHBOARD_PASSWORD`.
+  the session cookie from `/api/session`. A cookie-authorised write must be same-origin, so
+  a forged cross-site form cannot deposit or delete.
 - **Statuses.** Parsed (rows exist), Needs review (the parser doubted a line; the reasons are
   shown under the status), Rejected (a last parade state, or not a parade state), Pending
   (stored, never parsed). Rules in `src/model/paradeMessages.js`.

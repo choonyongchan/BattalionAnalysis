@@ -165,6 +165,12 @@ async function strengthTab(db: Db): Promise<Row[]> {
       unitType: strengthRows.unitType,
       totalStrength: strengthRows.totalStrength,
       totalPresent: strengthRows.totalPresent,
+      officerStrength: strengthRows.officerStrength,
+      officerPresent: strengthRows.officerPresent,
+      wospecStrength: strengthRows.wospecStrength,
+      wospecPresent: strengthRows.wospecPresent,
+      enlisteeStrength: strengthRows.enlisteeStrength,
+      enlisteePresent: strengthRows.enlisteePresent,
     })
     .from(strengthRows)
     .innerJoin(paradeSubmissions, eq(strengthRows.paradeResponseId, paradeSubmissions.paradeResponseId))
@@ -178,6 +184,12 @@ async function strengthTab(db: Db): Promise<Row[]> {
     unit_type: r.unitType,
     total_strength: r.totalStrength,
     total_present: r.totalPresent,
+    officer_strength: r.officerStrength,
+    officer_present: r.officerPresent,
+    wospec_strength: r.wospecStrength,
+    wospec_present: r.wospecPresent,
+    enlistee_strength: r.enlisteeStrength,
+    enlistee_present: r.enlisteePresent,
   }));
 }
 
@@ -230,7 +242,9 @@ async function personnelTab(db: Db): Promise<Row[]> {
 }
 
 /**
- * Reads the Command Roster tab; a vacant appointment is left out, as the Sheet left it out.
+ * Reads the Command Roster tab, a vacant appointment included and marked `vacant`: a
+ * company that filed `PDS 3: -` has told us the chair is empty, which is not the same as
+ * not filing it.
  *
  * @param db The read-only handle.
  * @returns Records keyed by Sheet header.
@@ -246,10 +260,10 @@ async function rosterTab(db: Db): Promise<Row[]> {
       unitLabel: commandRosterRows.unitLabel,
       rank: commandRosterRows.rank,
       name: commandRosterRows.name,
+      isVacant: commandRosterRows.isVacant,
     })
     .from(commandRosterRows)
     .innerJoin(paradeSubmissions, eq(commandRosterRows.paradeResponseId, paradeSubmissions.paradeResponseId))
-    .where(eq(commandRosterRows.isVacant, false))
     .orderBy(asc(paradeSubmissions.date), asc(commandRosterRows.id));
   return rows.map((r) => ({
     parade_response_id: r.id,
@@ -259,6 +273,7 @@ async function rosterTab(db: Db): Promise<Row[]> {
     role: rosterRole(r.roleKind, r.unitLabel),
     rank: r.rank,
     name: r.name,
+    vacant: r.isVacant,
   }));
 }
 

@@ -8,15 +8,15 @@
  * The grouping is the reading order, not a taxonomy. Overview answers "what is the
  * battalion today". The three medical pages answer the same four questions of report
  * sick, MC and status in turn. People is for looking one person or one duty roster up.
- * Parade States and Settings sit at the foot: the first is where a clerk deposits or
+ * Deposit and Settings sit at the foot: the first is where a clerk deposits or
  * corrects a parade state, the second is what the rest are reading from.
  */
 
 import {
+  DepositIcon,
   McMaIcon,
   OrbatIcon,
   OverviewIcon,
-  ParadeStatesIcon,
   ReportSickIcon,
   SettingsIcon,
   SoldierIcon,
@@ -28,7 +28,7 @@ import { McMa } from '../pages/McMa.jsx';
 import { Status } from '../pages/Status.jsx';
 import { Soldier } from '../pages/Soldier.jsx';
 import { Orbat } from '../pages/Orbat.jsx';
-import { ParadeStates } from '../pages/ParadeStates.jsx';
+import { Deposit } from '../pages/Deposit.jsx';
 import { Settings } from '../pages/Settings.jsx';
 
 /**
@@ -79,11 +79,11 @@ export const ROUTES = [
     icon: OrbatIcon,
   },
   {
-    path: '/parade-states',
-    component: ParadeStates,
-    label: 'Parade States',
+    path: '/deposit',
+    component: Deposit,
+    label: 'Deposit',
     group: '',
-    icon: ParadeStatesIcon,
+    icon: DepositIcon,
   },
   {
     path: '/settings',
@@ -101,7 +101,7 @@ export const DEFAULT_ROUTE = '/overview';
  * Groups the routes for the sidebar, keeping declaration order.
  *
  * Routes with no group name render as one ungrouped block at the foot of the rail, which
- * is where Parade States and Settings belong: reachable, but not part of the reading order.
+ * is where Deposit and Settings belong: reachable, but not part of the reading order.
  * @returns {!Array<{name: string, routes: !Array<!Object>}>} Groups in sidebar order.
  */
 export function navGroups() {

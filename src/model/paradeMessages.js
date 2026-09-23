@@ -1,5 +1,5 @@
 /**
- * How a stored parade-state message reads on the Parade States page: where it came from,
+ * How a stored parade-state message reads on the Deposit page: where it came from,
  * what became of it, and when it arrived.
  *
  * The rules mirror `lib/pipeline.ts`: a parsed message carries its `paradeResponseId`, a

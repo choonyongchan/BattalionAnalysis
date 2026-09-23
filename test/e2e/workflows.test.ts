@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Db } from '../../db/index.ts';
 import { loadAll } from '../../src/data/feed.js';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../src/data/parade.js';
+import { endSession, startSession } from '../../src/data/session.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
 import { battalionStrength, dutyCountsOn } from '../../src/model/metrics.js';
 import { MESSAGE_STATUS, toMessageRows } from '../../src/model/paradeMessages.js';
@@ -19,7 +20,7 @@ import { loadConfig } from '../../whatsapp/src/config.js';
 import { createMessageHandler } from '../../whatsapp/src/index.js';
 import { createIngestor } from '../../whatsapp/src/ingest.js';
 import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
-import { DASHBOARD_PASSWORD, INGEST_SECRET, startApp, withOrigin, type RunningApp } from '../support/app.ts';
+import { DASHBOARD_PASSWORD, INGEST_SECRET, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
 import { FAKE_NRIC, SICK_SPECS, webhookRequest } from '../support/formsg.ts';
 import { allEntries, companyTotals, expectedKey, renderParadeState, type ParadeSpec, type Section } from '../support/paradeState.ts';
@@ -27,7 +28,6 @@ import { DOUBTFUL_EDITS, SCENARIO_DATE, SCENARIOS } from '../support/scenarios.t
 
 const SPECS = SCENARIOS.map(({ spec }) => spec);
 const GROUP = '120363000000000000@g.us';
-const AUTH = { Authorization: `Bearer ${DASHBOARD_PASSWORD}` };
 const E2E_TIMEOUT_MS = DB_TIMEOUT_MS * 4;
 
 /*
@@ -35,12 +35,24 @@ const E2E_TIMEOUT_MS = DB_TIMEOUT_MS * 4;
  * loosely here; each test asserts the shape it relies on.
  */
 const page = {
-  deposit: (text: string): Promise<any> => depositMessage(AUTH, text),
-  list: (auth: Record<string, string> = AUTH): Promise<any[]> => listMessages(auth),
-  get: (id: number): Promise<any> => getMessage(AUTH, id),
-  edit: (id: number, text: string): Promise<any> => editMessage(AUTH, id, text),
-  remove: (id: number): Promise<any> => deleteMessage(AUTH, id),
+  deposit: (text: string): Promise<any> => depositMessage(text),
+  list: (): Promise<any[]> => listMessages(),
+  get: (id: number): Promise<any> => getMessage(id),
+  edit: (id: number, text: string): Promise<any> => editMessage(id, text),
+  remove: (id: number): Promise<any> => deleteMessage(id),
 };
+
+/**
+ * Unlocks the dashboard the way the login screen does: the password once, for a session
+ * cookie the jar in `withOrigin` then carries like a browser.
+ *
+ * @param origin The running app.
+ * @param password The password to send; defaults to the right one.
+ * @returns Nothing.
+ */
+async function unlock(origin: string, password = DASHBOARD_PASSWORD): Promise<void> {
+  await withOrigin(origin, () => startSession(password));
+}
 
 /**
  * What the dashboard should show for one parade, counted off the specs filed for it.
@@ -72,7 +84,7 @@ function expectedDashboard(specs: ParadeSpec[]) {
  * @returns The loaded records and the computed figures.
  */
 async function dashboardOn(origin: string, date: string) {
-  const data: any = await withOrigin(origin, () => loadAll(DASHBOARD_PASSWORD));
+  const data: any = await withOrigin(origin, () => loadAll());
   const strength: any = battalionStrength(data.strength, date, 'FPS');
   const duties: any = dutyCountsOn(data.personnel, date, 'FPS');
   const bySection = Object.fromEntries(
@@ -120,10 +132,16 @@ describe.skipIf(!hasTestDb)('end to end', () => {
   beforeEach(async () => {
     db = await resetTestDb();
     app = startApp(db, { now: () => new Date(`${SCENARIO_DATE}T00:30:00Z`) });
+    // Every test but the refusals opens the dashboard first, as a viewer does.
+    forgetCookies(app.origin);
   }, DB_TIMEOUT_MS);
-  afterEach(() => app.stop());
+  afterEach(() => {
+    forgetCookies(app.origin);
+    app.stop();
+  });
 
   test('WhatsApp group → bridge → intake → database → dashboard numbers', async () => {
+    await unlock(app.origin);
     const config = loadConfig({ env: { WA_GROUP_ID: GROUP, PARADE_API_URL: `${app.origin}/api/parade`, PARADE_INGEST_SECRET: INGEST_SECRET } });
     const { logger, records } = recordingLogger();
     const ingestor = createIngestor({ url: config.paradeApiUrl, secret: config.ingestSecret });
@@ -151,7 +169,8 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     expect((await dashboardOn(app.origin, SCENARIO_DATE)).shown).toEqual(expectedDashboard(SPECS));
   }, E2E_TIMEOUT_MS);
 
-  test('Parade States page: deposit, review, correct, move and delete, as the dashboard sees it', async () => {
+  test('Deposit page: deposit, review, correct, move and delete, as the dashboard sees it', async () => {
+    await unlock(app.origin);
     const [first, second] = [SPECS[1]!, SPECS[2]!];
     const doubtful = DOUBTFUL_EDITS[0]!.edit(renderParadeState(first));
     const moved: ParadeSpec = { ...first, date: '2026-09-19' };
@@ -187,6 +206,7 @@ describe.skipIf(!hasTestDb)('end to end', () => {
   }, E2E_TIMEOUT_MS);
 
   test('FormSG webhook → database → report-sick records on the dashboard, without the NRIC', async () => {
+    await unlock(app.origin);
     for (const spec of SICK_SPECS) {
       const signed = webhookRequest(spec);
       const response = await fetch(`${app.origin}/api/formsg`, { method: 'POST', headers: signed.headers, body: await signed.text() });
@@ -199,10 +219,21 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     expect(JSON.stringify(data)).not.toContain(FAKE_NRIC);
   }, E2E_TIMEOUT_MS);
 
-  test('the dashboard and the Parade States page refuse a wrong password', async () => {
+  test('a wrong password opens no session, and no session reads nothing', async () => {
     await withOrigin(app.origin, async () => {
-      await expect(loadAll('wrong-password')).rejects.toThrow('That password is not right.');
-      await expect(page.list({ Authorization: 'Bearer wrong-password' })).rejects.toThrow();
+      await expect(startSession('wrong-password')).rejects.toThrow('That password is not right.');
+      // The refusal left no cookie behind, so both routes are still shut.
+      await expect(loadAll()).rejects.toThrow('The session has ended. Enter the password again.');
+      await expect(page.list()).rejects.toThrow();
+    });
+  }, E2E_TIMEOUT_MS);
+
+  test('Lock ends the session at the server: what it opened no longer reads', async () => {
+    await unlock(app.origin);
+    expect((await withOrigin(app.origin, () => loadAll())) as any).toBeTruthy();
+    await withOrigin(app.origin, () => endSession());
+    await withOrigin(app.origin, async () => {
+      await expect(loadAll()).rejects.toThrow('The session has ended. Enter the password again.');
     });
   }, E2E_TIMEOUT_MS);
 });

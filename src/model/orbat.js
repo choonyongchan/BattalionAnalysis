@@ -4,7 +4,7 @@
  *
  * Coverage in the real data is poor, and this module says so rather than drawing a
  * confident empty tree: Archer files a roster on 32 days, Stallion 29, Hercules 33 but
- * COS only, Cougar 3 rows in total, and Braves and Scorpion file none, ever. A company
+ * COS only, Cougar 3 rows in total, and Braves files none, ever. A company
  * that filed nothing renders as a single leaf saying so — that absence is the finding,
  * and hiding the company would hide it.
  *
@@ -20,6 +20,9 @@ import { toIsoDate, toText } from './values.js';
 
 /** @type {string} What an unfilled role's node reads. */
 const NOT_FILED = 'Not filed';
+
+/** @type {string} What a role filed as vacant reads. */
+const VACANT = 'Vacant';
 
 /** @type {string} The leaf label for a company with no roster on the date. */
 const NO_ROSTER_LABEL = 'No roster filed';
@@ -59,8 +62,9 @@ function latestRosterRows_(rows, isoDate, company, session) {
  * @param {string} isoDate Parade date.
  * @param {string} company Company name.
  * @param {string=} session Parade session; defaults to 'FPS'.
- * @returns {Array<{role: string, rank: string, name: string, filed: boolean}>} One entry
- *     per role in COMMAND_ROLES order.
+ * @returns {Array<{role: string, rank: string, name: string, filed: boolean,
+ *     vacant: boolean}>} One entry per role in COMMAND_ROLES order; a role filed as `-`
+ *     is filed and vacant.
  */
 export function rosterOn(rows, isoDate, company, session) {
   const targetSession = session || 'FPS';
@@ -68,30 +72,66 @@ export function rosterOn(rows, isoDate, company, session) {
   latestRosterRows_(rows, isoDate, company, targetSession).forEach((row) => {
     const role = toText(row.role);
     if (COMMAND_ROLES.includes(role)) {
-      byRole.set(role, { rank: toText(row.rank), name: toText(row.name) });
+      byRole.set(role, { rank: toText(row.rank), name: toText(row.name), vacant: isVacant_(row) });
     }
   });
 
   return COMMAND_ROLES.map((role) => {
     const filled = byRole.get(role);
     return filled
-      ? { role, rank: filled.rank, name: filled.name, filed: true }
-      : { role, rank: '', name: '', filed: false };
+      ? { role, rank: filled.rank, name: filled.name, filed: true, vacant: filled.vacant }
+      : { role, rank: '', name: '', filed: false, vacant: false };
   });
 }
 
 /**
+ * Whether a roster row is an appointment the parade state filed as vacant (`-`).
+ *
+ * The feed carries the flag as a JSON boolean; the string form is accepted too, so a
+ * record built from text cells reads the same.
+ * @param {!Object} row A Command Roster record.
+ * @returns {boolean} True when the appointment was filed vacant.
+ */
+function isVacant_(row) {
+  return row.vacant === true || toText(row.vacant).toLowerCase() === 'true';
+}
+
+/**
+ * Every appointment filed vacant on one parade, battalion-wide.
+ *
+ * Read from the latest submission per company, like the tree, but across every PDS
+ * sub-unit a company names — Hercules' `PDSMED` included — rather than only PDS1 to PDS4,
+ * so a vacant chair outside the four platoons is still counted.
+ * @param {Array<!Object>} rows Normalised Command Roster records.
+ * @param {string} isoDate Parade date.
+ * @param {string=} session Parade session; defaults to 'FPS'.
+ * @returns {Array<{company: string, role: string}>} Vacant appointments, in COMPANIES
+ *     order and then in the order filed.
+ */
+export function vacanciesOn(rows, isoDate, session) {
+  const targetSession = session || 'FPS';
+  return COMPANIES.flatMap((company) =>
+    latestRosterRows_(rows, isoDate, company, targetSession)
+      .filter(isVacant_)
+      .map((row) => ({ company, role: toText(row.role) }))
+  );
+}
+
+/**
  * Builds one node for a role.
- * @param {{role: string, rank: string, name: string, filed: boolean}} entry A roster row.
+ * @param {{role: string, rank: string, name: string, filed: boolean, vacant: boolean}}
+ *     entry A roster row.
  * @param {Array<!Object>=} children The node's children.
  * @returns {!Object} A tree node.
  */
 function roleNode_(entry, children) {
+  const name = entry.vacant ? VACANT : entry.filed ? entry.rank + ' ' + entry.name : NOT_FILED;
   return {
-    name: entry.filed ? entry.rank + ' ' + entry.name : NOT_FILED,
+    name,
     role: entry.role,
     rank: entry.rank,
     filed: entry.filed,
+    vacant: entry.vacant,
     children: children || [],
   };
 }
@@ -120,10 +160,10 @@ function companyTree_(rows, isoDate, company, session) {
 /**
  * The order-of-battle tree for one date: one company, or the whole battalion.
  *
- * Without `options.company`, the root is '40 SAR' with all six companies as children in
+ * Without `options.company`, the root is '40 SAR' with all five companies as children in
  * COMPANIES order — including the ones that filed nothing, which collapse to a single
  * leaf rather than a hollow command chain. That leaf is the point: a battalion-level view
- * that quietly omitted Braves and Scorpion would look complete and would not be.
+ * that quietly omitted Braves would look complete and would not be.
  * @param {Array<!Object>} rows Normalised Command Roster records.
  * @param {string} isoDate Parade date.
  * @param {{company?: string, session?: string}=} options Restrict to one company, and/or

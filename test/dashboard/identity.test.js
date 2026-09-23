@@ -55,4 +55,20 @@ describe('identityKey', () => {
   test('neither field present yields no key', () => {
     expect(identityKey('', '')).toBe('');
   });
+
+  test('a placeholder 4D falls back to the name, exactly as a personnel row does', () => {
+    // "NIL" alone stood for thirty different people in FormSG. Keying on it makes them one
+    // soldier, and makes that soldier a different one from the personnel row for the same
+    // person, which resolves the placeholder and keys on the name.
+    ['NIL', 'Nil', 'NA', 'N/A', 'NONE', '-', 'REC'].forEach((placeholder) => {
+      expect(identityKey(placeholder, 'Marcus Tan')).toBe('NAME:MARCUS TAN');
+      expect(identityKey(placeholder, 'Marcus Tan')).toBe(
+        identityOf({ four_d: placeholder, name: 'Marcus Tan' }).key
+      );
+    });
+  });
+
+  test('a placeholder 4D with no name yields no key, not a key shared by everyone', () => {
+    expect(identityKey('NIL', '')).toBe('');
+  });
 });

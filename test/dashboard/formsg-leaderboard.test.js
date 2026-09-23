@@ -68,10 +68,10 @@ describe('submissionRateByCompany', () => {
       { date: '2026-07-20', session: 'FPS', company: 'Archer', unit_type: 'Company', total_strength: 100 },
     ]);
     const ranked = submissionRateByCompany(submissions, strength);
-    expect(ranked).toHaveLength(6);
-    const scorpion = ranked.find((r) => r.company === 'Scorpion');
-    expect(scorpion.count).toBe(0);
-    expect(scorpion.per100).toBeNull();
+    expect(ranked).toHaveLength(5);
+    const hercules = ranked.find((r) => r.company === 'Hercules');
+    expect(hercules.count).toBe(0);
+    expect(hercules.per100).toBeNull();
   });
 
   test('ranks by rate, not by raw count', () => {

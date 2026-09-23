@@ -37,6 +37,35 @@ export const DUTY_CLASS = {
 };
 
 /**
+ * The duty classes the MC / MA page reads together.
+ *
+ * MC and MA are one question for a commander — "who is out for a medical reason" — and
+ * the Overview's MC / MA tile has always counted both. The page carries the same
+ * definition from here, so the two cannot drift apart.
+ * @type {!Array<string>}
+ */
+export const MC_MA = [DUTY_CLASS.ATT_C, DUTY_CLASS.MA];
+
+/**
+ * Reads a duty-class argument as a list, so every view can be about one class or several.
+ * @param {string|!Array<string>} wanted One duty class, or several.
+ * @returns {!Array<string>} The classes, as a list.
+ */
+export function dutyList(wanted) {
+  return Array.isArray(wanted) ? wanted : [wanted];
+}
+
+/**
+ * Whether a duty class is one a view is about.
+ * @param {string|!Array<string>} wanted One duty class, or several.
+ * @param {string} dutyClass The class a row or episode carries.
+ * @returns {boolean} True when it matches.
+ */
+export function isDuty(wanted, dutyClass) {
+  return Array.isArray(wanted) ? wanted.includes(dutyClass) : wanted === dutyClass;
+}
+
+/**
  * Maps a Personnel Data `reason_category` to a duty class.
  *
  * Mirrors `REASON_CATEGORIES` in `src/parser/ParserSchema.js`. A category outside this

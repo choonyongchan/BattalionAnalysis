@@ -1,8 +1,8 @@
 /**
  * The frame every page renders inside.
  *
- * It owns three things and no data: whether the narrow-screen rail is open, the page
- * heading, and the skip link. Pages receive nothing from it — they read `state.js`
+ * It owns four things and no data: whether the narrow-screen rail is open, the page
+ * heading, the skip link, and the background refresh that keeps an open page current. Pages receive nothing from it — they read `state.js`
  * directly — so a page can be opened, read and tested without the frame around it.
  */
 
@@ -12,6 +12,7 @@ import { Sidebar } from './Sidebar.jsx';
 import { Logo } from './Logo.jsx';
 import { MenuIcon } from './icons.jsx';
 import { routeAt } from './routes.js';
+import { startAutoRefresh } from './auth.js';
 
 /**
  * Renders the sidebar, the top bar shown on narrow screens, and the content column.
@@ -28,6 +29,9 @@ export function Shell({ children }) {
   useEffect(() => {
     setRailOpen(false);
   }, [location]);
+
+  // The shell exists only while the dashboard is unlocked, so it owns the polling.
+  useEffect(() => startAutoRefresh(), []);
 
   return (
     <div class="shell">

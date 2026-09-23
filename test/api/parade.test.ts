@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { handle, type Deps } from '../../api/parade.ts';
+import { SESSION_COOKIE, SESSION_TTL_MS, issueSession } from '../../lib/session.ts';
 import type { Db } from '../../db/index.ts';
 import { DASHBOARD_PASSWORD, INGEST_SECRET, paradeDeps } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
@@ -31,16 +32,25 @@ const UNTOUCHABLE: Deps = {
   ingestSecret: INGEST_SECRET,
 };
 
+/** A session cookie the dashboard would hold, and the clock it was issued against. */
+const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
+const SESSION = issueSession(DASHBOARD_PASSWORD, SESSION_TTL_MS, NOW);
+
 /**
  * Builds a request.
  *
  * @param method The HTTP method.
- * @param options Token, query string and JSON (or raw) body.
+ * @param options Token, session cookie, origin, query string and JSON (or raw) body.
  * @returns The request.
  */
-function request(method: string, options: { token?: string; query?: string; body?: unknown } = {}): Request {
+function request(
+  method: string,
+  options: { token?: string; session?: string; origin?: string; query?: string; body?: unknown } = {}
+): Request {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  if (options.session) headers.cookie = `${SESSION_COOKIE}=${options.session}`;
+  if (options.origin) headers.origin = options.origin;
   return new Request(URL + (options.query ?? ''), {
     method,
     headers,
@@ -85,6 +95,21 @@ describe('requests refused before the store', () => {
   test('a 405 names the allowed methods', async () => {
     const response = await handle(request('PATCH', { token: DASHBOARD_PASSWORD }), UNTOUCHABLE);
     expect(response.headers.get('Allow')).toContain('DELETE');
+  });
+
+  test.each([
+    ['a session from another site', request('DELETE', { session: SESSION, origin: 'https://evil.test', query: '?id=1' })],
+    ['a session with no origin at all', request('DELETE', { session: SESSION, query: '?id=1' })],
+    ['a session posting from another site', request('POST', { session: SESSION, origin: 'https://evil.test', body: { body: GOOD } })],
+  ] as const)('%s cannot write: the cookie alone is not enough', async (_name, incoming) => {
+    expect((await handle(incoming, { ...UNTOUCHABLE, now: () => NOW }).then((r) => r.status))).toBe(401);
+  });
+
+  test('an expired session is refused, and a rotated password ends one early', async () => {
+    const expired = request('GET', { session: SESSION });
+    expect((await handle(expired, { ...UNTOUCHABLE, now: () => NOW + SESSION_TTL_MS + 1 })).status).toBe(401);
+    const rotated = { ...UNTOUCHABLE, dashboardPassword: 'the-new-password', now: () => NOW };
+    expect((await handle(request('GET', { session: SESSION }), rotated)).status).toBe(401);
   });
 
   test('a store failure is a 500 that does not echo personnel text', async () => {

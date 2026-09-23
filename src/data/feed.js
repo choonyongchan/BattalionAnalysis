@@ -1,15 +1,11 @@
 /**
  * Reads the dashboard's data from Neon through `/api/dashboard`.
  *
- * One GET carrying the password, one JSON reply holding every tab, shaped as the tabs the
- * retired Google Sheet held (`lib/dashboard.ts#loadTabs`). The password is checked on the
- * server (`api/dashboard.ts`), which is the whole point: a check in this file would be a
- * check the caller could skip by reading the page source.
- *
- * The password goes in the `Authorization` header, never the URL: a query string lands in
- * browser history, referrer headers and request logs. It is held in memory by `app/auth.js`
- * and passed in on each call, so it is never written to `localStorage`, `sessionStorage`,
- * or a cookie.
+ * One GET, one JSON reply holding every tab, shaped as the tabs the retired Google Sheet
+ * held (`lib/dashboard.ts#loadTabs`). The caller carries no credential: the session cookie
+ * `api/session.ts` issued goes with the request, and `api/dashboard.ts` checks it. That
+ * check is on the server, which is the whole point — a check in this file would be one the
+ * caller could skip by reading the page source.
  */
 
 import { toRecords } from './records.js';
@@ -33,7 +29,7 @@ const API = '/api/dashboard';
  * @type {!Object<number, string>}
  */
 const HTTP_ERRORS = {
-  401: 'That password is not right.',
+  401: 'The session has ended. Enter the password again.',
   503:
     'The dashboard is not configured yet. Set DASHBOARD_PASSWORD and DASHBOARD_DATABASE_URL ' +
     'on Vercel.',
@@ -62,15 +58,14 @@ const OPTIONAL_TAB_SPECS = [
 
 /**
  * Requests every tab from the read route.
- * @param {string} password The password the viewer typed.
  * @returns {!Promise<{tabs: !Object<string, !Array<!Array<*>>>, generatedAt: string}>} Tab
  *     name to values.
- * @throws {Error} If the password is wrong, or the route is unreachable or failing.
+ * @throws {Error} If the session is over, or the route is unreachable or failing.
  */
-async function fetchTabs(password) {
+async function fetchTabs() {
   let response;
   try {
-    response = await fetch(API, { headers: { Authorization: 'Bearer ' + password } });
+    response = await fetch(API, { credentials: 'same-origin' });
   } catch {
     throw new Error('Could not reach the dashboard. Check the network connection and try again.');
   }
@@ -82,6 +77,7 @@ async function fetchTabs(password) {
         'The dashboard could not load its data (HTTP ' + response.status + reference + ').'
     );
     error.code = body.error || String(response.status);
+    error.status = response.status;
     throw error;
   }
   return { tabs: body.tabs || {}, generatedAt: body.generatedAt || '' };
@@ -114,11 +110,10 @@ function readOptional(tabs, spec, notes) {
  * A required tab whose header row no longer matches throws from `toRecords` naming the
  * tab and the missing column. Optional tabs never throw; an empty one is recorded in
  * `notes` and shown on the Settings page.
- * @param {string} password The password the viewer typed.
  * @returns {!Promise<!Object>} Records per tab, plus `generatedAt` and `notes`.
  */
-export function loadAll(password) {
-  return fetchTabs(password).then(({ tabs, generatedAt }) => {
+export function loadAll() {
+  return fetchTabs().then(({ tabs, generatedAt }) => {
     const notes = {};
     const data = { generatedAt, notes, available: {} };
 

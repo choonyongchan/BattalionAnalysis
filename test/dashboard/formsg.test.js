@@ -43,6 +43,27 @@ describe('toSubmissions', () => {
     expect(submission.reportSickType).toBe('FFI');
   });
 
+  test('a placeholder 4D is no identity: people who typed NIL, Nil or Rec stay apart', () => {
+    const submissions = toSubmissions([
+      row({ '[Myinfo] Name': 'ALPHA ONE', '4D Number (REC Only)': 'NIL' }),
+      row({ '[Myinfo] Name': 'BRAVO TWO', '4D Number (REC Only)': 'Nil' }),
+      row({ '[Myinfo] Name': 'CHARLIE THREE', '4D Number (REC Only)': 'Rec' }),
+      row({ '[Myinfo] Name': 'DELTA FOUR', '4D Number (REC Only)': ' n/a ' }),
+    ]);
+    expect(submissions.map((s) => s.key)).toEqual([
+      'NAME:ALPHA ONE',
+      'NAME:BRAVO TWO',
+      'NAME:CHARLIE THREE',
+      'NAME:DELTA FOUR',
+    ]);
+    expect(submissionCounts(submissions).total.soldiers).toBe(4);
+  });
+
+  test('a real 4D keys the soldier, so the Sankey can join it to the parade state', () => {
+    const [submission] = toSubmissions([row({ '4D Number (REC Only)': ' 3203 ' })]);
+    expect(submission.key).toBe('4D:3203');
+  });
+
   test('a row with no type column reads as blank, not undefined', () => {
     const bare = row({});
     delete bare['Report Sick Type'];
@@ -71,9 +92,9 @@ describe('submissionTrend', () => {
     ]);
     const trend = submissionTrend(submissions, [], ['2026-07-20'], { scope: 'companies' });
     const archer = trend.series.find((s) => s.name === 'Archer');
-    const scorpion = trend.series.find((s) => s.name === 'Scorpion');
+    const hercules = trend.series.find((s) => s.name === 'Hercules');
     expect(archer.values[0]).toBe(2);
-    expect(scorpion.values[0]).toBe(0);
+    expect(hercules.values[0]).toBe(0);
   });
 
   test('battalion scope returns a rate per 100 accountable', () => {

@@ -79,7 +79,8 @@
   letter-spacing: -0.224px;
 }
 
-.button--toggle[aria-pressed='true'] {
+.button--toggle[aria-pressed='true'],
+.button--toggle[aria-checked='true'] {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
@@ -135,21 +136,79 @@ select.field {
 }
 
 .daterange__trigger {
-  min-width: 14rem;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
+.daterange__trigger svg {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+/* Strip the native button chrome inside the popover; `:where` keeps this below every
+   class rule, so the day and preset states still paint over it. */
+:where(.daterange__popover) button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* Quick ranges on the left, the month grid on the right; stacked on a phone. */
 .daterange__popover {
   position: absolute;
   top: calc(100% + var(--space-xs));
   left: 0;
   z-index: 30;
+  display: flex;
+  gap: var(--space-md);
   padding: var(--space-md);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-float);
+}
+
+.daterange__presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 8rem;
+  padding-right: var(--space-md);
+  border-right: 1px solid var(--hairline-soft);
+}
+
+.daterange__preset {
+  padding: 7px var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.daterange__preset:hover {
+  background: var(--hairline-soft);
+}
+
+.daterange__preset[aria-pressed='true'] {
+  background: var(--accent-wash);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .daterange__popover {
+    flex-direction: column;
+  }
+
+  .daterange__presets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 0 0 var(--space-sm);
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline-soft);
+  }
 }
 
 .calendar {
@@ -245,18 +304,6 @@ select.field {
   color: var(--ink-faint);
 }
 
-.calendar__clear {
-  padding: 7px var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.calendar__clear:hover {
-  border-color: var(--accent);
-}
-
 /* A labelled control: the field-label-plus-input pattern used by every filter. */
 .control {
   display: flex;
@@ -283,12 +330,27 @@ select.field {
   z-index: 15;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
   padding: var(--space-sm) 0;
   background: var(--canvas-sunken);
   border-bottom: 1px solid var(--hairline-soft);
+}
+
+/* Six companies in one segmented row; on a phone the row scrolls rather than wraps. */
+.pagecontrols__companies {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pagecontrols__companies .toggle {
+  flex-wrap: nowrap;
+}
+
+.pagecontrols__companies .button--toggle {
+  white-space: nowrap;
 }
 
 /*

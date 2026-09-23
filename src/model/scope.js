@@ -12,8 +12,8 @@
  * Two inputs are handled apart from the rest. The raw FormSG rows carry no clean company
  * column — the company is a free-text "Unit & Coy" answer that only `toSubmissions`
  * resolves — so submissions are scoped after normalisation by `scopeSubmissions`. The
- * parade-state filing records behind the Overview timeline are never scoped here at all:
- * `model/submissions.js`'s `filingsOn` always pads to six companies because absence is
+ * parade-state filing records behind the Overview filing chips are never scoped here at all:
+ * `model/submissions.js`'s `filingsOn` always pads to every company because absence is
  * the point, so that view is filtered at its output instead.
  *
  * Every function here is pure.
@@ -78,8 +78,8 @@ export function scopeSubmissions(submissions, company) {
 /**
  * Filters filing entries (from `model/submissions.js`'s `filingsOn`) to one company.
  *
- * `filingsOn` always returns all six companies so the Overview timeline can show which
- * did not file; when a single company is selected the timeline shows just that lane.
+ * `filingsOn` always returns every company so the Overview filing chips can show which
+ * did not file; when a single company is selected the row shows just that chip.
  * @param {Array<!Object>} entries Entries from `filingsOn`, each with a `company` field.
  * @param {string} company A `COMPANIES` entry, or `ALL_COMPANIES`.
  * @returns {Array<!Object>} The same array for `ALL`; otherwise the one matching entry.

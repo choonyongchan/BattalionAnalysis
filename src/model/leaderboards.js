@@ -46,7 +46,7 @@ function episodeIsPermanent_(episode) {
 /**
  * The most common count-based leaderboards: report sick, MA, and similar.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
- * @param {string} dutyClass Duty class to rank, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {number=} limit Rows to return; defaults to 10.
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     platoon: string, platoonInferred: boolean, count: number}>} Most episodes first,
@@ -74,7 +74,7 @@ export function topByCount(episodes, dutyClass, limit) {
 /**
  * The MC leaderboard: soldier, company, platoon, number of MCs, and total days.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
- * @param {string} dutyClass Duty class to rank, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {number=} limit Rows to return; defaults to 10.
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     platoon: string, platoonInferred: boolean, count: number, days: number,
@@ -154,7 +154,7 @@ export function topByStatusCount(episodes, limit) {
  * regardless of level instead of branching between two metrics-layer names.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to rank, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {string} level 'company' or 'platoon'.
  * @returns {Array<!Object>} Units ranked by rate, highest first.
  */

@@ -1,5 +1,5 @@
 /**
- * How stored parade-state messages read on the Parade States page.
+ * How stored parade-state messages read on the Deposit page.
  */
 import { describe, expect, test } from 'bun:test';
 import {

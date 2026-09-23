@@ -14,7 +14,7 @@
  * Every function here is pure.
  */
 
-import { classify } from './classify.js';
+import { classify, dutyList, isDuty } from './classify.js';
 import { COMPANIES, UNIT_TYPE_COMPANY } from './domain.js';
 import { identityOf } from './identity.js';
 import { battalionStrength, dutyCountsOn } from './metrics.js';
@@ -38,6 +38,89 @@ function companyRowsOn_(strengthRows, isoDate, session) {
 }
 
 
+
+/**
+ * The three rank tiers a parade state splits its strength into, in command order.
+ *
+ * `key` is the column prefix in Strength Data (`officer_strength`, `officer_present`, ...).
+ * @type {Array<{key: string, label: string}>}
+ */
+export const RANK_TIERS = [
+  { key: 'officer', label: 'Officers' },
+  { key: 'wospec', label: 'WOSpecs' },
+  { key: 'enlistee', label: 'Enlistees' },
+];
+
+/**
+ * One tier's strength and presence off a company row, or null when the row does not state it.
+ * @param {!Object} row A `unit_type === 'Company'` Strength Data record.
+ * @param {string} key A RANK_TIERS key.
+ * @returns {?{strength: number, present: number}} The stated pair, or null.
+ */
+function tierOf_(row, key) {
+  const strength = toNumber(row[key + '_strength']);
+  const present = toNumber(row[key + '_present']);
+  return strength === null || present === null ? null : { strength, present };
+}
+
+/**
+ * Sums stated tier pairs into one entry with its percentage present.
+ * @param {{key: string, label: string}} tier The tier.
+ * @param {Array<?{strength: number, present: number}>} pairs One pair per company; null
+ *     where that company did not state this tier.
+ * @returns {{key: string, label: string, strength: ?number, present: ?number,
+ *     percent: ?number}} The tier's totals; all null when no company stated it.
+ */
+function tierTotal_(tier, pairs) {
+  const stated = pairs.filter((pair) => pair !== null);
+  if (stated.length === 0) {
+    return { key: tier.key, label: tier.label, strength: null, present: null, percent: null };
+  }
+  const strength = stated.reduce((total, pair) => total + pair.strength, 0);
+  const present = stated.reduce((total, pair) => total + pair.present, 0);
+  return {
+    key: tier.key,
+    label: tier.label,
+    strength,
+    present,
+    percent: strength > 0 ? (present / strength) * 100 : null,
+  };
+}
+
+/**
+ * Presence by rank tier on one parade: battalion-wide, and for each company that filed.
+ *
+ * A company can be at 90% and still be missing half its officers, which the total hides.
+ * A tier a company did not state is left out of that tier's battalion sum rather than read
+ * as zero, and the companies that stated no split at all are named.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string=} session Parade session; defaults to 'FPS'.
+ * @returns {{battalion: Array<!Object>, byCompany: Array<{company: string,
+ *     tiers: Array<!Object>}>, companiesWithoutSplit: string[]}} Tier totals in
+ *     RANK_TIERS order, battalion-wide and per company in COMPANIES order.
+ */
+export function tierPresence(strengthRows, isoDate, session) {
+  const rows = companyRowsOn_(strengthRows, isoDate, session || 'FPS');
+  const byName = new Map(rows.map((row) => [toText(row.company), row]));
+  const filed = COMPANIES.filter((company) => byName.has(company));
+
+  const byCompany = filed.map((company) => ({
+    company,
+    tiers: RANK_TIERS.map((tier) => tierTotal_(tier, [tierOf_(byName.get(company), tier.key)])),
+  }));
+  const battalion = RANK_TIERS.map((tier) =>
+    tierTotal_(tier, filed.map((company) => tierOf_(byName.get(company), tier.key)))
+  );
+
+  return {
+    battalion,
+    byCompany,
+    companiesWithoutSplit: byCompany
+      .filter((entry) => entry.tiers.every((tier) => tier.strength === null))
+      .map((entry) => entry.company),
+  };
+}
 
 /**
  * Per-company accountable and present strength on one parade, keyed by company.
@@ -107,7 +190,7 @@ export function presentTrend(strengthRows, dates, options) {
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {string} isoDate Parade date.
  * @param {string} session Parade session.
- * @param {string} dutyClass Duty class to count, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to count, from DUTY_CLASS.
  * @returns {!Map<string, number>} Company name to distinct-soldier count.
  */
 function dutyCountsByCompany_(personnelRows, isoDate, session, dutyClass) {
@@ -117,7 +200,7 @@ function dutyCountsByCompany_(personnelRows, isoDate, session, dutyClass) {
       (row) =>
         toIsoDate(row.date) === isoDate &&
         toText(row.session) === session &&
-        classify(row) === dutyClass
+        isDuty(dutyClass, classify(row))
     )
     .forEach((row) => {
       const identity = identityOf(row);
@@ -142,7 +225,7 @@ function dutyCountsByCompany_(personnelRows, isoDate, session, dutyClass) {
  * comparison is a rate rather than a count.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to trend, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to trend, from DUTY_CLASS.
  * @param {string[]} dates Parade dates to plot, oldest first.
  * @param {{scope?: string, session?: string, asRate?: boolean}=} options `scope` is
  *     'battalion' (default) or 'companies'; `asRate` divides by strength, defaulting true.
@@ -185,7 +268,9 @@ export function dutyTrend(personnelRows, strengthRows, dutyClass, dates, options
         name: 'Battalion',
         values: dates.map((date) => {
           const strength = battalionStrength(strengthRows, date, session);
-          const count = dutyCountsOn(personnelRows, date, session).counts[dutyClass] || 0;
+          // Several classes sum, as the Overview's MC / MA tile has always summed them.
+          const counts = dutyCountsOn(personnelRows, date, session).counts;
+          const count = dutyList(dutyClass).reduce((sum, name) => sum + (counts[name] || 0), 0);
           if (!asRate) {
             return count;
           }

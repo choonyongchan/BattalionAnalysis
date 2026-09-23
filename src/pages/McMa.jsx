@@ -4,7 +4,7 @@
  * long-term MC cases are running, and where soldiers are actually being seen.
  */
 
-import { DUTY_CLASS, extractSymptoms } from '../model/classify.js';
+import { extractSymptoms, isDuty, MC_MA } from '../model/classify.js';
 import {
   CategoryPage,
   DutyTrend,
@@ -20,8 +20,12 @@ import {
   useCategory,
 } from './shared/category.jsx';
 
-/** @type {string} The duty class this page is about. */
-const DUTY = DUTY_CLASS.ATT_C;
+/**
+ * The duty classes this page is about: MC (Att C) and MA together, the same pair the
+ * Overview's MC / MA tile counts. Defined in `classify.js` so the two cannot drift.
+ * @type {!Array<string>}
+ */
+const DUTY = MC_MA;
 
 /**
  * The MC/MA page.
@@ -36,7 +40,7 @@ export function McMa() {
       <DutyTrend title="MC / MA Trend" data={data} dutyClass={DUTY} range={range} />
       <PlatoonHeatmap cells={episodeCells(range.episodes, DUTY)} />
       <ReasonsOverTime
-        rows={episodes.filter((e) => e.dutyClass === DUTY)}
+        rows={episodes.filter((e) => isDuty(DUTY, e.dutyClass))}
         dateOf={(e) => e.startDate}
         labelsOf={(e) => (e.symptoms.length > 0 ? e.symptoms : extractSymptoms(e.reasons.join(' ')))}
         range={range}

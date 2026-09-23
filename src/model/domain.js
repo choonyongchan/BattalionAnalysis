@@ -9,10 +9,11 @@
  */
 
 /**
- * The six companies the battalion tracks, in parade order.
+ * The five companies the battalion tracks, in parade order. Scorpion is gone, as it is
+ * from `companyEnum` in `db/schema.ts`.
  * @type {string[]}
  */
-export const COMPANIES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Scorpion', 'Hercules'];
+export const COMPANIES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Hercules'];
 
 /**
  * The platoons a per-platoon rate is drawn for.

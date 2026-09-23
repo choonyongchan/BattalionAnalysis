@@ -14,6 +14,7 @@ import './theme/controls.css';
 import './theme/shell.css';
 import './theme/components.css';
 import { Router } from './app/Router.jsx';
+import { resume } from './app/auth.js';
 import * as state from './app/state.js';
 
 /*
@@ -30,3 +31,4 @@ if (import.meta.env.DEV) {
 }
 
 render(<Router />, document.getElementById('app'));
+resume();

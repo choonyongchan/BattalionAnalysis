@@ -24,7 +24,6 @@ import {
   HeatmapChart,
   LineChart,
   SankeyChart,
-  TreeChart,
 } from 'echarts/charts';
 import {
   GridComponent,
@@ -43,17 +42,16 @@ use([
 
   // Series types, one per component under this directory.
   BarChart, // Bar, GroupedBar, Histogram
-  CustomChart, // Timeline lanes, Heatmap's inferred-cell hatch
+  CustomChart, // Heatmap's inferred-cell hatch
   HeatmapChart, // Heatmap
   LineChart, // Line (and the empty carrier series that holds its annotations)
   SankeyChart, // Sankey
-  TreeChart, // Tree
 
   // Components.
   GridComponent,
   LegendComponent,
   MarkAreaComponent, // weekend bands
-  MarkLineComponent, // public holidays, the Timeline's deadline
+  MarkLineComponent, // public holidays
   TooltipComponent,
   VisualMapComponent, // the Heatmap's sequential ramp
 ]);

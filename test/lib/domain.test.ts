@@ -17,7 +17,10 @@ import {
   paradeResponseId,
   unitTypeOf,
 } from '../../lib/domain.ts';
-import { normaliseName as dashboardNormaliseName } from '../../src/model/identity.js';
+import {
+  normaliseFourD as dashboardNormaliseFourD,
+  normaliseName as dashboardNormaliseName,
+} from '../../src/model/identity.js';
 
 describe('the vocabulary comes from the database schema', () => {
   test('lists the five companies, without Scorpion', () => {
@@ -158,6 +161,14 @@ describe('the identity key matches the dashboard', () => {
   for (const name of cases) {
     test(`agrees on ${JSON.stringify(name)}`, () => {
       expect(normaliseName(name)).toBe(dashboardNormaliseName(name));
+    });
+  }
+});
+
+describe('the server and the dashboard read the same 4D placeholders as no 4D', () => {
+  for (const fourD of ['NIL', 'Nil', 'na', 'N/A', 'none', '-', 'Rec', ' 2208 ', 'a1105']) {
+    test(`agrees on ${JSON.stringify(fourD)}`, () => {
+      expect(normaliseFourD(fourD) ?? '').toBe(dashboardNormaliseFourD(fourD));
     });
   }
 });

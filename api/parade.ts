@@ -7,9 +7,14 @@
  *   PUT    ?id=<n>       replace its text, re-parse    dashboard password
  *   DELETE ?id=<n>       delete it and its rows        dashboard password
  *
- * Callers send `Authorization: Bearer <secret>`. The WhatsApp relay holds
- * `PARADE_INGEST_SECRET` and may only POST; the dashboard sends the password its viewer
- * typed, checked against `DASHBOARD_PASSWORD`.
+ * The dashboard calls with the session cookie `api/session.ts` issued it, so the password
+ * never sits in the page. The WhatsApp relay is not a browser and holds no cookie: it sends
+ * `Authorization: Bearer <PARADE_INGEST_SECRET>` and may only POST. The password itself is
+ * still accepted as a bearer token, which is how a script or a test calls in.
+ *
+ * A cookie-authorised write must also come from this deployment's own origin. `SameSite=Strict`
+ * already keeps the cookie off cross-site requests, but a deposit or a delete is not something
+ * to leave resting on one browser setting, so the origin is checked too.
  *
  * Status codes are chosen for the relay, which retries a 5xx and nothing else: a message that
  * parsed, or that never will without a person correcting it, answers 2xx or 4xx.
@@ -18,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
 import { OpenAiParser } from '../lib/parser/llm.ts';
 import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
+import { hasSession, isSameOrigin } from '../lib/session.ts';
 import {
   deleteMessage,
   editMessage,
@@ -41,6 +47,8 @@ export interface Deps {
   store: Store;
   dashboardPassword: string | undefined;
   ingestSecret: string | undefined;
+  /** The clock, injected so tests hold a session's expiry. */
+  now?: () => number;
 }
 
 /** Who a request is from. */
@@ -64,15 +72,22 @@ function reply(status: number, body: unknown): Response {
 }
 
 /**
- * Identifies the caller from its bearer token.
+ * Identifies the caller: a dashboard session cookie, or a bearer secret.
  *
  * An unset secret matches nothing, so a deployment missing one fails closed for that caller.
+ * A session only counts on a request from this deployment's own origin when that request
+ * changes something; see the file header.
  *
  * @param request The incoming request.
- * @param deps The configured secrets.
- * @returns The caller, or null when the token matches no configured secret.
+ * @param deps The configured secrets and the clock.
+ * @returns The caller, or null when nothing it carries is accepted.
  */
 function callerOf(request: Request, deps: Deps): Caller | null {
+  const now = (deps.now ?? (() => Date.now()))();
+  if (hasSession(request, deps.dashboardPassword, now)) {
+    if (request.method === 'GET' || isSameOrigin(request)) return 'dashboard';
+    return null;
+  }
   const token = bearerToken(request);
   if (!token) return null;
   if (deps.dashboardPassword && sameSecret(token, deps.dashboardPassword)) return 'dashboard';

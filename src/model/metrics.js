@@ -18,7 +18,7 @@
  * Every function here is pure.
  */
 
-import { classify, DUTY_CLASS, isAbsent, isRestricted } from './classify.js';
+import { classify, DUTY_CLASS, isAbsent, isDuty, isRestricted } from './classify.js';
 import { identityOf } from './identity.js';
 import { COMPANIES, PLATOONS, UNASSIGNED, UNIT_TYPE_COMPANY } from './domain.js';
 import { inclusiveDaySpan } from './dates.js';
@@ -152,38 +152,53 @@ export function dutyCountsOn(personnelRows, isoDate, session) {
  *
  * Pax-days is the denominator that makes units of different sizes comparable: a platoon
  * of 55 observed over 4 days contributes 220 pax-days, and its absence person-days
- * divide into that. Company-total rows are excluded from the denominator so a company's
- * strength is not counted twice.
+ * divide into that.
+ *
+ * **The caller picks the denominator rows, because the grain decides them.** Both sides
+ * of the fraction have to describe the same population: whatever `keyOf` groups the
+ * personnel rows into, `strengthRows` must carry the strength of. Filtering here instead
+ * once cost `companyRates` a company — the rows were narrowed to the platoon breakdown
+ * while the absences were counted off every row, so a company filing one company-total
+ * line put its absences in the battalion numerator with no pax-days under them, doubling
+ * the baseline and scoring an average company at z = -2.5.
  *
  * `keyOf` decides the grain, which is the only difference between the company and
  * platoon views — both need the same arithmetic and the same z-score against the
  * battalion rate.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @param {Array<!Object>} strengthRows The Strength Data records holding this grain's
+ *     denominator, already narrowed by the caller.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
  * @param {function(!Object): string} keyOf Groups a row into a unit.
  * @returns {Array<!Object>} One entry per unit, with rate and z-score.
  * @private
  */
 function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
   const paxDays = new Map();
-  strengthRows
-    .filter((row) => toText(row.unit_type) !== UNIT_TYPE_COMPANY)
-    .forEach((row) => {
-      const key = keyOf(row);
-      paxDays.set(key, (paxDays.get(key) || 0) + (toNumber(row.total_strength) || 0));
-    });
+  strengthRows.forEach((row) => {
+    const key = keyOf(row);
+    paxDays.set(key, (paxDays.get(key) || 0) + (toNumber(row.total_strength) || 0));
+  });
 
   const personDays = new Map();
   // Distinct soldiers per unit, deduped on identity alone: the same soldier out on
   // ten parades is ten person-days but one person. This is the headcount the platoon
   // grid colours by, where `days` is the load a rate divides.
   const persons = new Map();
+  const unattributable = new Map();
   personnelRows
-    .filter((row) => classify(row) === dutyClass)
+    .filter((row) => isDuty(dutyClass, classify(row)))
     .forEach((row) => {
       const key = keyOf(row);
       const identity = identityOf(row);
+      // A row naming neither a 4D nor a soldier cannot be a person-day. Keying it anyway
+      // folds every such row in the unit into the single identity '', which reports one
+      // person-day for a soldier who does not exist and loses the real ones. Counted
+      // aside instead, exactly as `dutyCountsOn` counts it.
+      if (identity.key === '') {
+        unattributable.set(key, (unattributable.get(key) || 0) + 1);
+        return;
+      }
       const date = toIsoDate(row.date);
       const bucket = personDays.get(key) || new Set();
       bucket.add(identity.key + '@' + date);
@@ -193,9 +208,10 @@ function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
       persons.set(key, heads);
     });
 
-  const keys = new Set([...paxDays.keys(), ...personDays.keys()]);
+  const keys = new Set([...paxDays.keys(), ...personDays.keys(), ...unattributable.keys()]);
   const rows = Array.from(keys).map((key) => ({
     key,
+    unattributable: unattributable.get(key) || 0,
     days: (personDays.get(key) || new Set()).size,
     people: (persons.get(key) || new Set()).size,
     paxDays: paxDays.get(key) || 0,
@@ -233,7 +249,7 @@ function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
  * measure each platoon against a battalion it is not part of.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
  * @returns {Array<!Object>} One entry per company/platoon on the roll.
  */
 export function unitRates(personnelRows, strengthRows, dutyClass) {
@@ -241,7 +257,11 @@ export function unitRates(personnelRows, strengthRows, dutyClass) {
   const keyOf = (row) => toText(row.company) + '|' + toText(row.platoon);
   return rateRows_(
     personnelRows.filter(onRoll),
-    strengthRows.filter(onRoll),
+    // The breakdown rows, never the company total: at platoon grain the total would land
+    // on whichever key its own `platoon` cell happens to name and count that company's
+    // strength twice. `onRoll` already drops it in the observed data, where the cell reads
+    // 'Company'; excluding it by `unit_type` does not rely on that.
+    strengthRows.filter((row) => onRoll(row) && toText(row.unit_type) !== UNIT_TYPE_COMPANY),
     dutyClass,
     keyOf
   )
@@ -256,15 +276,26 @@ export function unitRates(personnelRows, strengthRows, dutyClass) {
  * Absence rate per company, with elevated companies flagged.
  *
  * A separate roll-up rather than a sum of `unitRates`, because the z-score has to be
- * recomputed at this level: a company's denominator is the sum of its platoons', and a
- * z-score computed per platoon says nothing about the company that contains them.
+ * recomputed at this level: a company's denominator is its own accountable strength, and
+ * a z-score computed per platoon says nothing about the company that contains them.
+ *
+ * The denominator is the company-total row, which is the only row that covers everyone
+ * the numerator counts. The platoon breakdown does not: a company files it or it does
+ * not — Hercules files one line in the samples — and its command element sits outside the
+ * platoon roll either way, so a company's absences would be read against a fraction of
+ * its strength, or against none at all.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
  * @returns {Array<!Object>} One entry per company, highest rate first.
  */
 export function companyRates(personnelRows, strengthRows, dutyClass) {
-  return rateRows_(personnelRows, strengthRows, dutyClass, (row) => toText(row.company))
+  return rateRows_(
+    personnelRows,
+    strengthRows.filter((row) => toText(row.unit_type) === UNIT_TYPE_COMPANY),
+    dutyClass,
+    (row) => toText(row.company)
+  )
     .filter((row) => row.key !== '')
     .map((row) => ({ ...row, company: row.key }))
     .sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
@@ -310,14 +341,14 @@ function episodeDays_(episode) {
 /**
  * The long episodes of one duty class: length greater than `minDays`.
  * @param {Array<!Object>} episodes Episodes to filter.
- * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to keep, from DUTY_CLASS.
  * @param {number} minDays Length a long episode must exceed.
  * @returns {Array<!Object>} The matching episodes.
  */
 function longEpisodes_(episodes, dutyClass, minDays) {
   return episodes.filter(
     (episode) =>
-      episode.dutyClass === dutyClass &&
+      isDuty(dutyClass, episode.dutyClass) &&
       episode.startDate &&
       episode.endDate &&
       episodeDays_(episode) > minDays
@@ -335,7 +366,7 @@ function longEpisodes_(episodes, dutyClass, minDays) {
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
  * @param {?string} fromIso First day to report, ISO 'yyyy-MM-dd'.
  * @param {?string} toIso Last day to report, ISO 'yyyy-MM-dd'.
- * @param {string} dutyClass Duty class to trend, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to trend, from DUTY_CLASS.
  * @param {number=} minDays Length a long episode must exceed; defaults to 4.
  * @returns {Array<{date: string, count: number}>} One entry per day, oldest first.
  */
@@ -388,13 +419,13 @@ export function longMcRoster(episodes, dutyClass, minDays = 4) {
  * soldier avoiding training appear the same way here, and the difference is a
  * conversation, not a number.
  * @param {Array<!Object>} episodes Episodes to rank.
- * @param {string} dutyClass Duty class to rank, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @returns {Array<!Object>} One entry per soldier, most episodes first.
  */
 export function leaderboard(episodes, dutyClass) {
   const bySoldier = new Map();
   episodes
-    .filter((episode) => episode.dutyClass === dutyClass)
+    .filter((episode) => isDuty(dutyClass, episode.dutyClass))
     .forEach((episode) => {
       const entry = bySoldier.get(episode.key) || {
         key: episode.key,
@@ -464,7 +495,7 @@ function countGroups_(episodes, keyOf) {
  * whole, never summed from `byCompany`: a soldier who files under two companies across
  * the range is one soldier to the battalion but a member of two company groups.
  * @param {Array<!Object>} episodes Episodes to count, any duty class.
- * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to keep, from DUTY_CLASS.
  * @returns {{byCompany: Array<{key: string, episodes: number, soldiers: number}>,
  *   byPlatoon: Array<{key: string, episodes: number, soldiers: number}>,
  *   total: {episodes: number, soldiers: number, perSoldier: ?number}}} Company groups
@@ -472,7 +503,7 @@ function countGroups_(episodes, keyOf) {
  *   episodes per soldier (null when no soldier was counted).
  */
 export function episodeCounts(episodes, dutyClass) {
-  const scoped = episodes.filter((episode) => episode.dutyClass === dutyClass);
+  const scoped = episodes.filter((episode) => isDuty(dutyClass, episode.dutyClass));
 
   const byCompany = countGroups_(scoped, (episode) => toText(episode.company)).sort(
     (a, b) => b.episodes - a.episodes || a.key.localeCompare(b.key)

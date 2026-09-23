@@ -2,73 +2,69 @@
  * The control bar every page opens with: which company, and which span of dates.
  *
  * It owns no data — it reads and writes the `company`, `dateFrom` and `dateTo` signals
- * directly, the same way `RangeControls` did before it, so the shell stays a function of
- * state and a page can still be rendered in isolation. The company select and the
- * date-range picker were previously a company `<select>` buried on ORBAT and a range row
- * copied into Overview and every category page; one bar now carries both, pinned to the
- * top of the content column so the reader can retarget the whole page without scrolling
- * back up.
+ * directly, so the shell stays a function of state and a page can still be rendered in
+ * isolation. It is pinned to the top of the content column so the reader can retarget the
+ * whole page without scrolling back up.
+ *
+ * The company is a segmented control rather than a dropdown: six short options fit in one
+ * row, every choice is visible without opening anything, and switching between two
+ * companies is one click instead of two. The date range is one calendar button; its quick
+ * ranges live inside the popover, so the bar carries two controls, not three.
  */
 
 import { company, dateFrom, dateTo } from '../app/state.js';
 import { COMPANIES } from '../model/domain.js';
 import { ALL_COMPANIES } from '../model/scope.js';
-import { isoToday, resolvePreset } from '../model/dateRange.js';
-import { DateRangePicker, PresetBar } from './DateRangePicker.jsx';
+import { DateRangePicker } from './DateRangePicker.jsx';
+import { Segmented } from './Segmented.jsx';
+
+/**
+ * The company options, "All" first, then parade order.
+ * @type {Array<{name: string, label: string}>}
+ */
+const COMPANY_OPTIONS = [
+  { name: ALL_COMPANIES, label: 'All' },
+  ...COMPANIES.map((name) => ({ name, label: name })),
+];
 
 /**
  * The sticky company + date-range bar.
- * @param {{min: string, max: string, showRange?: boolean}} props The selectable date
- *     bounds (a page passes its full, unscoped parade-date span so the range does not
- *     shrink when a company is picked), and whether to show the date-range controls —
- *     ORBAT and Soldier, which have no range, pass `false`.
+ * @param {{min: string, max: string, showRange?: boolean, children?: *}} props The
+ *     selectable date bounds (a page passes its full, unscoped parade-date span so the
+ *     range does not shrink when a company is picked); whether to show the date-range
+ *     control — ORBAT and Soldier, which have no range, pass `false`; and any page-own
+ *     control to sit in the same row, such as ORBAT's single-date picker.
  * @returns {!preact.VNode} The control bar.
  */
-export function PageControls({ min, max, showRange = true }) {
+export function PageControls({ min, max, showRange = true, children }) {
   return (
     <div class="pagecontrols">
-      <label class="control">
-        <span class="field__label">Company</span>
-        <select
-          class="field"
+      <div class="pagecontrols__companies">
+        <Segmented
+          options={COMPANY_OPTIONS}
           value={company.value}
-          onChange={(event) => {
-            company.value = event.currentTarget.value;
+          onChange={(name) => {
+            company.value = name;
           }}
-        >
-          <option value={ALL_COMPANIES}>40 SAR</option>
-          {COMPANIES.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
+          label="Company"
+          radio
+        />
+      </div>
 
       {showRange ? (
-        <div class="controlrow">
-          <DateRangePicker
-            min={min}
-            max={max}
-            from={dateFrom.value}
-            to={dateTo.value}
-            onChange={({ from, to }) => {
-              dateFrom.value = from;
-              dateTo.value = to;
-            }}
-          />
-          <PresetBar
-            from={dateFrom.value}
-            to={dateTo.value}
-            today={isoToday()}
-            onSelect={(preset) => {
-              const resolved = resolvePreset(preset, isoToday());
-              dateFrom.value = resolved.from;
-              dateTo.value = resolved.to;
-            }}
-          />
-        </div>
+        <DateRangePicker
+          min={min}
+          max={max}
+          from={dateFrom.value}
+          to={dateTo.value}
+          onChange={({ from, to }) => {
+            dateFrom.value = from;
+            dateTo.value = to;
+          }}
+        />
       ) : null}
+
+      {children}
     </div>
   );
 }

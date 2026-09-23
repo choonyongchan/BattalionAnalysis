@@ -67,6 +67,18 @@
   --seq-4: #4f95d3;
   --seq-5: #0f5fa6;
 
+  /* Company identity: each company's own pastel, for highlights that name a company
+     (the Overview filing chips, the ORBAT cards). Not a chart palette — the series ramp
+     above stays the one colour-blind-safe set for lines. Pastel fills carry dark ink in
+     both themes, and Hercules' black carries white, so one set serves light and dark. */
+  --company-archer: #fbe38e;
+  --company-braves: #f6b8b8;
+  --company-cougar: #b9e6c6;
+  --company-stallion: #bcd5f7;
+  --company-hercules: #1d1d1f;
+  --company-ink: #1d1d1f;
+  --company-hercules-ink: #ffffff;
+
   /* Semantic. Used for a reading's standing, never for a category. */
   --good: #1a7f37;
   --warning: #b7791f;

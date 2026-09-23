@@ -10,7 +10,7 @@ import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../src/data/records.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../src/data/tabs.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
-import { dutyTrend, presentTrend } from '../../src/model/strength.js';
+import { dutyTrend, presentTrend, tierPresence } from '../../src/model/strength.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.
@@ -62,13 +62,13 @@ describe('presentTrend companies scope', () => {
     expect(braves.values[0]).toBeNull();
   });
 
-  test('returns all six companies even when only one filed', () => {
+  test('returns all five companies even when only one filed', () => {
     const rows = strengthRows([
       { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
     ]);
     const trend = presentTrend(rows, ['2026-07-22'], { scope: 'companies' });
     expect(trend.series.map((series) => series.name).sort()).toEqual(
-      ['Archer', 'Braves', 'Cougar', 'Hercules', 'Scorpion', 'Stallion'].sort()
+      ['Archer', 'Braves', 'Cougar', 'Hercules', 'Stallion'].sort()
     );
   });
 });
@@ -127,5 +127,50 @@ describe('dutyTrend', () => {
       asRate: false,
     });
     expect(trend.series[0].values[0]).toBe(2);
+  });
+});
+
+describe('tierPresence', () => {
+  const tiers = (officer, wospec, enlistee) => ({
+    officer_strength: officer[0], officer_present: officer[1],
+    wospec_strength: wospec[0], wospec_present: wospec[1],
+    enlistee_strength: enlistee[0], enlistee_present: enlistee[1],
+  });
+  const company = (name, split) => ({
+    date: '2026-09-22', session: 'FPS', company: name, unit_type: 'Company', total_strength: 1, total_present: 1, ...split,
+  });
+
+  test('sums each tier across the companies that filed, with its percentage', () => {
+    const rows = strengthRows([
+      company('Archer', tiers([4, 2], [10, 9], [80, 72])),
+      company('Braves', tiers([6, 6], [10, 10], [70, 70])),
+    ]);
+    const { battalion, byCompany } = tierPresence(rows, '2026-09-22');
+    expect(battalion.map((tier) => [tier.label, tier.strength, tier.present])).toEqual([
+      ['Officers', 10, 8],
+      ['WOSpecs', 20, 19],
+      ['Enlistees', 150, 142],
+    ]);
+    expect(battalion[0].percent).toBeCloseTo(80);
+    expect(byCompany.map((entry) => entry.company)).toEqual(['Archer', 'Braves']);
+    expect(byCompany[0].tiers[0].percent).toBeCloseTo(50);
+  });
+
+  test('a tier a company did not state is a gap in its row and left out of the sum, not zero', () => {
+    const rows = strengthRows([
+      company('Archer', tiers([4, 2], [10, 9], [80, 72])),
+      company('Cougar', tiers(['', ''], [5, 5], [40, 40])),
+      company('Stallion', {}),
+    ]);
+    const { battalion, byCompany, companiesWithoutSplit } = tierPresence(rows, '2026-09-22');
+    expect(battalion[0]).toMatchObject({ strength: 4, present: 2 });
+    expect(byCompany.find((entry) => entry.company === 'Cougar').tiers[0].percent).toBeNull();
+    expect(companiesWithoutSplit).toEqual(['Stallion']);
+  });
+
+  test('a day with no parade has no tiers', () => {
+    const { battalion, byCompany } = tierPresence(strengthRows([]), '2026-09-22');
+    expect(byCompany).toEqual([]);
+    expect(battalion.every((tier) => tier.percent === null)).toBe(true);
   });
 });

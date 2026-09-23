@@ -19,8 +19,6 @@ export { Heatmap } from './Heatmap.jsx';
 export { Histogram } from './Histogram.jsx';
 export { Line } from './Line.jsx';
 export { Sankey } from './Sankey.jsx';
-export { Timeline } from './Timeline.jsx';
-export { Tree } from './Tree.jsx';
 export { WordCloud } from './WordCloud.jsx';
 
 // The table twin on its own, for the handful of card-shaped things that are a table and

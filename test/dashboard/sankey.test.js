@@ -271,7 +271,7 @@ describe('reportSickFlow — right side (per submission)', () => {
 
 describe('reportSickFlow — coverage and conservation', () => {
   test('a company with no FormSG rows at all is named in coverage', () => {
-    const personnel = personnelRows([reportSick({ company: 'Scorpion' })]);
+    const personnel = personnelRows([reportSick({ company: 'Hercules' })]);
     const flow = reportSickFlow({
       personnel,
       episodes: buildEpisodes(personnel),
@@ -279,7 +279,7 @@ describe('reportSickFlow — coverage and conservation', () => {
       from: null,
       to: null,
     });
-    expect(flow.coverage.companiesWithNoFormSg).toContain('Scorpion');
+    expect(flow.coverage.companiesWithNoFormSg).toContain('Hercules');
   });
 
   test('one soldier filing two submissions fans the FormSG branch out past the matched count', () => {

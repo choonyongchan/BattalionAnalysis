@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { handle, type Deps } from '../../api/dashboard.ts';
+import { SESSION_COOKIE, SESSION_TTL_MS, issueSession } from '../../lib/session.ts';
 
 const PASSWORD = 'dashboard-pw';
 const URL = 'https://example.vercel.app/api/dashboard';
@@ -38,7 +39,37 @@ function request(method = 'GET', token?: string): Request {
   return new Request(URL, { method, headers: token ? { Authorization: `Bearer ${token}` } : {} });
 }
 
+/**
+ * Builds a request carrying a session cookie.
+ *
+ * @param token The session token.
+ * @returns The request.
+ */
+function withSession(token: string): Request {
+  return new Request(URL, { headers: { cookie: `${SESSION_COOKIE}=${token}` } });
+}
+
 describe('api/dashboard', () => {
+  const NOW = new Date('2026-09-22T01:00:00Z');
+
+  test('a session cookie reads every tab, so the page needs no password of its own', async () => {
+    const { deps, calls } = setup();
+    const token = issueSession(PASSWORD, SESSION_TTL_MS, NOW.getTime());
+    expect((await handle(withSession(token), deps)).status).toBe(200);
+    expect(calls.load).toBe(1);
+  });
+
+  test('an expired session, a forged one, and one signed with the old password are refused', async () => {
+    const { deps, calls } = setup();
+    const token = issueSession(PASSWORD, SESSION_TTL_MS, NOW.getTime());
+    const expired = setup({ now: () => new Date(NOW.getTime() + SESSION_TTL_MS + 1) });
+    expect((await handle(withSession(token), expired.deps)).status).toBe(401);
+    expect((await handle(withSession('v1.99999999999999.forged'), deps)).status).toBe(401);
+    const rotated = setup({ dashboardPassword: 'the-new-password' });
+    expect((await handle(withSession(token), rotated.deps)).status).toBe(401);
+    expect(calls.load).toBe(0);
+  });
+
   test('the right password reads every tab, uncached', async () => {
     const { deps } = setup();
     const response = await handle(request('GET', PASSWORD), deps);

@@ -13,12 +13,13 @@ the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 | Path | Runtime | Owns |
 |---|---|---|
 | `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `public_holidays` and `rotations` are dashboard settings maintained by SQL |
-| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `domain.ts` |
+| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookie), `domain.ts` |
 | `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
-| `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
+| `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
+| `api/session.ts` | Vercel Function | The dashboard's login: POST the password once for an `HttpOnly`, 12-hour session cookie (`lib/session.ts`); DELETE ends it. The only route the password is sent to |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
 | `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
-| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Parade States page writes through `api/parade.ts`. See `docs/dashboard.md` |
+| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Deposit page writes through `api/parade.ts`. See `docs/dashboard.md` |
 | `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql), `import-sheet.ts` (one-time, idempotent import of the Sheet's CSV exports) |
 
 ## How parade states are parsed
@@ -28,7 +29,7 @@ message idempotently on `wa_message_id`, parse it, and write its rows, all in on
 
 ```
 WhatsApp group ─► whatsapp/ (first-parade check) ─► POST /api/parade  (Bearer PARADE_INGEST_SECRET, WhatsApp id)
-Parade States page ───────────────────────────────► POST /api/parade  (Bearer dashboard password, id = manual:<sha256>)
+Deposit page ─────────────────────────────────────► POST /api/parade  (session cookie, id = manual:<sha256>)
                                                         │
                                   recordMessage ─► parseBody ─► writeSubmission (one db.batch)
 ```
@@ -45,7 +46,7 @@ and gets `maxDuration: 300` in `vercel.json`; the relay waits as long. The model
 through the same `validate`, and `parade_submissions.model` records which parser wrote the rows
 (`deterministic` or the model id). With no key configured, or when the model call fails, no rows
 are written: the message is stored with `error = 'Needs review: …'`, the intake answers 422 with
-the problems, and a person corrects the text on the Parade States page. A filing habit that
+the problems, and a person corrects the text on the Deposit page. A filing habit that
 keeps reaching the model is worth teaching the rules, with a synthetic case in
 `test/lib/parser-deterministic.test.ts`.
 
@@ -69,7 +70,7 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 - **`neon-http` has no interactive transactions.** Atomic writes go through `db.batch([...])`,
   so no statement may depend on an earlier `RETURNING`; that is why `parade_response_id` is a
   computable natural key.
-- **NRICs never reach the dashboard; message bodies reach only the Parade States editor.**
+- **NRICs never reach the dashboard; message bodies reach only the Deposit editor.**
   FormSG NRIC answers resolve to `discard` in `lib/formsg/fields.ts` and have no column in
   `report_sick_formsg`. `raw_messages.body` leaves the database only through
   `GET /api/parade?id=`, one message at a time, to a caller holding the dashboard password, so
@@ -84,6 +85,14 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 - **Fail closed on missing configuration.** A route with an unset secret refuses every request
   that secret would authorise. `api/parade.ts` checks bearer tokens in constant time; it has no
   lockout, so `DASHBOARD_PASSWORD` and `PARADE_INGEST_SECRET` must be long.
+- **The browser holds a session, never the password.** `api/session.ts` exchanges the password
+  for a token signed with `DASHBOARD_PASSWORD` itself, carried in an `HttpOnly`, `Secure`,
+  `SameSite=Strict` cookie: page script cannot read it, and rotating the password ends every
+  open session because the old signatures stop verifying. There is no session store — the token
+  carries its own expiry, which is what makes it work on `neon-http`. A cookie-authorised write
+  must also be same-origin (`Sec-Fetch-Site`, else `Origin` against `Host`), so a forged
+  cross-site form cannot deposit or delete. The relay is not a browser and still uses its bearer
+  token.
 
 ## Dashboard (`src/`)
 
@@ -93,7 +102,7 @@ Layers, dependency direction strictly downward:
 |---|---|---|
 | `pages/` | one file per page; `pages/shared/` for the three category pages | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
-| `app/` | shell, router, signals (`state.js`), password lifecycle (`auth.js`) | `data/`, `theme/` |
+| `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`) | `data/`, `theme/` |
 | `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the `/api/parade` calls (`parade.js`), which take the auth header from the page | `model/` |
 | `model/` | every number and rule; pure functions, no DOM, no network | other `model/` files |
 

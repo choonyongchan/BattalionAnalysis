@@ -1,14 +1,16 @@
 /**
- * Parade States: deposit one WhatsApp missed, and correct or delete any already stored.
+ * Deposit: deposit a parade state WhatsApp missed, and correct or delete any already stored.
  *
  * The one page that writes. It talks to `/api/parade` on Vercel, which parses with the same
  * rule-based parser the WhatsApp relay's messages go through, so a deposited parade state is
  * indistinguishable from a relayed one except for its source. The charts read the same
- * tables through `/api/dashboard`, so a deposit reaches them on the next refresh.
+ * tables through `/api/dashboard`; a change here refreshes them at once, and the list below
+ * reloads with every background refresh so a message the relay stores meanwhile appears.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { authHeader } from '../app/auth.js';
+import { refresh } from '../app/auth.js';
+import { dataset } from '../app/state.js';
 import { Banner, Card, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../data/parade.js';
@@ -140,10 +142,10 @@ function StatusCell({ status, reasons }) {
 }
 
 /**
- * The Parade States page.
+ * The Deposit page.
  * @returns {!preact.VNode} The page.
  */
-export function ParadeStates() {
+export function Deposit() {
   const [messages, setMessages] = useState(null);
   const [listError, setListError] = useState('');
   const [text, setText] = useState('');
@@ -154,7 +156,7 @@ export function ParadeStates() {
   const formRef = useRef(null);
 
   const reload = useCallback(() => {
-    return listMessages(authHeader())
+    return listMessages()
       .then((list) => {
         setMessages(list);
         setListError('');
@@ -162,9 +164,11 @@ export function ParadeStates() {
       .catch((error) => setListError(error.message));
   }, []);
 
+  // `dataset` changes on every background refresh; the list follows it.
+  const refreshedAt = dataset.value && dataset.value.generatedAt;
   useEffect(() => {
     reload();
-  }, [reload]);
+  }, [reload, refreshedAt]);
 
   /** Runs one intake call with the page marked busy, showing a thrown error as the outcome. */
   const run = async (action) => {
@@ -185,16 +189,17 @@ export function ParadeStates() {
 
   const submit = () =>
     run(async () => {
-      const outcome = editing ? await editMessage(authHeader(), editing, text) : await depositMessage(authHeader(), text);
+      const outcome = editing ? await editMessage(editing, text) : await depositMessage(text);
       const said = describeOutcome(outcome);
       setResult(said);
       if (said.tone === 'good') resetForm();
       await reload();
+      refresh();
     });
 
   const startEdit = (id) =>
     run(async () => {
-      const message = await getMessage(authHeader(), id);
+      const message = await getMessage(id);
       setEditing(id);
       setText(message.body);
       setResult(null);
@@ -204,11 +209,12 @@ export function ParadeStates() {
 
   const confirmDelete = (id) =>
     run(async () => {
-      await deleteMessage(authHeader(), id);
+      await deleteMessage(id);
       setConfirming(null);
       if (editing === id) resetForm();
       setResult({ tone: 'good', text: `Deleted #${id} and everything parsed from it.`, reasons: [] });
       await reload();
+      refresh();
     });
 
   const rows = toMessageRows(messages || []).map((row) => ({
@@ -233,7 +239,7 @@ export function ParadeStates() {
     <div class="page">
       <header class="pagehead">
         <div>
-          <h1 class="pagehead__title">Parade States</h1>
+          <h1 class="pagehead__title">Deposit</h1>
           <p class="pagehead__sub">Deposit a parade state WhatsApp missed, or correct one already stored.</p>
         </div>
       </header>

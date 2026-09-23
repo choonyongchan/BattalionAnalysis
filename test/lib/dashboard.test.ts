@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { handle as handleFormsg } from '../../api/formsg.ts';
 import type { Db } from '../../db/index.ts';
-import { publicHolidays, rotations } from '../../db/schema.ts';
+import { commandRosterRows, publicHolidays, rotations } from '../../db/schema.ts';
 import {
   loadTabs,
   personnelNumDays,
@@ -164,7 +164,16 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + expectedCounts(spec).strength, 0));
     for (const spec of SPECS) {
       const company = rows.find((row) => row.parade_response_id === expectedKey(spec) && row.unit_type === 'Company');
-      expect(company).toMatchObject({ date: spec.date, company: spec.company, total_present: companyTotals(spec).total.present });
+      const totals = companyTotals(spec);
+      expect(company).toMatchObject({
+        date: spec.date,
+        company: spec.company,
+        total_present: totals.total.present,
+        officer_strength: totals.officer.strength,
+        officer_present: totals.officer.present,
+        wospec_present: totals.wospec.present,
+        enlistee_present: totals.enlistee.present,
+      });
     }
   });
 
@@ -184,6 +193,7 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     const rows = records(TABS.ROSTER);
     expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + spec.command.length, 0));
     expect(rows.map((row) => row.role)).toContain('PDS1');
+    expect(rows.every((row) => row.vacant === false)).toBe(true);
   });
 
   test('the FormSG tab has each submission once, in Singapore time, with no NRIC', () => {
@@ -211,6 +221,20 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     const line = renderEntry(SCENARIOS[1]!.spec.units[0]!.entries[0]!, 1);
     expect(JSON.stringify(tabs)).not.toContain(line);
   });
+});
+
+describe.skipIf(!hasTestDb)('a vacant appointment', () => {
+  test('comes through marked vacant, not dropped', async () => {
+    const db = await resetTestDb();
+    const spec = SCENARIOS[1]!.spec;
+    await ingestMessage(db, { waMessageId: 'wa-vacant', body: renderParadeState(spec) }, new Date(`${spec.date}T00:30:00Z`));
+    await db.insert(commandRosterRows).values({ paradeResponseId: expectedKey(spec), roleKind: 'PDS', unitLabel: 'MED', isVacant: true });
+
+    const tabs = await loadTabs(db);
+    const [header, ...rows] = tabs[TABS.ROSTER] as [string[], ...unknown[][]];
+    const vacant = rows.map((row) => Object.fromEntries(header.map((name, index) => [name, row[index]]))).filter((row) => row.vacant === true);
+    expect(vacant).toEqual([expect.objectContaining({ role: 'PDSMED', name: '' })]);
+  }, DB_TIMEOUT_MS);
 });
 
 describe.skipIf(!hasTestDb || !TEST_DASHBOARD_DATABASE_URL)('as the read-only dashboard_read role', () => {

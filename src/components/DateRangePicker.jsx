@@ -1,19 +1,26 @@
 /**
- * A two-click month-grid date-range picker, plus the preset buttons beside it.
+ * A calendar button that opens the quick ranges and a two-click month grid.
  *
- * Ported from the previous implementation's hand-rolled `calendar.js`: same interaction
- * (click a start day, click an end day, or Clear), same reason for being hand-rolled
- * rather than a dependency — a date-range picker is a small, well-understood control, and
- * a library earns its weight only when the control is not. The state that changes on
- * every click (which month is shown, the half-made selection) stays local; only the
- * committed range is reported to the caller.
+ * Closed, the bar shows one button naming the committed range; the quick ranges ("This
+ * week", "Last month", …) appear only in the popover, beside the month grid, so the bar
+ * stays one control wide. Hand-rolled rather than a dependency — a date-range picker is a
+ * small, well-understood control, and a library earns its weight only when the control is
+ * not. The state that changes on every click (which month is shown, the half-made
+ * selection) stays local; only the committed range is reported to the caller.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { addMonths, daysOfMonth, firstOfMonth, matchPreset, PRESETS } from '../model/dateRange.js';
+import {
+  addMonths,
+  daysOfMonth,
+  firstOfMonth,
+  isoToday,
+  matchPreset,
+  PRESETS,
+  resolvePreset,
+} from '../model/dateRange.js';
 import { weekdayOf } from '../model/dates.js';
 import { fmtDate } from '../format.js';
-import { Segmented } from './Segmented.jsx';
 
 /** @type {string[]} Month names for the popover header. */
 const MONTHS = [
@@ -79,7 +86,70 @@ function MonthGrid({ shownMonth, min, max, from, to, onPick }) {
 }
 
 /**
- * The date-range picker: a trigger button and a popover month grid.
+ * A calendar glyph for the trigger, on the shell's 24-unit, 1.6-stroke grid.
+ * @returns {!preact.VNode} The icon.
+ */
+function CalendarGlyph() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.4" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+/**
+ * What the closed trigger says: the preset's name when the range is one, and the dates.
+ * @param {?string} from Committed range start, or null.
+ * @param {?string} to Committed range end, or null.
+ * @param {?string} preset The matching preset's name, or null.
+ * @returns {string} The label.
+ */
+function triggerLabel(from, to, preset) {
+  if (!from && !to) {
+    return 'All dates';
+  }
+  const dates = fmtDate(from) + ' – ' + fmtDate(to);
+  const match = PRESETS.find((entry) => entry.name === preset);
+  return match ? match.label + ' · ' + dates : dates;
+}
+
+/**
+ * The quick ranges, stacked beside the month grid inside the popover.
+ * @param {{value: ?string, onSelect: function(string): void}} props The preset the
+ *     committed range matches, and what to call with a preset name.
+ * @returns {!preact.VNode} The list.
+ */
+function PresetList({ value, onSelect }) {
+  return (
+    <div class="daterange__presets" role="group" aria-label="Quick date ranges">
+      {PRESETS.map((preset) => (
+        <button
+          key={preset.name}
+          type="button"
+          class="daterange__preset"
+          aria-pressed={value === preset.name}
+          onClick={() => onSelect(preset.name)}
+        >
+          {preset.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The date-range picker: a calendar button, and a popover of quick ranges and a month grid.
  * @param {{min: string, max: string, from: ?string, to: ?string,
  *     onChange: function({from: ?string, to: ?string}): void}} props The selectable
  *     bounds, the committed range (null/null for "All"), and the change callback.
@@ -129,6 +199,19 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
 
   const rangeFrom = pendingFrom || from;
   const rangeTo = pendingFrom ? null : to;
+  const today = isoToday();
+  const preset = matchPreset(from, to, today);
+
+  /**
+   * Commits a quick range and closes the popover.
+   * @param {string} name A `PRESETS` name.
+   * @returns {void}
+   */
+  function pickPreset(name) {
+    setPendingFrom(null);
+    setOpen(false);
+    onChange(resolvePreset(name, today));
+  }
 
   return (
     <div class="daterange" ref={rootRef}>
@@ -148,11 +231,13 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
           setOpen(true);
         }}
       >
-        {from || to ? fmtDate(from) + ' – ' + fmtDate(to) : 'All dates'}
+        <CalendarGlyph />
+        <span>{triggerLabel(from, to, preset)}</span>
       </button>
 
       {open ? (
-        <div class="daterange__popover">
+        <div class="daterange__popover" role="dialog" aria-label="Choose dates">
+          <PresetList value={preset} onSelect={pickPreset} />
           <div class="calendar">
             <div class="calendar__head">
               <button
@@ -177,38 +262,9 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
             </div>
             <MonthGrid shownMonth={shownMonth} min={min} max={max} from={rangeFrom} to={rangeTo} onPick={pickDay} />
             <p class="calendar__hint">{pendingFrom ? 'Pick the end date' : 'Pick the start date'}</p>
-            <button
-              type="button"
-              class="calendar__clear"
-              onClick={() => {
-                setPendingFrom(null);
-                setOpen(false);
-                onChange({ from: null, to: null });
-              }}
-            >
-              All dates
-            </button>
           </div>
         </div>
       ) : null}
     </div>
-  );
-}
-
-/**
- * The quick-range preset buttons beside the picker.
- * @param {{from: ?string, to: ?string, today: string,
- *     onSelect: function(string): void}} props The committed range (to find which preset
- *     it matches), today's date, and what to call with a preset name when one is chosen.
- * @returns {!preact.VNode} The preset row.
- */
-export function PresetBar({ from, to, today, onSelect }) {
-  return (
-    <Segmented
-      options={PRESETS}
-      value={matchPreset(from, to, today)}
-      onChange={onSelect}
-      label="Quick date ranges"
-    />
   );
 }

@@ -14,8 +14,10 @@ import {
   DUTY_CLASS,
   extractSymptoms,
   isAbsent,
+  isDuty,
   isRestricted,
   keywords,
+  MC_MA,
 } from '../../src/model/classify.js';
 
 describe('MC is Att C, matched by category', () => {
@@ -104,5 +106,19 @@ describe('keywords for the word cloud', () => {
       'sore',
       'throat',
     ]);
+  });
+});
+
+describe('isDuty', () => {
+  test('matches one duty class, or any of several', () => {
+    expect(isDuty(DUTY_CLASS.ATT_C, DUTY_CLASS.ATT_C)).toBe(true);
+    expect(isDuty(DUTY_CLASS.ATT_C, DUTY_CLASS.MA)).toBe(false);
+    expect(isDuty(MC_MA, DUTY_CLASS.MA)).toBe(true);
+    expect(isDuty(MC_MA, DUTY_CLASS.STATUS)).toBe(false);
+  });
+
+  test('MC / MA is Att C and MA, and never Status — status is not absence', () => {
+    expect(MC_MA).toEqual([DUTY_CLASS.ATT_C, DUTY_CLASS.MA]);
+    expect(MC_MA).not.toContain(DUTY_CLASS.STATUS);
   });
 });

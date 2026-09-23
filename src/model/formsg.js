@@ -14,7 +14,7 @@
  */
 
 import { extractSymptoms, keywords } from './classify.js';
-import { normaliseName } from './identity.js';
+import { identityKey, normaliseFourD } from './identity.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 import { COMPANIES, PLATOONS, UNASSIGNED, UNIT_TYPE_COMPANY } from './domain.js';
 import { platoonOf } from './platoon.js';
@@ -193,14 +193,17 @@ export function toSubmissions(rows) {
       const symptomAnswer = toText(row['I am experiencing _____________________ symptoms.']);
       const text = [reason, symptomAnswer].filter((part) => part !== '').join('. ');
       const name = toText(row['[Myinfo] Name']);
-      const fourD = toText(row['4D Number (REC Only)']).toUpperCase();
+      const fourD = normaliseFourD(row['4D Number (REC Only)']);
       return {
         date: toIsoDate(row.Timestamp),
         timestamp: row.Timestamp,
         rank: toText(row.RANK),
         name,
         fourD,
-        key: fourD !== '' ? '4D:' + fourD : name !== '' ? 'NAME:' + normaliseName(name) : '',
+        // Built by `identityKey`, never inline: this is the key a submission is joined to
+        // its personnel rows on, so a third spelling of the same rule is a third chance
+        // for the two sources to describe one soldier as two.
+        key: identityKey(fourD, name),
         company: companyFrom_(row['Unit & Coy']),
         unitText: toText(row['Unit & Coy']),
         reportSickType: toText(row['Report Sick Type']),
@@ -220,9 +223,9 @@ export function toSubmissions(rows) {
  *
  * A count, not a rate, in the companies scope: zero FormSG submissions in a day is a real
  * fact about that company, unlike a parade-state gap — nobody has to file a form for the
- * absence of one to be informative. Scorpion's whole FormSG history is zero for exactly
- * this reason, and it is drawn as a flat line at zero rather than a gap, which is the
- * honest picture of a channel with no adoption.
+ * absence of one to be informative. A company with no submissions is drawn as a flat
+ * line at zero rather than a gap, which is the honest picture of a channel with no
+ * adoption.
  * @param {Array<!Object>} submissions Normalised FormSG submissions from `toSubmissions`.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records, for the
  *     battalion-scope rate.

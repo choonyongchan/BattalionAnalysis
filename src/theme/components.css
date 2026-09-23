@@ -376,3 +376,175 @@ tbody tr:last-child td {
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------- company colours */
+
+/*
+ * One class per company sets `--company-fill` and `--company-on`; the filing chips and
+ * the ORBAT headings read those two, so a company's colour is decided once, here.
+ */
+.filingchip--archer,
+.orbat__company--archer {
+  --company-fill: var(--company-archer);
+  --company-on: var(--company-ink);
+}
+
+.filingchip--braves,
+.orbat__company--braves {
+  --company-fill: var(--company-braves);
+  --company-on: var(--company-ink);
+}
+
+.filingchip--cougar,
+.orbat__company--cougar {
+  --company-fill: var(--company-cougar);
+  --company-on: var(--company-ink);
+}
+
+.filingchip--stallion,
+.orbat__company--stallion {
+  --company-fill: var(--company-stallion);
+  --company-on: var(--company-ink);
+}
+
+.filingchip--hercules,
+.orbat__company--hercules {
+  --company-fill: var(--company-hercules);
+  --company-on: var(--company-hercules-ink);
+}
+
+/* ---------------------------------------------------------------- filing chips */
+
+/* Grey and struck through until the company's first parade state is received, then its
+   own pastel. */
+.filingchips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filingchip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--canvas-sunken);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-sm);
+  color: var(--ink-faint);
+}
+
+/*
+ * The diagonal, drawn as a single hard band in the chip's own background rather than a
+ * rotated element, so it meets the rounded corners exactly and needs no overflow clip.
+ * The `to top right` corner keyword angles the band so it runs corner to corner whatever
+ * the chip's width.
+ */
+.filingchip--missing {
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    var(--hairline) calc(50% - 1px),
+    var(--hairline) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.filingchip--filed {
+  background: var(--company-fill);
+  border-color: var(--company-fill);
+  color: var(--company-on);
+}
+
+.filingchip__name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+}
+
+.filingchip__time {
+  font-size: 12px;
+  letter-spacing: -0.12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* ---------------------------------------------------------------- ORBAT */
+
+.orbat {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-md);
+}
+
+.orbat__company {
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.orbat__heading {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--company-fill);
+  color: var(--company-on);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Each level hangs off a rule under its parent's role tag. */
+.orbat__list {
+  margin: 0 0 0 0.6rem;
+  padding: 0 0 0 var(--space-sm);
+  list-style: none;
+  border-left: 1px solid var(--hairline);
+}
+
+.orbat__list--root {
+  padding: var(--space-xs) var(--space-md);
+  border-left: 0;
+  margin-left: 0;
+}
+
+.orbat__role {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 5px 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.orbat__role--unfiled {
+  color: var(--ink-faint);
+}
+
+/* Filed as `-`: the company says the chair is empty, which is a finding, not a gap. */
+.orbat__role--vacant .orbat__name {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.orbat__tag {
+  flex: none;
+  min-width: 2.8rem;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.12px;
+  color: var(--ink-muted);
+}
+
+.orbat__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.orbat__none {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--ink-faint);
+  font-size: 14px;
+}
