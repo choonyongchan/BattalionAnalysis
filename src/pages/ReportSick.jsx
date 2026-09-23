@@ -19,12 +19,11 @@ import {
   REPORT_SICK_TYPES,
   reportSickTypeOf,
   submissionCounts,
-  submissionHeatmapCells,
   submissionCountByCompany,
-  submissionCountByPlatoon,
   submissionTrend,
   topSubmitters,
 } from '../model/formsg.js';
+import { rankUnits } from '../model/leaderboards.js';
 import { episodeCounts } from '../model/metrics.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { isWeekend } from '../model/dates.js';
@@ -38,6 +37,7 @@ import {
   ReasonsOverTime,
   SoldierLookup,
   TrendSection,
+  episodeCells,
   useCategory,
 } from './shared/category.jsx';
 
@@ -45,22 +45,18 @@ import {
 const DUTY = DUTY_CLASS.REPORT_SICK;
 
 /**
- * The FormSG-side rankings: who reports sick most through the form, and how the reported-
- * sick count falls across companies and platoons. These replace the parade-state
- * "Top 10 by Episode Count" and "Companies/Platoons, by Count" — on this page the form is
- * the primary source, and the parade-state versions sit one section up as tiles and a
- * trend instead.
- *
- * Platoon is not something FormSG states; it is inferred from the submitter's 4D through
- * the same rule `model/platoon.js` applies elsewhere, and a submission with no usable 4D
- * is placed under HQ. The coverage note on the platoon table says so.
- * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
+ * The report-sick rankings: who reports sick most through the form, how the FormSG count
+ * falls across companies, and how the parade-state count falls across platoons. The
+ * platoon table reads the parade state because it names each soldier's platoon outright,
+ * where FormSG only lets it be inferred from the 4D.
+ * @param {{submissions: Array<!Object>, data: !Object}} props FormSG submissions already
+ *     restricted to the range, and the scoped dataset.
  * @returns {!preact.VNode} The three cards.
  */
-function ReportedSickRankings({ submissions }) {
+function ReportedSickRankings({ submissions, data }) {
   const top = topSubmitters(submissions, 10);
   const companies = submissionCountByCompany(submissions);
-  const platoons = submissionCountByPlatoon(submissions);
+  const platoons = rankUnits(data.personnel, data.strength, DUTY, 'platoon');
 
   return (
     <>
@@ -96,7 +92,7 @@ function ReportedSickRankings({ submissions }) {
             columns={[
               { key: 'company', label: 'Company' },
               { key: 'platoon', label: 'Platoon' },
-              { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
+              { key: 'count', label: 'Reporting Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
             ]}
             rows={platoons.map((row) => ({
               company: row.company,
@@ -106,10 +102,7 @@ function ReportedSickRankings({ submissions }) {
             }))}
             rowKey={(row) => row.company + ' ' + row.platoon}
           />
-          <Coverage>
-            Platoon is inferred from the submitter's 4D; a submission with no 4D is placed
-            under HQ. Counts are FormSG submissions in the selected range.
-          </Coverage>
+          <Coverage>Counts are parade-state reporting-sick soldier-days in the selected range.</Coverage>
         </Card>
       </div>
     </>
@@ -216,11 +209,8 @@ export function ReportSick() {
       <DutyTrend title="Reporting Sick (Parade State) Trend" data={data} dutyClass={DUTY} range={range} />
       <FormSgTrend submissions={submissions} strength={data.strength} range={range} />
       <PlatoonHeatmap
-        cells={submissionHeatmapCells(ranged)}
-        title="Reported Sick (FormSG) — by Company and Platoon"
-        coverage="Count of FormSG submissions. Platoon is inferred from the leading digit of the 4D; a submission with no 4D, or from a company whose platoons are named rather than numbered (Stallion, Hercules), is placed under Coy HQ."
-        valueName="submissions"
-        empty="No FormSG submissions in range to place on the grid."
+        cells={episodeCells(range.episodes, DUTY)}
+        title="Reporting Sick (Parade State) — by Company and Platoon"
       />
       <ReasonsOverTime
         title="Top Report Sick Categories over time"
@@ -235,7 +225,7 @@ export function ReportSick() {
       <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
         <Histogram bins={hourBins(ranged)} />
       </ChartCard>
-      <ReportedSickRankings submissions={ranged} />
+      <ReportedSickRankings submissions={ranged} data={data} />
       <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
     </CategoryPage>
   );

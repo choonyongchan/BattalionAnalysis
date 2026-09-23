@@ -1,15 +1,9 @@
 /**
  * Tests for the report-sick Sankey.
  *
- * The left side is an aggregate per-company join (`reconcileReportSick`), summed to
- * battalion totals: `Reporting sick`/`Unaccounted` into `Reported sick`/`No FormSG
- * submission` are counts of distinct soldiers, not events. The right side stays
- * event-level and hangs off the FormSG branch only — one flow per submission, through its
- * type to whatever MC or Status followed within two days.
- *
- * The cases worth having are the ones the diagram must not paper over: a soldier on the
- * parade state who never filed, a form with no parade-state line, one soldier filing
- * several forms, and an outcome deliberately too late to count.
+ * The diagram is count-only: nothing is matched by name or 4D. Each stage's total pours
+ * into the next in order, so the cases worth having are the imbalances — more parade-state
+ * reports than forms, more forms than reports, and more outcomes than reports.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -17,358 +11,156 @@ import { toRecords } from '../../src/data/records.js';
 import { PERSONNEL_HEADERS } from '../../src/data/tabs.js';
 import { buildEpisodes } from '../../src/model/episodes.js';
 import { toSubmissions } from '../../src/model/formsg.js';
-import { reconcileReportSick } from '../../src/model/reconcile.js';
 import { reportSickFlow } from '../../src/model/sankey.js';
 
 /**
- * Builds Personnel Data records from column-keyed row specs.
+ * Builds episodes from column-keyed Personnel Data row specs.
  * @param {Array<!Object>} specs Partial records; unlisted headers read as ''.
- * @returns {Array<!Object>} Normalised records.
+ * @returns {Array<!Object>} Episodes from `buildEpisodes`.
  */
-function personnelRows(specs) {
+function episodesOf(specs) {
   const values = [
     PERSONNEL_HEADERS.slice(),
     ...specs.map((spec) => PERSONNEL_HEADERS.map((header) => (header in spec ? spec[header] : ''))),
   ];
-  return toRecords(values, PERSONNEL_HEADERS, 'Personnel Data');
+  return buildEpisodes(toRecords(values, PERSONNEL_HEADERS, 'Personnel Data'));
 }
 
 /**
- * Builds a FormSG submission via the real normaliser, filling in defaults.
- * @param {!Object} overrides Fields to set on top of the defaults.
- * @returns {!Object} One normalised submission.
+ * A personnel row spec for one soldier, with the common fields pre-filled.
+ * @param {string} fourD The soldier's 4D, which keeps soldiers distinct.
+ * @param {string} category The row's reason category.
+ * @param {!Object=} overrides Fields to set on top of the defaults.
+ * @returns {!Object} A row spec for `episodesOf`.
  */
-function submission(overrides) {
-  const row = {
-    Timestamp: '2026-07-20T08:00:00',
-    RANK: 'REC',
-    '[Myinfo] Name': 'ZED',
-    '4D Number (REC Only)': '1101',
-    'Unit & Coy': '40 SAR / Archer',
-    'Report Sick Type': 'Report Sick In-Camp (RSI)',
-    ...overrides,
-  };
-  return toSubmissions([row])[0];
-}
-
-/**
- * A report-sick personnel row spec with the common fields pre-filled.
- * @param {!Object} overrides Fields to set on top of the defaults.
- * @returns {!Object} A row spec for `personnelRows`.
- */
-function reportSick(overrides) {
+function row(fourD, category, overrides) {
   return {
     date: '2026-07-20',
     session: 'FPS',
     company: 'Archer',
-    four_d: '1101',
-    name: 'ZED',
-    reason_category: 'Report Sick',
+    four_d: fourD,
+    name: 'SOLDIER ' + fourD,
+    reason_category: category,
     start_date: '2026-07-20',
     ...overrides,
   };
 }
 
 /**
- * Sums link values between two node names, 0 when there is no such link.
- * @param {Array<{source: string, target: string, value: number}>} links The flow's links.
+ * Builds normalised FormSG submissions, one per type answer.
+ * @param {Array<string>} types Each submission's 'Report Sick Type' answer.
+ * @returns {Array<!Object>} Normalised submissions.
+ */
+function submissions(types) {
+  return toSubmissions(
+    types.map((type, index) => ({
+      Timestamp: '2026-07-20T08:00:00',
+      RANK: 'REC',
+      '[Myinfo] Name': 'FORM ' + index,
+      '4D Number (REC Only)': String(9000 + index),
+      'Unit & Coy': '40 SAR / Archer',
+      'Report Sick Type': type,
+    }))
+  );
+}
+
+/**
+ * The value of the link between two nodes, 0 when there is none.
+ * @param {!Object} flow A `reportSickFlow` result.
  * @param {string} source Source node name.
  * @param {string} target Target node name.
  * @returns {number} The link's value.
  */
-function linkValue(links, source, target) {
-  const link = links.find((entry) => entry.source === source && entry.target === target);
+function linkValue(flow, source, target) {
+  const link = flow.links.find((entry) => entry.source === source && entry.target === target);
   return link ? link.value : 0;
 }
 
 /**
- * Sums every link leaving a node.
- * @param {Array<{source: string, value: number}>} links The flow's links.
- * @param {string} node The node name.
- * @returns {number} Total outflow.
+ * Runs the flow over an unbounded range.
+ * @param {Array<!Object>} episodes Episodes.
+ * @param {Array<!Object>} subs Submissions.
+ * @returns {!Object} The flow.
  */
-function outflow(links, node) {
-  return links.filter((link) => link.source === node).reduce((sum, link) => sum + link.value, 0);
+function flowOf(episodes, subs) {
+  return reportSickFlow({ episodes, submissions: subs, from: null, to: null });
 }
 
-/**
- * Sums every link entering a node.
- * @param {Array<{target: string, value: number}>} links The flow's links.
- * @param {string} node The node name.
- * @returns {number} Total inflow.
- */
-function inflow(links, node) {
-  return links.filter((link) => link.target === node).reduce((sum, link) => sum + link.value, 0);
-}
-
-describe('reportSickFlow — left side (aggregate reconcile)', () => {
-  test('a soldier reporting sick with no FormSG submission flows to No FormSG submission', () => {
-    const personnel = personnelRows([reportSick({})]);
-    const episodes = buildEpisodes(personnel);
-    const flow = reportSickFlow({ personnel, episodes, submissions: [], from: null, to: null });
-
-    expect(linkValue(flow.links, 'Reporting sick', 'No FormSG submission')).toBe(1);
-    expect(flow.coverage.paradeOnly).toBe(1);
-    expect(flow.coverage.matched).toBe(0);
+describe('reportSickFlow — reporting to reported', () => {
+  test('fewer parade-state reports than forms: all flow on, the surplus is Unaccounted', () => {
+    const flow = flowOf(episodesOf([row('1101', 'Report Sick')]), submissions(['RSI', 'RSO', 'RSI']));
+    expect(linkValue(flow, 'Reporting sick', 'Reported sick')).toBe(1);
+    expect(linkValue(flow, 'Unaccounted', 'Reported sick')).toBe(2);
+    expect(linkValue(flow, 'Reporting sick', 'No FormSG submission')).toBe(0);
   });
 
-  test('a submission with no parade-state line flows Unaccounted -> Reported sick', () => {
-    const flow = reportSickFlow({
-      personnel: [],
-      episodes: [],
-      submissions: [submission({ '4D Number (REC Only)': '2201', '[Myinfo] Name': 'LIM' })],
-      from: null,
-      to: null,
-    });
-
-    expect(linkValue(flow.links, 'Unaccounted', 'Reported sick')).toBe(1);
-    expect(flow.coverage.unaccounted).toBe(1);
-    expect(linkValue(flow.links, 'Reported sick', 'Type: RSI')).toBe(1);
+  test('more parade-state reports than forms: the surplus ends at No FormSG submission', () => {
+    const episodes = episodesOf([row('1101', 'Report Sick'), row('1102', 'Report Sick'), row('1103', 'Report Sick')]);
+    const flow = flowOf(episodes, submissions(['RSI']));
+    expect(linkValue(flow, 'Reporting sick', 'Reported sick')).toBe(1);
+    expect(linkValue(flow, 'Reporting sick', 'No FormSG submission')).toBe(2);
+    expect(linkValue(flow, 'Unaccounted', 'Reported sick')).toBe(0);
   });
 
-  test('a soldier in both sources (same 4D, any in-range dates) flows Reporting sick -> Reported sick', () => {
-    const personnel = personnelRows([reportSick({ start_date: '2026-07-18' })]);
-    const episodes = buildEpisodes(personnel);
-    const flow = reportSickFlow({
-      personnel,
-      episodes,
-      submissions: [submission({ Timestamp: '2026-07-25T08:00:00' })],
-      from: null,
-      to: null,
-    });
-
-    expect(linkValue(flow.links, 'Reporting sick', 'Reported sick')).toBe(1);
-    expect(flow.coverage.matched).toBe(1);
-  });
-
-  test('a fuzzy name match with no 4D on either side still counts as matched', () => {
-    const personnel = personnelRows([
-      reportSick({ four_d: '', name: 'TAN JUN HAO, DARREN', company: 'Braves' }),
-    ]);
-    const episodes = buildEpisodes(personnel);
-    const flow = reportSickFlow({
-      personnel,
-      episodes,
-      submissions: [
-        submission({
-          '4D Number (REC Only)': '',
-          '[Myinfo] Name': 'TAN JUN HAO',
-          'Unit & Coy': '40 SAR / Braves',
-        }),
-      ],
-      from: null,
-      to: null,
-    });
-
-    expect(linkValue(flow.links, 'Reporting sick', 'Reported sick')).toBe(1);
-    expect(flow.coverage.matched).toBe(1);
-  });
-
-  test('the three left-side link values equal the reconcile sums for the same fixtures', () => {
-    const personnel = personnelRows([
-      reportSick({ four_d: '1101', name: 'ZED', company: 'Archer' }),
-      reportSick({ four_d: '1102', name: 'ADA', company: 'Braves' }),
-    ]);
-    const episodes = buildEpisodes(personnel);
-    const reportSickEpisodes = episodes.filter((episode) => episode.dutyClass === 'Report Sick');
-    const submissions = [
-      submission({ '4D Number (REC Only)': '1101' }),
-      submission({
-        '4D Number (REC Only)': '9999',
-        '[Myinfo] Name': 'QUX',
-        'Unit & Coy': '40 SAR / Cougar',
-      }),
-    ];
-
-    const rows = reconcileReportSick(reportSickEpisodes, submissions);
-    const sum = (field) => rows.reduce((total, row) => total + row[field], 0);
-    const expectedMatched = sum('matched');
-    const expectedParadeOnly = sum('paradeCount') - expectedMatched;
-    const expectedUnaccounted = sum('formsgCount') - expectedMatched;
-
-    const flow = reportSickFlow({ personnel, episodes, submissions, from: null, to: null });
-
-    expect(linkValue(flow.links, 'Reporting sick', 'Reported sick')).toBe(expectedMatched);
-    expect(linkValue(flow.links, 'Reporting sick', 'No FormSG submission')).toBe(expectedParadeOnly);
-    expect(linkValue(flow.links, 'Unaccounted', 'Reported sick')).toBe(expectedUnaccounted);
+  test('different names on each side still flow through, since nothing is matched', () => {
+    const flow = flowOf(episodesOf([row('1101', 'Report Sick')]), submissions(['RSI']));
+    expect(linkValue(flow, 'Reporting sick', 'Reported sick')).toBe(1);
   });
 });
 
-describe('reportSickFlow — right side (per submission)', () => {
-  test('a blank type answer routes to Type: Type not recorded', () => {
-    const flow = reportSickFlow({
-      personnel: [],
-      episodes: [],
-      submissions: [submission({ 'Report Sick Type': '' })],
-      from: null,
-      to: null,
+describe('reportSickFlow — type, outcome, status', () => {
+  test('types take both the short code and the verbatim answer; blank is not recorded', () => {
+    const flow = flowOf([], submissions(['RSO', 'Report Sick In-Camp (RSI)', 'FFI', 'MR', '']));
+    ['RSO', 'RSI', 'FFI', 'Medical Review', 'Type not recorded'].forEach((label) => {
+      expect(linkValue(flow, 'Reported sick', 'Type: ' + label)).toBe(1);
     });
-    expect(linkValue(flow.links, 'Reported sick', 'Type: Type not recorded')).toBe(1);
   });
 
-  test('an MC starting the day after the submission is the outcome', () => {
-    const personnel = personnelRows([
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', four_d: '1101', name: 'ZED', reason_category: 'Att C', start_date: '2026-07-21', end_date: '2026-07-23', num_days: 3 },
-    ]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
-    expect(linkValue(flow.links, 'Type: RSI', 'Outcome: MC')).toBe(1);
+  test('outcomes fill in order MC, Status, then None recorded for the rest', () => {
+    const episodes = episodesOf([row('1101', 'Att C'), row('1102', 'Status', { reason: 'Excuse RMJ' })]);
+    const flow = flowOf(episodes, submissions(['RSO', 'RSI', 'RSI']));
+    expect(linkValue(flow, 'Type: RSO', 'Outcome: MC')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: Status')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: None recorded')).toBe(1);
+    expect(linkValue(flow, 'Outcome: Status', 'Status: Excuse RMJ')).toBe(1);
   });
 
-  test('MC beats Status when both fall in the window', () => {
-    const personnel = personnelRows([
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', four_d: '1101', name: 'ZED', reason_category: 'Att C', start_date: '2026-07-21', end_date: '2026-07-22', num_days: 2 },
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', four_d: '1101', name: 'ZED', reason_category: 'Status', reason: 'Excuse RMJ', start_date: '2026-07-21' },
-    ]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
-    expect(linkValue(flow.links, 'Type: RSI', 'Outcome: MC')).toBe(1);
-    expect(linkValue(flow.links, 'Type: RSI', 'Outcome: Status')).toBe(0);
+  test('outcomes past the reported-sick count are not drawn and are reported', () => {
+    const episodes = episodesOf([row('1101', 'Att C'), row('1102', 'Att C'), row('1103', 'Status', { reason: 'LD' })]);
+    const flow = flowOf(episodes, submissions(['RSI']));
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: MC')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: Status')).toBe(0);
+    expect(flow.coverage.outcomesNotShown).toBe(2);
   });
 
-  test('a Status starting four days after the submission is too late to count', () => {
-    const personnel = personnelRows([
-      { date: '2026-07-24', session: 'FPS', company: 'Archer', four_d: '1101', name: 'ZED', reason_category: 'Status', reason: 'Excuse RMJ', start_date: '2026-07-24' },
-    ]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
-    expect(linkValue(flow.links, 'Type: RSI', 'Outcome: Status')).toBe(0);
-    expect(linkValue(flow.links, 'Type: RSI', 'Outcome: None recorded')).toBe(1);
-  });
-
-  test('a multi-restriction Status outcome fans out to several buckets, flagged as such', () => {
-    const personnel = personnelRows([
-      { date: '2026-07-21', session: 'FPS', company: 'Archer', four_d: '1101', name: 'ZED', reason_category: 'Status', reason: 'Excuse RMJ, Heavy Load, Kneeling', start_date: '2026-07-21' },
-    ]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
-    expect(linkValue(flow.links, 'Outcome: Status', 'Status: Excuse RMJ')).toBe(1);
-    expect(linkValue(flow.links, 'Outcome: Status', 'Status: Excuse Heavy Load')).toBe(1);
-    expect(linkValue(flow.links, 'Outcome: Status', 'Status: Excuse Kneeling/Squatting')).toBe(1);
-    expect(flow.coverage.statusMultiLabelled).toBe(true);
+  test('status buckets never carry more than the Status outcome received', () => {
+    const episodes = episodesOf([row('1101', 'Status', { reason: 'Excuse RMJ, Heavy Load' })]);
+    const flow = flowOf(episodes, submissions(['RSI']));
+    const bucketTotal = flow.links
+      .filter((link) => link.source === 'Outcome: Status')
+      .reduce((sum, link) => sum + link.value, 0);
+    expect(bucketTotal).toBe(1);
   });
 });
 
-describe('reportSickFlow — coverage and conservation', () => {
-  test('a company with no FormSG rows at all is named in coverage', () => {
-    const personnel = personnelRows([reportSick({ company: 'Hercules' })]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [],
-      from: null,
-      to: null,
-    });
-    expect(flow.coverage.companiesWithNoFormSg).toContain('Hercules');
-  });
-
-  test('one soldier filing two submissions fans the FormSG branch out past the matched count', () => {
-    const personnel = personnelRows([reportSick({})]);
-    const episodes = buildEpisodes(personnel);
-    const submissions = [submission({}), submission({ Timestamp: '2026-07-22T09:00:00' })];
-    const flow = reportSickFlow({ personnel, episodes, submissions, from: null, to: null });
-
-    expect(flow.coverage.matched).toBe(1);
-    expect(flow.coverage.reportedSick).toBe(1);
-    expect(flow.coverage.submissions).toBe(2);
-    expect(flow.coverage.submissionFanout).toBe(true);
-    expect(outflow(flow.links, 'Reported sick')).toBe(2);
-  });
-
+describe('reportSickFlow — range and empty inputs', () => {
   test('events outside the date range are excluded', () => {
-    const personnel = personnelRows([
-      reportSick({ four_d: '1101', name: 'ZED', date: '2026-07-20', start_date: '2026-07-20' }),
-      reportSick({ four_d: '1102', name: 'ADA', date: '2026-08-20', start_date: '2026-08-20' }),
+    const episodes = episodesOf([
+      row('1101', 'Report Sick'),
+      row('1102', 'Report Sick', { date: '2026-08-20', start_date: '2026-08-20' }),
     ]);
-    const episodes = buildEpisodes(personnel);
-    const flow = reportSickFlow({
-      personnel,
-      episodes,
-      submissions: [],
-      from: '2026-08-01',
-      to: '2026-08-31',
-    });
+    const flow = reportSickFlow({ episodes, submissions: [], from: '2026-08-01', to: '2026-08-31' });
     expect(flow.coverage.reportingSick).toBe(1);
   });
 
-  test('empty inputs produce empty nodes and links rather than throwing', () => {
-    const flow = reportSickFlow({ personnel: [], episodes: [], submissions: [], from: null, to: null });
+  test('empty inputs produce empty nodes and links', () => {
+    const flow = flowOf([], []);
     expect(flow.nodes).toEqual([]);
     expect(flow.links).toEqual([]);
-    expect(flow.coverage.reportingSick).toBe(0);
-  });
-
-  test('Reporting sick outflow and Reported sick inflow reconcile with coverage', () => {
-    const personnel = personnelRows([
-      reportSick({ four_d: '1101', name: 'ZED', company: 'Archer' }),
-      reportSick({ four_d: '1102', name: 'ADA', company: 'Archer' }),
-    ]);
-    const episodes = buildEpisodes(personnel);
-    const submissions = [
-      submission({ '4D Number (REC Only)': '1101' }),
-      submission({ '4D Number (REC Only)': '3303', '[Myinfo] Name': 'BEE' }),
-    ];
-    const flow = reportSickFlow({ personnel, episodes, submissions, from: null, to: null });
-
-    expect(outflow(flow.links, 'Reporting sick')).toBe(flow.coverage.reportingSick);
-    expect(inflow(flow.links, 'Reported sick')).toBe(flow.coverage.reportedSick);
-  });
-
-  test('coverage carries exactly the fields the parent renders', () => {
-    const personnel = personnelRows([reportSick({})]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
-    expect(Object.keys(flow.coverage).sort()).toEqual(
-      [
-        'byCompany',
-        'companiesWithNoFormSg',
-        'matchRule',
-        'matched',
-        'paradeOnly',
-        'reportedSick',
-        'reportingSick',
-        'statusMultiLabelled',
-        'submissionFanout',
-        'submissions',
-        'unaccounted',
-      ].sort()
-    );
   });
 
   test('nodes carry their stage', () => {
-    const personnel = personnelRows([reportSick({})]);
-    const flow = reportSickFlow({
-      personnel,
-      episodes: buildEpisodes(personnel),
-      submissions: [submission({})],
-      from: null,
-      to: null,
-    });
+    const flow = flowOf(episodesOf([row('1101', 'Report Sick')]), submissions(['RSI']));
     const stageOf = (name) => (flow.nodes.find((node) => node.name === name) || {}).stage;
     expect(stageOf('Reporting sick')).toBe('reporting');
     expect(stageOf('Reported sick')).toBe('reported');

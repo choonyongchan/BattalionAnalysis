@@ -303,10 +303,9 @@ export function Overview() {
 
       <Card
         title="Report-Sick Flow"
-        note="Reconciled per company by name; type and outcome are per FormSG submission."
+        note="Counts only, not matched by name: each stage's total fills the next in order."
       >
         <SankeyCard
-          personnel={data.personnel}
           episodes={episodes}
           submissions={submissions}
           from={dateFrom.value}
@@ -319,14 +318,14 @@ export function Overview() {
 
 /**
  * The report-sick Sankey, with its coverage findings printed under it.
- * @param {{personnel: Array<!Object>, episodes: Array<!Object>, submissions:
- *     Array<!Object>, from: ?string, to: ?string}} props Inputs to `reportSickFlow`.
+ * @param {{episodes: Array<!Object>, submissions: Array<!Object>, from: ?string, to:
+ *     ?string}} props Inputs to `reportSickFlow`.
  * @returns {!preact.VNode} The card body.
  */
-function SankeyCard({ personnel, episodes, submissions, from, to }) {
+function SankeyCard({ episodes, submissions, from, to }) {
   const flow = useMemo(
-    () => reportSickFlow({ personnel, episodes, submissions, from, to }),
-    [personnel, episodes, submissions, from, to]
+    () => reportSickFlow({ episodes, submissions, from, to }),
+    [episodes, submissions, from, to]
   );
   const c = flow.coverage;
 
@@ -337,16 +336,9 @@ function SankeyCard({ personnel, episodes, submissions, from, to }) {
       </ChartCard>
       <Coverage>
         {fmtInt(c.reportingSick)} reporting sick on the parade state, {fmtInt(c.reportedSick)} reported
-        sick on FormSG — {fmtInt(c.matched)} both, {fmtInt(c.paradeOnly)} filed no form,{' '}
-        {fmtInt(c.unaccounted)} unaccounted (FormSG with no parade-state line).
-        {c.companiesWithNoFormSg && c.companiesWithNoFormSg.length > 0
-          ? ' No FormSG channel recorded for ' + c.companiesWithNoFormSg.join(', ') + '.'
-          : ''}
-        {c.submissionFanout
-          ? ' A soldier who filed more than one form is one person on the left and several submissions on the right, so the FormSG branch is wider than the soldier count.'
-          : ''}
-        {c.statusMultiLabelled
-          ? ' A status outcome naming several restrictions is counted under each — the Status branch\'s outflow can exceed its inflow.'
+        sick on FormSG, then {fmtInt(c.mc)} MC and {fmtInt(c.status)} Status.
+        {c.outcomesNotShown > 0
+          ? ' ' + fmtInt(c.outcomesNotShown) + ' outcomes exceed the reported-sick count and are not drawn.'
           : ''}
       </Coverage>
     </>
