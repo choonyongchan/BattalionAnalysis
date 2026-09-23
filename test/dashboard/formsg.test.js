@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
+  reportSickTypeOf,
   submissionCounts,
   submissionHeatmapCells,
   submissionPlatoonOf,
@@ -111,6 +112,21 @@ describe('submissionTrend', () => {
     const trend = submissionTrend(submissions, [], ['2026-07-20'], { scope: 'battalion' });
     expect(trend.series[0].values[0]).toBe(0);
   });
+
+  test('asRate:false returns the raw submission count and ignores strength', () => {
+    const submissions = toSubmissions([
+      row({ Timestamp: '2026-07-20 08:00:00' }),
+      row({ Timestamp: '2026-07-20 09:00:00' }),
+    ]);
+    const strength = strengthRows([
+      { date: '2026-07-20', session: 'FPS', company: 'Cougar', unit_type: 'Company', total_strength: 100, total_present: 90 },
+    ]);
+    const trend = submissionTrend(submissions, strength, ['2026-07-20'], {
+      scope: 'battalion',
+      asRate: false,
+    });
+    expect(trend.series[0].values[0]).toBe(2);
+  });
 });
 
 describe('submissionPlatoonOf', () => {
@@ -156,14 +172,25 @@ describe('submissionCounts', () => {
 describe('submissionHeatmapCells', () => {
   test('counts submissions per company x inferred platoon, dropping unknown companies', () => {
     const cells = submissionHeatmapCells([
-      { company: 'Cougar', fourD: '3203' },
-      { company: 'Cougar', fourD: '3299' },
+      { company: 'Cougar', fourD: '8203' },
+      { company: 'Cougar', fourD: 'C8299' },
       { company: 'Archer', fourD: '' },
       { company: '', fourD: '1234' },
     ]);
-    expect(cells).toContainEqual({ row: 'Cougar', column: '3', value: 2 });
+    expect(cells).toContainEqual({ row: 'Cougar', column: '8', value: 2 });
     expect(cells).toContainEqual({ row: 'Archer', column: 'HQ', value: 1 });
     expect(cells.length).toBe(2);
+  });
+
+  test("a 4D digit that is not one of the company's platoons falls back to HQ", () => {
+    const cells = submissionHeatmapCells([
+      { company: 'Cougar', fourD: '3203' },
+      { company: 'Stallion', fourD: '1234' },
+    ]);
+    expect(cells).toEqual([
+      { row: 'Cougar', column: 'HQ', value: 1 },
+      { row: 'Stallion', column: 'HQ', value: 1 },
+    ]);
   });
 });
 
@@ -198,5 +225,20 @@ describe('submissionRateByPlatoon', () => {
     ]);
     const rows = submissionRateByPlatoon(submissions, strength);
     expect(rows.map((r) => r.company + r.platoon)).toEqual(['Archer2', 'Cougar1']);
+  });
+});
+
+describe('reportSickTypeOf', () => {
+  test("reads the stored short code and the form's verbatim answer alike", () => {
+    expect(reportSickTypeOf({ reportSickType: 'RSO' })).toBe('RSO');
+    expect(reportSickTypeOf({ reportSickType: 'MR' })).toBe('MR');
+    expect(reportSickTypeOf({ reportSickType: 'Report Sick In-Camp (RSI)' })).toBe('RSI');
+    expect(reportSickTypeOf({ reportSickType: 'Medical Review' })).toBe('MR');
+    expect(reportSickTypeOf({ reportSickType: 'FFI' })).toBe('FFI');
+  });
+
+  test('an unrecorded or pending type matches no filter option', () => {
+    expect(reportSickTypeOf({ reportSickType: '' })).toBe('');
+    expect(reportSickTypeOf({ reportSickType: 'PENDING' })).toBe('');
   });
 });

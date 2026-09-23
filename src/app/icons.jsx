@@ -1,7 +1,7 @@
 /**
  * The shell's icon set.
  *
- * Hand-drawn rather than pulled from a library: seven nav icons and four controls is not
+ * Hand-drawn rather than pulled from a library: seven nav icons and a handful of controls is not
  * worth a dependency, and drawing them here keeps every one on the same 24-unit grid at
  * the same 1.6 stroke, which is what makes an icon rail look deliberate rather than
  * assembled. All inherit `currentColor`, so the active-link and theme colours reach them
@@ -104,6 +104,21 @@ export const LockIcon = () => (
 export const DepositIcon = () => (
   <Glyph>
     <path d="M9 4h6v3H9zM9 5.5H6.5A1.5 1.5 0 0 0 5 7v12.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V7a1.5 1.5 0 0 0-1.5-1.5H15M8.5 11.5h7M8.5 15h7M8.5 18.5h4" />
+  </Glyph>
+);
+
+/** @returns {!preact.VNode} A magnifying glass: search. */
+export const SearchIcon = () => (
+  <Glyph>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.3 15.3 20.5 20.5" />
+  </Glyph>
+);
+
+/** @returns {!preact.VNode} A cross: clear what was typed. */
+export const ClearIcon = () => (
+  <Glyph>
+    <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
   </Glyph>
 );
 

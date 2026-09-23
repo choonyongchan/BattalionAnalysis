@@ -7,13 +7,17 @@
  * a source for.
  */
 
+import { useState } from 'preact/hooks';
 import { Card, Coverage } from '../components/Card.jsx';
+import { Segmented } from '../components/Segmented.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { ChartCard, Histogram, WordCloud } from '../charts/index.js';
 import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import {
+  REPORT_SICK_TYPES,
+  reportSickTypeOf,
   submissionCounts,
   submissionHeatmapCells,
   submissionRateByCompany,
@@ -133,6 +137,39 @@ function ReportedSickRankings({ submissions, strength, range }) {
   );
 }
 
+/** @type {string} The type filter's "no filter" option. */
+const ALL_TYPES = 'ALL';
+
+/** @type {Array<{name: string, label: string}>} The type filter's options, "All" first. */
+const TYPE_OPTIONS = [{ name: ALL_TYPES, label: 'All' }, ...REPORT_SICK_TYPES];
+
+/**
+ * The FormSG trend, with a filter for the form's report-sick type.
+ *
+ * A component of its own so the filter's `useState` has its own hook slot. The filter
+ * narrows only this chart; the tiles, heatmap and rankings still count every submission.
+ * @param {{submissions: Array<!Object>, strength: Array<!Object>, range: !Object}} props
+ *     Every FormSG submission in scope, Strength Data, and the range.
+ * @returns {!preact.VNode} The trend card.
+ */
+function FormSgTrend({ submissions, strength, range }) {
+  const [type, setType] = useState(ALL_TYPES);
+  const shown =
+    type === ALL_TYPES ? submissions : submissions.filter((s) => reportSickTypeOf(s) === type);
+
+  return (
+    <TrendSection
+      title="Reported Sick (FormSG) Trend"
+      coverage="FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap."
+      trendFn={(scope, dates) => submissionTrend(shown, strength, dates, { scope, session: 'FPS' })}
+      range={range}
+      controls={
+        <Segmented options={TYPE_OPTIONS} value={type} onChange={setType} label="Report sick type" />
+      }
+    />
+  );
+}
+
 /** @type {string[]} Hour labels, 00:00 through 23:00. */
 const HOUR_LABELS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0') + ':00');
 
@@ -167,9 +204,9 @@ function hourBins(submissions) {
  * The Report Sick page.
  *
  * Every panel carries both sources of the same event: the parade state ("Reporting
- * Sick") and FormSG ("Reported Sick"). The second tile row ends with the absolute gap
- * between the two counts, because a reader comparing the channels needs the pair on
- * screen at once.
+ * Sick") and FormSG ("Reported Sick"). Each source's tiles count soldiers rather than
+ * events, and the second tile row ends with the absolute gap between the two event counts,
+ * because a reader comparing the channels needs that gap on screen.
  * @returns {!preact.VNode} The page.
  */
 export function ReportSick() {
@@ -184,13 +221,12 @@ export function ReportSick() {
         range={range}
         dutyClass={DUTY}
         labels={{
-          episodes: 'Reporting Sick (Parade State) Count',
+          episodes: null,
           soldiers: 'Soldiers Reporting Sick',
           perSoldier: 'Mean Reporting Sick Count per Soldier',
         }}
       />
       <TileRow>
-        <Tile label="Reported Sick (FormSG)" value={fmtInt(formSg.submissions)} />
         <Tile label="Soldiers Reported Sick" value={fmtInt(formSg.soldiers)} />
         <Tile
           label="Mean Reported Sick Count per Soldier"
@@ -199,16 +235,11 @@ export function ReportSick() {
         <Tile label="Δ Report Sick" value={fmtInt(Math.abs(paradeEpisodes - formSg.submissions))} />
       </TileRow>
       <DutyTrend title="Reporting Sick (Parade State) Trend" data={data} dutyClass={DUTY} range={range} />
-      <TrendSection
-        title="Reported Sick (FormSG) Trend"
-        coverage="FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap."
-        trendFn={(scope, dates) => submissionTrend(submissions, data.strength, dates, { scope, session: 'FPS' })}
-        range={range}
-      />
+      <FormSgTrend submissions={submissions} strength={data.strength} range={range} />
       <PlatoonHeatmap
         cells={submissionHeatmapCells(ranged)}
         title="Reported Sick (FormSG) — by Company and Platoon"
-        coverage="Count of FormSG submissions. Platoon is inferred from the 4D; a submission with no 4D is placed under HQ."
+        coverage="Count of FormSG submissions. Platoon is inferred from the leading digit of the 4D; a submission with no 4D, or from a company whose platoons are named rather than numbered (Stallion, Hercules), is placed under Coy HQ."
         valueName="submissions"
         empty="No FormSG submissions in range to place on the grid."
       />

@@ -267,47 +267,163 @@ tbody tr:last-child td {
 
 /* ------------------------------------------------------------ soldier search */
 
+/*
+ * One search box, the way a web search engine draws it: a 48px pill that lifts on hover
+ * and focus, and a suggestion list that grows out of its lower edge. While the list is
+ * open, the bar's bottom corners square off and the list's top corners do too, so the
+ * pair reads as one card split by a hairline.
+ */
 .soldiersearch {
+  --soldiersearch-height: 48px;
+  --soldiersearch-lift: 0 1px 6px rgba(32, 33, 36, 0.18);
   position: relative;
-  max-width: 28rem;
+  width: 100%;
+  max-width: 40rem;
+}
+
+.soldiersearch__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: var(--soldiersearch-height);
+  padding: 0 var(--space-xs) 0 var(--space-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: calc(var(--soldiersearch-height) / 2);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.soldiersearch__bar:hover,
+.soldiersearch__bar:focus-within {
+  border-color: transparent;
+  box-shadow: var(--soldiersearch-lift);
+}
+
+.soldiersearch--open .soldiersearch__bar {
+  border-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: var(--soldiersearch-lift);
+}
+
+.soldiersearch__lead,
+.soldiersearch__glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-muted);
 }
 
 .soldiersearch__input {
-  width: 100%;
-  height: 48px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+/* The bar draws the focus, so the input inside it does not draw a second ring. */
+.soldiersearch__input:focus,
+.soldiersearch__input:focus-visible {
+  outline: none;
+}
+
+/* The bar carries its own clear button; the browser's would make two. */
+.soldiersearch__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.soldiersearch__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.soldiersearch__clear:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
 }
 
 .soldiersearch__list {
   position: absolute;
-  top: calc(100% + var(--space-xs));
+  top: 100%;
   left: 0;
   right: 0;
   z-index: 30;
   margin: 0;
-  padding: var(--space-xs);
+  padding: var(--space-xxs) 0 var(--space-xs);
   list-style: none;
   background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-float);
-  max-height: 20rem;
+  border-top: 1px solid var(--hairline-soft);
+  border-radius: 0 0 calc(var(--soldiersearch-height) / 2) calc(var(--soldiersearch-height) / 2);
+  box-shadow: 0 4px 6px rgba(32, 33, 36, 0.18);
+  max-height: 22rem;
   overflow-y: auto;
 }
 
 .soldiersearch__option {
   display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.soldiersearch__text {
+  display: flex;
   flex-direction: column;
   gap: 1px;
-  width: 100%;
-  padding: var(--space-xs) var(--space-sm);
-  text-align: left;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
+  min-width: 0;
 }
 
 .soldiersearch__option:hover,
 .soldiersearch__option[aria-selected='true'] {
   background: var(--accent-wash);
+}
+
+/*
+ * The Soldier page before anything is picked: the search bar alone, centred in the
+ * content area. Once a soldier is picked, the bar moves to the top of the page and the
+ * report fills in below it.
+ */
+.soldierhome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 18vh var(--space-md) var(--space-xxl);
+  text-align: center;
+}
+
+.soldierhome__title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+
+.soldierhome__hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+/* Suggestions are left-aligned even inside the centred landing view. */
+.soldierhome .soldiersearch {
+  text-align: left;
 }
 
 .soldiersearch__name {
@@ -547,4 +663,36 @@ tbody tr:last-child td {
   padding: var(--space-sm) var(--space-md);
   color: var(--ink-faint);
   font-size: 14px;
+}
+
+/* ------------------------------------------------------------ heatmap column key */
+
+/*
+ * Under a position heatmap: what "1st Pl" and the rest mean for each company, since the
+ * companies number and name their platoons differently.
+ */
+.heatmapkey {
+  display: grid;
+  gap: var(--space-xxs);
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--hairline-soft);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.heatmapkey__row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: var(--space-sm);
+}
+
+.heatmapkey__column {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.heatmapkey__units {
+  margin: 0;
+  color: var(--ink-muted);
 }

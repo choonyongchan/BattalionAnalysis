@@ -32,7 +32,14 @@ export function Status() {
 
   return (
     <CategoryPage title="Status" range={range}>
-      <EpisodeTiles range={range} dutyClass={DUTY} />
+      <EpisodeTiles
+        range={range}
+        dutyClass={DUTY}
+        labels={{
+          episodes: 'Number of Status taken',
+          perSoldier: 'Average number of Status taken per soldier',
+        }}
+      />
       <DutyTrend title="Status Trend" data={data} dutyClass={DUTY} range={range} />
       <PlatoonHeatmap cells={episodeCells(range.episodes, DUTY)} />
       <ReasonsOverTime

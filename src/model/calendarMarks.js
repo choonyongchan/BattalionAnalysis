@@ -50,7 +50,7 @@ const SG_PUBLIC_HOLIDAYS = {
   '2026-01-01': "New Year's Day",
   '2026-02-17': 'Chinese New Year',
   '2026-02-18': 'Chinese New Year',
-  '2026-03-20': 'Hari Raya Puasa',
+  '2026-03-21': 'Hari Raya Puasa',
   '2026-04-03': 'Good Friday',
   '2026-05-01': 'Labour Day',
   '2026-05-27': 'Hari Raya Haji',

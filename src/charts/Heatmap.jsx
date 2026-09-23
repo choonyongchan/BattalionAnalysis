@@ -147,7 +147,7 @@ function option_(props, palette) {
       formatter: (params) => {
         const entry = params.data.cell;
         return tooltipLines(
-          entry.row + ' · ' + entry.column,
+          entry.row + ' · ' + (entry.platoon ? entry.platoon + ' (' + entry.column + ')' : entry.column),
           [
             (valueName || 'Value') + ': ' + fmtInt(entry.value),
             ...(detail ? detail(entry) : []),
@@ -183,6 +183,22 @@ function option_(props, palette) {
           value: [entry.column, entry.row, entry.cell.value],
           cell: entry.cell,
         })),
+        // A cell carrying its own platoon name says so in place, because on a position
+        // grid the column alone does not say which platoon a company means by it. The
+        // surface halo keeps the name legible on every step of the ramp.
+        label: {
+          show: placed.some((entry) => entry.cell.platoon),
+          formatter: (params) => {
+            const cell = params.data.cell;
+            return cell.platoon ? cell.platoon + '\n' + fmtInt(cell.value) : '';
+          },
+          color: palette.ink,
+          fontSize: 11,
+          lineHeight: 14,
+          fontFamily: palette.fontUi,
+          textBorderColor: palette.surface,
+          textBorderWidth: 2,
+        },
         // A 2px surface gap between cells, rather than a border drawn around each.
         itemStyle: { borderColor: palette.surface, borderWidth: 2, borderRadius: 2 },
         emphasis: { itemStyle: { borderColor: palette.ink, borderWidth: 2 } },
@@ -198,53 +214,85 @@ function option_(props, palette) {
 }
 
 /**
+ * The key under a position grid: what each column means, company by company.
+ * @param {{columnKey: Array<{column: string, units: Array<{company: string,
+ *     platoon: string}>}>}} props From `positionKey`.
+ * @returns {!preact.VNode} The key.
+ */
+function ColumnKey({ columnKey }) {
+  return (
+    <dl class="heatmapkey" aria-label="What each column means">
+      {columnKey.map((entry) => (
+        <div class="heatmapkey__row" key={entry.column}>
+          <dt class="heatmapkey__column">{entry.column}</dt>
+          <dd class="heatmapkey__units">
+            {entry.units.map((unit) => unit.company + ' ' + unit.platoon).join(' · ')}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
  * A company by platoon heatmap.
  * @param {{rows: string[], columns: string[],
  *     cells: Array<{row: string, column: string, value: ?number,
- *         inferred: (boolean|undefined)}>,
+ *         inferred: (boolean|undefined), platoon: (string|undefined)}>,
  *     valueName: (string|undefined), detail: (function(!Object): string[]|undefined),
+ *     columnKey: (Array<!Object>|undefined),
  *     height: (number|undefined), view: (string|undefined)}} props
- *     `rows` are normally `COMPANIES` and `columns` `PLATOONS`; a cell naming a row or
- *     column not on the axis is dropped rather than drawn somewhere wrong; `inferred`
- *     marks a cell whose platoon was worked out from the 4D and draws the hatch; `detail`
- *     adds tooltip lines for one cell — its text is inserted as text, never as markup;
- *     `view` is set by `ChartCard`.
+ *     `rows` are normally `COMPANIES`; a cell naming a row or column not on the axis is
+ *     dropped rather than drawn somewhere wrong; `inferred` marks a cell whose platoon was
+ *     worked out from the 4D and draws the hatch; `platoon` is the company's own name for
+ *     the cell's column, written in the cell, when the columns are positions rather than
+ *     platoons; `columnKey` (from `positionKey`) spells out each column under the grid;
+ *     `detail` adds tooltip lines for one cell — its text is inserted as text, never as
+ *     markup; `view` is set by `ChartCard`.
  * @returns {!Object} The chart, or its table twin.
  */
 export function Heatmap(props) {
-  const { rows, columns, cells, valueName, height = 300, view } = props;
+  const { rows, columns, cells, valueName, columnKey, height = 300, view } = props;
+  const key = columnKey ? <ColumnKey columnKey={columnKey} /> : null;
   if (view === 'table') {
     const byKey = new Map(cells.map((cell) => [cell.row + '|' + cell.column, cell]));
     return (
-      <TableTwin
-        columns={[{ label: 'Company' }, ...columns.map((column) => ({ label: column, numeric: true }))]}
-        rows={rows.map((row) => [
-          row,
-          ...columns.map((column) => {
-            const cell = byKey.get(row + '|' + column);
-            return {
-              text: cell ? fmtInt(cell.value) : '—',
-              inferred: Boolean(cell && cell.inferred),
-            };
-          }),
-        ])}
-        caption={(valueName || 'Value') + ' by company and platoon; hatched cells are inferred'}
-      />
+      <>
+        <TableTwin
+          columns={[{ label: 'Company' }, ...columns.map((column) => ({ label: column, numeric: true }))]}
+          rows={rows.map((row) => [
+            row,
+            ...columns.map((column) => {
+              const cell = byKey.get(row + '|' + column);
+              const value = cell ? fmtInt(cell.value) : '—';
+              return {
+                text: cell && cell.platoon ? cell.platoon + ': ' + value : value,
+                inferred: Boolean(cell && cell.inferred),
+              };
+            }),
+          ])}
+          caption={(valueName || 'Value') + ' by company and platoon; hatched cells are inferred'}
+        />
+        {key}
+      </>
     );
   }
   return (
-    <Plot
-      height={height}
-      label={
-        (valueName || 'Value') +
-        ' for ' +
-        rows.length +
-        ' companies by ' +
-        columns.length +
-        ' platoons. Switch to Table for the values.'
-      }
-      build={(palette) => option_(props, palette)}
-    />
+    <>
+      <Plot
+        height={height}
+        label={
+          (valueName || 'Value') +
+          ' for ' +
+          rows.length +
+          ' companies by ' +
+          columns.length +
+          ' platoons. Switch to Table for the values.'
+        }
+        build={(palette) => option_(props, palette)}
+      />
+      {key}
+    </>
   );
 }
 

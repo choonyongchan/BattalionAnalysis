@@ -12,8 +12,8 @@
  * denominator.
  *
  * The selected parade also anchors the one forward-looking section: presence by rank tier,
- * then projected % present over the next week from the dates each absence states
- * (`model/projection.js`), and the list of who is due back when.
+ * then the list of who is due back when, from the dates each absence states
+ * (`model/projection.js`).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -36,8 +36,7 @@ import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions, submissionTrend } from '../model/formsg.js';
 import { filingsOn, toFilings } from '../model/submissions.js';
 import { dutyTrend, presentTrend, tierPresence } from '../model/strength.js';
-import { DEFAULT_PROJECTION_DAYS, projectedStrength, returnsToDuty } from '../model/projection.js';
-import { addDays } from '../model/dates.js';
+import { DEFAULT_PROJECTION_DAYS, returnsToDuty } from '../model/projection.js';
 import { reportSickFlow } from '../model/sankey.js';
 
 /** @type {string} Session every "today" figure and trend describes. */
@@ -225,7 +224,7 @@ export function Overview() {
         </h2>
       </div>
 
-      <ProjectionCards data={data} date={today} holidays={holidays} />
+      <ReturnsCard data={data} date={today} />
 
       <div class="band">
         <h2 class="pagehead__title" style="font-size:21px">
@@ -234,9 +233,9 @@ export function Overview() {
       </div>
 
       <TrendCard
-        title="% present"
+        title="Soldiers present"
         coverage={trendCoverage}
-        unit="%"
+        unit="soldiers"
         trendFn={(scope) => {
           const trend = presentTrend(data.strength, trendDates, { scope, session: SESSION });
           return { ...trend, weekends, holidays: rangeHolidays };
@@ -246,11 +245,12 @@ export function Overview() {
       <TrendCard
         title="Reporting Sick (Parade State)"
         coverage={trendCoverage}
-        unit="per 100"
+        unit="soldiers"
         trendFn={(scope) => {
           const trend = dutyTrend(data.personnel, data.strength, DUTY_CLASS.REPORT_SICK, trendDates, {
             scope,
             session: SESSION,
+            asRate: false,
           });
           return { ...trend, weekends, holidays: rangeHolidays };
         }}
@@ -261,9 +261,13 @@ export function Overview() {
         coverage={
           'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.'
         }
-        unit="per 100"
+        unit="submissions"
         trendFn={(scope) => {
-          const trend = submissionTrend(submissions, data.strength, trendDates, { scope, session: SESSION });
+          const trend = submissionTrend(submissions, data.strength, trendDates, {
+            scope,
+            session: SESSION,
+            asRate: false,
+          });
           return { ...trend, weekends, holidays: rangeHolidays };
         }}
       />
@@ -271,11 +275,12 @@ export function Overview() {
       <TrendCard
         title="MC / MA"
         coverage={trendCoverage}
-        unit="per 100"
+        unit="soldiers"
         trendFn={(scope) => {
           const trend = dutyTrend(data.personnel, data.strength, MC_MA, trendDates, {
             scope,
             session: SESSION,
+            asRate: false,
           });
           return { ...trend, weekends, holidays: rangeHolidays };
         }}
@@ -284,11 +289,12 @@ export function Overview() {
       <TrendCard
         title="Status"
         coverage={trendCoverage}
-        unit="per 100"
+        unit="soldiers"
         trendFn={(scope) => {
           const trend = dutyTrend(data.personnel, data.strength, DUTY_CLASS.STATUS, trendDates, {
             scope,
             session: SESSION,
+            asRate: false,
           });
           return { ...trend, weekends, holidays: rangeHolidays };
         }}
@@ -398,63 +404,37 @@ function TierCard({ strength, date, scoped }) {
 }
 
 /**
- * The forward view: projected % present over the coming days, and who is due back when.
- * @param {{data: !Object, date: string, holidays: Array<!Object>}} props The scoped
- *     dataset, the parade the projection starts from, and the public holidays.
- * @returns {!preact.VNode} The two cards.
+ * The forward view: who is due back when, from the dates each MC and leave line states.
+ * @param {{data: !Object, date: string}} props The scoped dataset and the parade the
+ *     absences are read from.
+ * @returns {!preact.VNode} The card.
  */
-function ProjectionCards({ data, date, holidays }) {
-  const end = addDays(date, DEFAULT_PROJECTION_DAYS);
-  const weekends = weekendBands(date, end);
-  const windowHolidays = holidaysIn(holidays, date, end);
-  const base = projectedStrength(data.personnel, data.strength, date, { session: SESSION });
+function ReturnsCard({ data, date }) {
   const returns = returnsToDuty(data.personnel, date, SESSION);
 
-  const coverage =
-    'Projected from the parade state for ' +
-    fmtDate(date) +
-    ' (' +
-    fmtFraction(base.companiesReporting.length, COMPANIES.length) +
-    ' companies) using the dates each MC and leave states; MA, others and status do not keep a soldier off parade, and nobody new is assumed to fall sick. ' +
-    (base.openEnded > 0
-      ? fmtInt(base.openEnded) + ' on MC or leave with no return date are held out for the whole week.'
-      : 'Every MC and leave states a return date.');
-
   return (
-    <>
-      <TrendCard
-        title="Projected % present"
-        coverage={coverage}
-        unit="%"
-        trendFn={(scope) => ({
-          ...projectedStrength(data.personnel, data.strength, date, { session: SESSION, scope }),
-          weekends,
-          holidays: windowHolidays,
-        })}
-      />
-      <Card title="Returning to Duty" note="Everyone on MC or leave on this parade, soonest back first">
-        {returns.length === 0 ? (
-          <EmptyState>Nobody is listed on MC or leave on {fmtDate(date)}.</EmptyState>
-        ) : (
-          <DataTable
-            columns={[
-              { key: 'name', label: 'Name' },
-              { key: 'company', label: 'Company' },
-              { key: 'platoon', label: 'Platoon' },
-              { key: 'category', label: 'Category' },
-              { key: 'from', label: 'From' },
-              { key: 'back', label: 'Back on' },
-            ]}
-            rows={returns.map((row) => ({
-              ...row,
-              name: (row.rank + ' ' + row.name).trim(),
-              from: fmtDate(row.from),
-              back: row.backOn ? fmtDate(row.backOn) : 'Not stated',
-            }))}
-            rowKey={(row) => row.company + row.key}
-          />
-        )}
-      </Card>
-    </>
+    <Card title="Returning to Duty" note="Everyone on MC or leave on this parade, soonest back first">
+      {returns.length === 0 ? (
+        <EmptyState>Nobody is listed on MC or leave on {fmtDate(date)}.</EmptyState>
+      ) : (
+        <DataTable
+          columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'company', label: 'Company' },
+            { key: 'platoon', label: 'Platoon' },
+            { key: 'category', label: 'Category' },
+            { key: 'from', label: 'From' },
+            { key: 'back', label: 'Back on' },
+          ]}
+          rows={returns.map((row) => ({
+            ...row,
+            name: (row.rank + ' ' + row.name).trim(),
+            from: fmtDate(row.from),
+            back: row.backOn ? fmtDate(row.backOn) : 'Not stated',
+          }))}
+          rowKey={(row) => row.company + row.key}
+        />
+      )}
+    </Card>
   );
 }

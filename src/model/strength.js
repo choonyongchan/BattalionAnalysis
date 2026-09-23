@@ -141,13 +141,20 @@ function companyStrengthOn_(strengthRows, isoDate, session) {
 }
 
 /**
- * The percentage-present trend, battalion-wide or split into six company series.
+ * The present-headcount trend, battalion-wide or split into six company series.
+ *
+ * This is the one trend on the Overview reported as a count rather than a rate: it answers
+ * "how many soldiers do I have", which is a number of bodies, not a ratio. Because the
+ * companies split therefore compares raw headcounts, a large company sits above a small one
+ * for reasons that are not performance — the rank tiers and the rate trends below it are
+ * where companies are compared like for like.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
  * @param {string[]} dates Parade dates to plot, oldest first.
  * @param {{scope?: string, session?: string}=} options `scope` is 'battalion' (default)
  *     or 'companies'; `session` defaults to 'FPS'.
  * @returns {{dates: string[], series: Array<{name: string, values: Array<?number>}>}} One
- *     series for the battalion, or one per company, with null where nothing was filed.
+ *     series of present soldiers for the battalion, or one per company, with null where
+ *     nothing was filed.
  */
 export function presentTrend(strengthRows, dates, options) {
   const scope = (options && options.scope) || 'battalion';
@@ -161,10 +168,7 @@ export function presentTrend(strengthRows, dates, options) {
         name: company,
         values: perDate.map((byCompany) => {
           const entry = byCompany.get(company);
-          if (!entry || !entry.strength) {
-            return null;
-          }
-          return (entry.present / entry.strength) * 100;
+          return entry ? entry.present : null;
         }),
       })),
     };
@@ -175,7 +179,14 @@ export function presentTrend(strengthRows, dates, options) {
     series: [
       {
         name: 'Battalion',
-        values: dates.map((date) => battalionStrength(strengthRows, date, session).percentPresent),
+        values: dates.map((date) => {
+          // `battalionStrength` sums an empty day to 0, which as a headcount would draw the
+          // battalion line falling to the floor on every day nobody filed. A day with no
+          // parade state is missing data, so it stays a gap — the same rule the percentage
+          // got for free from its `accountable > 0` guard.
+          const strength = battalionStrength(strengthRows, date, session);
+          return strength.companiesReporting.length === 0 ? null : strength.present;
+        }),
       },
     ],
   };
@@ -220,9 +231,11 @@ function dutyCountsByCompany_(personnelRows, isoDate, session, dutyClass) {
 /**
  * A duty class counted per date, battalion-wide or split into six company series.
  *
- * The by-company denominator is that company's own accountable strength, so a large
- * company and a small one are comparable — the dashboard's standing rule that every
- * comparison is a rate rather than a count.
+ * As a rate (the default), the by-company denominator is that company's own accountable
+ * strength, so a large company and a small one are comparable. `asRate: false` gives the
+ * raw headcount instead, which is what the Overview's trends ask for: a commander reading
+ * the front page wants to know how many soldiers are affected, not a normalised ratio.
+ * Either way a company that filed no strength row that day is a gap, never a zero.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
  * @param {string|!Array<string>} dutyClass Duty class(es) to trend, from DUTY_CLASS.

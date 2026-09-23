@@ -16,7 +16,14 @@
 import { extractSymptoms, keywords } from './classify.js';
 import { identityKey, normaliseFourD } from './identity.js';
 import { toIsoDate, toNumber, toText } from './values.js';
-import { COMPANIES, PLATOONS, UNASSIGNED, UNIT_TYPE_COMPANY } from './domain.js';
+import {
+  COMPANIES,
+  COMPANY_SUBUNITS,
+  PLATOONS,
+  UNASSIGNED,
+  UNIT_TYPE_COMPANY,
+  subunitPosition,
+} from './domain.js';
 import { platoonOf } from './platoon.js';
 import { battalionStrength } from './metrics.js';
 
@@ -48,6 +55,59 @@ export function submissionPlatoonOf(submission) {
 }
 
 /**
+ * The sub-unit a FormSG submission belongs to, for the position heatmap.
+ *
+ * Wider than `submissionPlatoonOf`: the 4D's leading digit is read across 1-9, since
+ * Braves numbers 4-6 and Cougar 7-9, and kept only when it is one of the submitter's own
+ * company's sub-units (`COMPANY_SUBUNITS`). Anything else — no 4D, or a digit the company
+ * has no platoon for, as for Stallion's and Hercules' named sub-units — goes under `HQ`,
+ * the same fallback `submissionPlatoonOf` uses.
+ * @param {!Object} submission A normalised submission from `toSubmissions`.
+ * @returns {string} A sub-unit of the submission's company, or `'HQ'`.
+ */
+export function submissionSubunitOf(submission) {
+  const match = /^[A-Z]?([1-9])/.exec(toText(submission.fourD).toUpperCase());
+  const digit = match ? match[1] : '';
+  return subunitPosition(submission.company, digit) > 0 ? digit : 'HQ';
+}
+
+/**
+ * The report-sick types a FormSG submission can carry, in the order a filter lists them.
+ * `name` is the short code the database stores; `label` is what a reader sees.
+ * @type {Array<{name: string, label: string}>}
+ */
+export const REPORT_SICK_TYPES = [
+  { name: 'RSO', label: 'RSO' },
+  { name: 'RSI', label: 'RSI' },
+  { name: 'FFI', label: 'FFI' },
+  { name: 'MR', label: 'Medical Review' },
+];
+
+/**
+ * The form's verbatim type answers, as a Sheet-era row carries them, mapped to short codes.
+ * @type {!Object<string, string>}
+ */
+const VERBATIM_TYPES_ = {
+  'REPORT SICK IN-CAMP (RSI)': 'RSI',
+  'REPORT SICK OUTSIDE (RSO)': 'RSO',
+  'MEDICAL REVIEW': 'MR',
+};
+
+/**
+ * The short code of a submission's report-sick type.
+ *
+ * The read route stores the short code (`RSO`), but a row imported from the Sheet may
+ * still carry the form's full answer (`Report Sick Outside (RSO)`), so both are read.
+ * @param {!Object} submission A normalised submission from `toSubmissions`.
+ * @returns {string} A `REPORT_SICK_TYPES` name, or '' when no known type was recorded.
+ */
+export function reportSickTypeOf(submission) {
+  const text = toText(submission.reportSickType).toUpperCase();
+  if (REPORT_SICK_TYPES.some((type) => type.name === text)) return text;
+  return VERBATIM_TYPES_[text] || '';
+}
+
+/**
  * Headline counts for the FormSG "reported sick" side, mirroring `metrics.episodeCounts`.
  *
  * A submission is already one event, so `submissions` is a plain row count. `soldiers` is
@@ -76,24 +136,24 @@ export function submissionCounts(submissions) {
  *
  * Company comes from the matched "Unit & Coy" answer; a submission naming no known company
  * is dropped, exactly as `submissionRateByCompany` drops it, rather than guessed at.
- * Platoon comes from `submissionPlatoonOf`. Empty cells are omitted, matching the contract
+ * Platoon comes from `submissionSubunitOf`. Empty cells are omitted, matching the contract
  * the parade-state `PlatoonHeatmap` already expects.
  * @param {Array<!Object>} submissions Normalised submissions, already restricted to the
  *     range being drawn.
  * @returns {Array<{row: string, column: string, value: number}>} One entry per non-empty
- *     company x platoon pair.
+ *     company x sub-unit pair.
  */
 export function submissionHeatmapCells(submissions) {
   const counts = new Map();
   submissions.forEach((submission) => {
     if (!COMPANIES.includes(submission.company)) return;
-    const key = submission.company + '\u0000' + submissionPlatoonOf(submission);
+    const key = submission.company + '\u0000' + submissionSubunitOf(submission);
     counts.set(key, (counts.get(key) || 0) + 1);
   });
 
   const cells = [];
   COMPANIES.forEach((company) => {
-    PLATOONS.forEach((platoon) => {
+    (COMPANY_SUBUNITS[company] || []).forEach((platoon) => {
       const value = counts.get(company + '\u0000' + platoon) || 0;
       if (value > 0) {
         cells.push({ row: company, column: platoon, value });
@@ -228,16 +288,19 @@ export function toSubmissions(rows) {
  * adoption.
  * @param {Array<!Object>} submissions Normalised FormSG submissions from `toSubmissions`.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records, for the
- *     battalion-scope rate.
+ *     battalion-scope rate; unused when `asRate` is false.
  * @param {string[]} dates Dates to plot, oldest first.
- * @param {{scope?: string, session?: string}=} options `scope` is 'battalion' (a rate per
- *     100 accountable) or 'companies' (a raw count per company); `session` defaults to
- *     'FPS' and is used only to look up battalion strength for the rate.
+ * @param {{scope?: string, session?: string, asRate?: boolean}=} options `scope` is
+ *     'battalion' (a rate per 100 accountable) or 'companies' (a raw count per company);
+ *     `asRate` divides the battalion series by strength, defaulting true, and false makes
+ *     it a raw submission count; `session` defaults to 'FPS' and is used only to look up
+ *     battalion strength for the rate.
  * @returns {{dates: string[], series: Array<{name: string, values: number[]}>}} The trend.
  */
 export function submissionTrend(submissions, strengthRows, dates, options) {
   const scope = (options && options.scope) || 'battalion';
   const session = (options && options.session) || 'FPS';
+  const asRate = !options || options.asRate !== false;
 
   const byDate = new Map();
   submissions.forEach((submission) => {
@@ -266,6 +329,9 @@ export function submissionTrend(submissions, strengthRows, dates, options) {
             (sum, count) => sum + count,
             0
           );
+          if (!asRate) {
+            return total;
+          }
           const strength = battalionStrength(strengthRows, date, session);
           return strength.accountable > 0 ? (total / strength.accountable) * 100 : 0;
         }),

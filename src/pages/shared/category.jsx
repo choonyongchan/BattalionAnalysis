@@ -24,7 +24,8 @@ import { SoldierSearch } from '../../components/SoldierSearch.jsx';
 import { Leaderboard } from '../../components/Leaderboard.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../../format.js';
 import { Bar, ChartCard, GroupedBar, Heatmap, Line } from '../../charts/index.js';
-import { COMPANIES, PLATOONS, UNASSIGNED } from '../../model/domain.js';
+import { COMPANIES, SUBUNIT_POSITIONS, UNASSIGNED } from '../../model/domain.js';
+import { positionKey, toPositionCells } from '../../model/platoon.js';
 import { ALL_COMPANIES, scopeDataset, scopeSubmissions } from '../../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
 import { GRANULARITIES } from '../../model/buckets.js';
@@ -126,14 +127,16 @@ export function CategoryPage({ title, range, children }) {
  * Episodes, soldiers and episodes per soldier for one duty class, over the range.
  * @param {{range: !Object, dutyClass: (string|!Array<string>), labels?: {episodes?: string,
  *     soldiers?: string, perSoldier?: string}}} props The range, the duty class, and
- *     optional tile labels.
+ *     optional tile labels; `labels.episodes: null` leaves the episode-count tile out.
  * @returns {!preact.VNode} The tile row.
  */
 export function EpisodeTiles({ range, dutyClass, labels = {} }) {
   const { total } = episodeCounts(range.episodes, dutyClass);
   return (
     <TileRow>
-      <Tile label={labels.episodes || 'Episodes'} value={fmtInt(total.episodes)} />
+      {labels.episodes === null ? null : (
+        <Tile label={labels.episodes || 'Episodes'} value={fmtInt(total.episodes)} />
+      )}
       <Tile label={labels.soldiers || 'Soldiers'} value={fmtInt(total.soldiers)} />
       <Tile
         label={labels.perSoldier || 'Episodes per soldier'}
@@ -151,11 +154,13 @@ export function EpisodeTiles({ range, dutyClass, labels = {} }) {
  * bar the toggle has nothing to switch between, so it is hidden and the chart draws that
  * company's one line in its own colour slot.
  * @param {{title: string, coverage: string, trendFn: function(string, string[]): !Object,
- *     range: !Object}} props The card's title and coverage line; `trendFn(scope, dates)`
- *     returns `{dates, series}`; the range supplies the dates and annotations.
+ *     range: !Object, controls?: *}} props The card's title and coverage line;
+ *     `trendFn(scope, dates)` returns `{dates, series}`; the range supplies the dates and
+ *     annotations; `controls` is any card-own filter, drawn in the same row as the scope
+ *     toggle.
  * @returns {!preact.VNode} The card.
  */
-export function TrendSection({ title, coverage, trendFn, range }) {
+export function TrendSection({ title, coverage, trendFn, range, controls }) {
   const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
   const [scope, setScope] = useState('battalion');
   const effectiveScope = scopedCompany ? 'battalion' : scope;
@@ -163,9 +168,12 @@ export function TrendSection({ title, coverage, trendFn, range }) {
 
   return (
     <Card title={title}>
-      {scopedCompany ? null : (
+      {scopedCompany && !controls ? null : (
         <div class="controlrow">
-          <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
+          {scopedCompany ? null : (
+            <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
+          )}
+          {controls}
         </div>
       )}
       <ChartCard title="" coverage={coverage}>
@@ -216,33 +224,36 @@ export function DutyTrend({ title, data, dutyClass, range }) {
  * Counts episodes of one duty class — or several — per company x platoon for the heatmap grid.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
  * @param {string|!Array<string>} dutyClass Duty class(es) to keep, from DUTY_CLASS.
- * @returns {Array<{row: string, column: string, value: number}>} Non-empty cells only.
+ * @returns {Array<{row: string, column: string, value: number}>} Non-empty cells, keyed by
+ *     company and the platoon as written (`7`, `PNR`, or `UNASSIGNED` when blank);
+ *     `PlatoonHeatmap` places them.
  */
 export function episodeCells(episodes, dutyClass) {
   const counts = new Map();
   episodes
-    .filter((episode) => isDuty(dutyClass, episode.dutyClass))
+    .filter((episode) => isDuty(dutyClass, episode.dutyClass) && COMPANIES.includes(episode.company))
     .forEach((episode) => {
-      const key = episode.company + '\u0000' + (episode.platoon || UNASSIGNED);
+      const key = episode.company + '\u0000' + (toText(episode.platoon) || UNASSIGNED);
       counts.set(key, (counts.get(key) || 0) + 1);
     });
-  const cells = [];
-  COMPANIES.forEach((row) => {
-    PLATOONS.forEach((column) => {
-      const value = counts.get(row + '\u0000' + column);
-      if (value) {
-        cells.push({ row, column, value });
-      }
-    });
+  return Array.from(counts, ([key, value]) => {
+    const [row, column] = key.split('\u0000');
+    return { row, column, value };
   });
-  return cells;
 }
 
 /**
  * The Company x Platoon heatmap.
+ *
+ * The companies number and name their platoons differently (Archer 1-3, Cougar 7-9,
+ * Stallion PNR/MTR/SCR/SIG), so the columns are a platoon's position within its company —
+ * Coy HQ, then 1st to 4th Pl — and each cell is labelled with the company's own name for
+ * it. The key under the grid spells every column out, and anything that fits no position
+ * is counted in the coverage line rather than drawn under the wrong one.
  * @param {{cells: Array<{row: string, column: string, value: number}>, title?: string,
- *     coverage?: string, valueName?: string, empty?: string}} props The cells, from
- *     `episodeCells` or another source, and the card's wording.
+ *     coverage?: string, valueName?: string, empty?: string}} props The cells, keyed by
+ *     company and platoon as written, from `episodeCells` or another source, and the
+ *     card's wording.
  * @returns {!preact.VNode} The card.
  */
 export function PlatoonHeatmap({
@@ -252,11 +263,50 @@ export function PlatoonHeatmap({
   valueName = 'episodes',
   empty = 'No episodes in range to place on the grid.',
 }) {
+  const positioned = toPositionCells(cells);
+  const anything = positioned.cells.some((cell) => cell.value > 0);
+  const note =
+    positioned.unplaced > 0
+      ? coverage + ' ' + fmtInt(positioned.unplaced) + ' ' + valueName + ' named no platoon of their company and are not drawn.'
+      : coverage;
   return (
-    <ChartCard title={title} coverage={coverage} empty={empty}>
-      <Heatmap rows={COMPANIES} columns={PLATOONS} cells={cells} valueName={valueName} />
+    <ChartCard title={title} coverage={note} empty={empty}>
+      <Heatmap
+        rows={COMPANIES}
+        columns={SUBUNIT_POSITIONS}
+        cells={anything ? positioned.cells : []}
+        valueName={valueName}
+        columnKey={positionKey()}
+        height={340}
+      />
     </ChartCard>
   );
+}
+
+/** @type {number} Pixels per bar in a reasons-over-time group. */
+const REASON_BAR_PX = 10;
+
+/** @type {number} Pixels of gap between one period's group of bars and the next. */
+const REASON_GROUP_GAP_PX = 16;
+
+/** @type {number} Pixels for the legend and value axis around the bars. */
+const REASON_CHROME_PX = 80;
+
+/** @type {number} The chart's floor height, so a short range is not drawn squat. */
+const REASON_MIN_PX = 360;
+
+/**
+ * The height that gives every bar in a reasons-over-time chart room to be read.
+ *
+ * The chart is horizontal, one group of bars per period, so a fixed height squeezes a
+ * month of daily groups into slivers. Growing with the number of periods keeps each bar
+ * the same thickness whatever the range; the page scrolls instead.
+ * @param {{categories: string[], series: Array<!Object>}} trend From `topLabelsOverTime`.
+ * @returns {number} The chart height in pixels.
+ */
+function reasonsChartHeight_(trend) {
+  const perGroup = trend.series.length * REASON_BAR_PX + REASON_GROUP_GAP_PX;
+  return Math.max(REASON_MIN_PX, trend.categories.length * perGroup + REASON_CHROME_PX);
 }
 
 /**
@@ -289,7 +339,7 @@ export function ReasonsOverTime({ rows, dateOf, labelsOf, range, title = 'Top Re
         />
       </div>
       <ChartCard title="" empty="No reasons recorded in range.">
-        <GroupedBar categories={trend.categories} series={trend.series} />
+        <GroupedBar categories={trend.categories} series={trend.series} height={reasonsChartHeight_(trend)} />
       </ChartCard>
     </Card>
   );

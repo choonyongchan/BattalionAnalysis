@@ -116,10 +116,10 @@ describe('composition: a scoped dataset yields that company\'s own rate', () => 
     expect(strength.percentPresent).toBe(90);
   });
 
-  test('presentTrend (battalion scope) on scoped rows equals the company ratio', () => {
+  test('presentTrend (battalion scope) on scoped rows is that company\'s headcount', () => {
     const scoped = scopeDataset(dataset_(), 'Braves');
     const trend = presentTrend(scoped.strength, ['2026-02-02'], { scope: 'battalion', session: 'FPS' });
-    expect(trend.series[0].values[0]).toBe(75);
+    expect(trend.series[0].values[0]).toBe(150);
   });
 
   test('dutyTrend (battalion scope) on scoped rows is the company per-100', () => {

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { platoonCoverage, platoonOf } from '../../src/model/platoon.js';
+import { platoonCoverage, platoonOf, positionKey, toPositionCells } from '../../src/model/platoon.js';
 import { UNASSIGNED } from '../../src/model/domain.js';
 
 describe('platoonOf', () => {
@@ -119,5 +119,52 @@ describe('platoonCoverage', () => {
       unknown: 0,
       inferredShare: 0,
     });
+  });
+});
+
+describe('toPositionCells', () => {
+  test("places each company's own platoon under its position column", () => {
+    const { cells, unplaced } = toPositionCells([
+      { row: 'Cougar', column: '8', value: 3 },
+      { row: 'Stallion', column: 'SIG', value: 2 },
+      { row: 'Hercules', column: 'OPR+ASA', value: 1 },
+      { row: 'Braves', column: 'HQ', value: 4 },
+    ]);
+    expect(unplaced).toBe(0);
+    expect(cells).toContainEqual({ row: 'Cougar', column: '2nd Pl', platoon: '8', value: 3, inferred: false });
+    expect(cells).toContainEqual({ row: 'Stallion', column: '4th Pl', platoon: 'SIG', value: 2, inferred: false });
+    expect(cells).toContainEqual({ row: 'Hercules', column: '2nd Pl', platoon: 'OPR+ASA', value: 1, inferred: false });
+    expect(cells).toContainEqual({ row: 'Braves', column: 'Coy HQ', platoon: 'Coy HQ', value: 4, inferred: false });
+  });
+
+  test('every sub-unit gets a cell, zero included, and a company has no cell past its last', () => {
+    const { cells } = toPositionCells([]);
+    expect(cells.filter((cell) => cell.row === 'Archer').map((cell) => cell.platoon)).toEqual(['Coy HQ', '1', '2', '3']);
+    expect(cells.find((cell) => cell.row === 'Archer' && cell.column === '4th Pl')).toBeUndefined();
+    expect(cells.every((cell) => cell.value === 0)).toBe(true);
+  });
+
+  test("a platoon the company does not have is counted as unplaced, not drawn", () => {
+    const { cells, unplaced } = toPositionCells([
+      { row: 'Archer', column: '7', value: 2 },
+      { row: 'Archer', column: UNASSIGNED, value: 1 },
+    ]);
+    expect(unplaced).toBe(3);
+    expect(cells.every((cell) => cell.value === 0)).toBe(true);
+  });
+});
+
+describe('positionKey', () => {
+  test('spells out what each position column means for every company', () => {
+    const key = positionKey();
+    expect(key.map((entry) => entry.column)).toEqual(['Coy HQ', '1st Pl', '2nd Pl', '3rd Pl', '4th Pl']);
+    expect(key[1].units).toEqual([
+      { company: 'Archer', platoon: '1' },
+      { company: 'Braves', platoon: '4' },
+      { company: 'Cougar', platoon: '7' },
+      { company: 'Stallion', platoon: 'PNR' },
+      { company: 'Hercules', platoon: 'SIG' },
+    ]);
+    expect(key[4].units).toEqual([{ company: 'Stallion', platoon: 'SIG' }]);
   });
 });

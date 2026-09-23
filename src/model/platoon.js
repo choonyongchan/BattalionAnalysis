@@ -14,7 +14,14 @@
  * Every function here is pure.
  */
 
-import { PLATOONS, UNASSIGNED } from './domain.js';
+import {
+  COMPANIES,
+  COMPANY_SUBUNITS,
+  PLATOONS,
+  SUBUNIT_POSITIONS,
+  UNASSIGNED,
+  subunitPosition,
+} from './domain.js';
 import { toText } from './values.js';
 
 /**
@@ -85,4 +92,62 @@ export function platoonCoverage(rows) {
     unknown,
     inferredShare: total === 0 ? 0 : inferred / total,
   };
+}
+
+/**
+ * Re-keys company x platoon cells onto the position columns of `SUBUNIT_POSITIONS`.
+ *
+ * Every sub-unit a company has gets a cell, a zero included, so the grid names each
+ * company's own platoon in place (`cell.platoon`) even where nothing happened. A cell whose
+ * platoon the company does not have — a blank platoon, or a stray label — cannot be placed
+ * and is counted in `unplaced` instead of being drawn under a column it does not belong to.
+ * @param {Array<{row: string, column: string, value: number, inferred?: boolean}>} cells
+ *     Counts keyed by company (`row`) and platoon as written (`column`).
+ * @returns {{cells: Array<{row: string, column: string, platoon: string, value: number,
+ *     inferred: boolean}>, unplaced: number}} Position cells, in COMPANIES then position
+ *     order, and the total value that fitted no position.
+ */
+export function toPositionCells(cells) {
+  const byKey = new Map();
+  let unplaced = 0;
+  cells.forEach((cell) => {
+    const position = subunitPosition(cell.row, cell.column);
+    if (position < 0) {
+      unplaced += cell.value || 0;
+      return;
+    }
+    const key = cell.row + '\u0000' + position;
+    const entry = byKey.get(key) || { value: 0, inferred: false };
+    entry.value += cell.value || 0;
+    entry.inferred = entry.inferred || Boolean(cell.inferred);
+    byKey.set(key, entry);
+  });
+
+  const placed = COMPANIES.flatMap((company) =>
+    (COMPANY_SUBUNITS[company] || []).map((platoon, position) => {
+      const entry = byKey.get(company + '\u0000' + position) || { value: 0, inferred: false };
+      return {
+        row: company,
+        column: SUBUNIT_POSITIONS[position],
+        platoon: platoon === 'HQ' ? 'Coy HQ' : platoon,
+        value: entry.value,
+        inferred: entry.inferred,
+      };
+    })
+  );
+  return { cells: placed, unplaced };
+}
+
+/**
+ * What each position column means, company by company, for a heatmap's key.
+ * @returns {Array<{column: string, units: Array<{company: string, platoon: string}>}>} One
+ *     entry per `SUBUNIT_POSITIONS` column, listing the companies that have a sub-unit there.
+ */
+export function positionKey() {
+  return SUBUNIT_POSITIONS.map((column, position) => ({
+    column,
+    units: COMPANIES.filter((company) => (COMPANY_SUBUNITS[company] || [])[position]).map(
+      (company) => ({ company, platoon: COMPANY_SUBUNITS[company][position] })
+    ),
+  }));
 }

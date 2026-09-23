@@ -107,6 +107,10 @@ start_date, end_date)` are seeded by the import and maintained afterwards with S
 Neon console. Until they have rows, the Settings page says so, no holiday lines are drawn,
 and there is no rotational grouping. Everything else works without them.
 
+`db/seed-public-holidays.sql` holds the MOM-gazetted Singapore holidays for 2025-2027,
+including each in-lieu Monday. Paste it into the Neon SQL editor (it is idempotent and
+never overwrites a name edited by hand), and extend it as new years are gazetted.
+
 **Then share the password with the CO, S1 and S3.** Not by anything that keeps a searchable
 copy forever if you can help it.
 
@@ -203,16 +207,15 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
 
 ## Looking ahead
 
-The Overview's **Next 7 Days** section is the one forward-looking view. It starts from the
-selected parade's reported present strength and moves it by the dates each MC and leave line
-states: a soldier is back the day after his end date, and an absence booked ahead takes him
-away from its start date. Only MC (`Att C`) and `Off/Leave` count. MA is a timed appointment
-later the same day, so the soldier is on parade; counting MA and Others put 51 soldiers off
-parade on 22 Sep 26 against the 28 the strength figures reported, while MC and leave gave 23.
-An absence with no end date is held out for the week and counted in the coverage line. Nobody
-new is assumed to fall sick, so the line is a floor on what the next parades will show, not
-a forecast of illness. Back-tested from 21 Sep 26, it gave 93.6% for 22 Sep; the parade
-reported 93.4%. The rules are in `src/model/projection.js`.
+The Overview's **Next 7 Days** section is the one forward-looking view: **Returning to Duty**,
+the soldiers on MC or leave on the selected parade with the day each is expected back, soonest
+first. A soldier is back the day after his stated end date, and `From` is the earliest stated
+start, which is later than the parade date for an absence booked ahead. Only MC (`Att C`) and
+`Off/Leave` are listed. MA is a timed appointment later the same day, so the soldier is on
+parade; counting MA and Others put 51 soldiers off parade on 22 Sep 26 against the 28 the
+strength figures reported, while MC and leave gave 23. A soldier listed twice is one row, back
+only when both absences end, and an absence with no end date reads `Not stated` rather than a
+guessed day. The rules are in `src/model/projection.js`.
 
 **Presence by Rank** splits the day's presence into officers, WOSpecs and enlistees from the
 strength block's own split, so a company at 90% missing half its officers shows it.

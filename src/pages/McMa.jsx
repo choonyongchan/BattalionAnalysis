@@ -36,7 +36,14 @@ export function McMa() {
 
   return (
     <CategoryPage title="MC / MA" range={range}>
-      <EpisodeTiles range={range} dutyClass={DUTY} />
+      <EpisodeTiles
+        range={range}
+        dutyClass={DUTY}
+        labels={{
+          episodes: 'Number of MC/MA taken',
+          perSoldier: 'Average number of MC/MA taken per soldier',
+        }}
+      />
       <DutyTrend title="MC / MA Trend" data={data} dutyClass={DUTY} range={range} />
       <PlatoonHeatmap cells={episodeCells(range.episodes, DUTY)} />
       <ReasonsOverTime

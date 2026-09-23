@@ -64,6 +64,27 @@ export const COMPANY_SUBUNITS = {
 };
 
 /**
+ * The columns of a company x platoon heatmap: a sub-unit's position within its company,
+ * since the companies number and name their platoons differently. Position `i` is
+ * `COMPANY_SUBUNITS[company][i]`.
+ * @type {string[]}
+ */
+export const SUBUNIT_POSITIONS = ['Coy HQ', '1st Pl', '2nd Pl', '3rd Pl', '4th Pl'];
+
+/**
+ * Where a platoon sits among its company's sub-units.
+ * @param {string} company Company name.
+ * @param {*} platoon A platoon cell, e.g. `7`, `PNR` or `HQ`; case and spaces are ignored.
+ * @returns {number} The index into `SUBUNIT_POSITIONS`, or -1 when the company has no such
+ *     sub-unit.
+ */
+export function subunitPosition(company, platoon) {
+  const text = String(platoon == null ? '' : platoon).toUpperCase().replace(/\s+/g, '');
+  const unit = text === 'COYHQ' ? 'HQ' : text;
+  return (COMPANY_SUBUNITS[company] || []).indexOf(unit);
+}
+
+/**
  * The roster roles one company files, in ORBAT order: the command roles, then a PDS per
  * sub-unit.
  * @param {string} company Company name.

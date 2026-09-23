@@ -5,19 +5,22 @@
  * soldier been lately". The 'Others' table reads the opposite way, oldest-first, because
  * it is a narrative of attachments and duties rather than a history of absence — both
  * orderings come straight from `soldier.js`'s `soldierReport` and are not re-sorted here.
+ *
+ * The page is one search bar and nothing else to set, like a web search engine: centred
+ * on its own until a soldier is picked, then pinned above that soldier's report. It
+ * searches the whole battalion rather than following the company selector, since a
+ * soldier found by 4D or name already says which company they are in.
  */
 
 import { useMemo, useState } from 'preact/hooks';
-import { company, dataset } from '../app/state.js';
+import { dataset } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { SoldierSearch } from '../components/SoldierSearch.jsx';
-import { PageControls } from '../components/PageControls.jsx';
 import { fmtDate, fmtInt } from '../format.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions } from '../model/formsg.js';
-import { scopeDataset, scopeSubmissions } from '../model/scope.js';
 import { soldierIndex, soldierReport } from '../model/soldier.js';
 
 /**
@@ -50,14 +53,10 @@ function ReasonTable({ title, rows }) {
  * @returns {!preact.VNode} The page.
  */
 export function Soldier() {
-  const full = dataset.value;
-  const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
+  const data = dataset.value;
   const [selectedKey, setSelectedKey] = useState(null);
 
-  const submissions = useMemo(
-    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
-    [data.formSg, company.value]
-  );
+  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
 
@@ -65,21 +64,15 @@ export function Soldier() {
     ? soldierReport(selectedKey, { personnel: data.personnel, episodes, submissions })
     : null;
 
+  // One tree for both layouts, so the search bar keeps what was typed when a soldier is
+  // picked and the page moves from the centred landing view to the report.
   return (
-    <div class="page">
-      <header class="pagehead">
-        <div>
-          <h1 class="pagehead__title">Soldier</h1>
-          <p class="pagehead__sub">Type 4D or name to search for soldier.</p>
-        </div>
-      </header>
-
-      <PageControls showRange={false} />
-
-      <SoldierSearch index={index} onSelect={(soldier) => setSelectedKey(soldier.key)} />
+    <div class={report ? 'page' : 'soldierhome'}>
+      <h1 class={report ? 'visually-hidden' : 'soldierhome__title'}>Soldier</h1>
+      <SoldierSearch index={index} autoFocus onSelect={(soldier) => setSelectedKey(soldier.key)} />
 
       {!report ? (
-        <EmptyState>Search above to see a soldier's report.</EmptyState>
+        <p class="soldierhome__hint">Type a 4D or a name to see that soldier's record.</p>
       ) : (
         <div class="page">
           <TileRow>

@@ -39,32 +39,50 @@ function personnelRows(specs) {
 }
 
 describe('presentTrend battalion scope', () => {
-  test('one series named Battalion, one value per date', () => {
+  test('one series named Battalion carrying the present headcount, not a percentage', () => {
+    // 90 of 200: a headcount and a percentage are different numbers here, so the fixture
+    // fails loudly if this ever goes back to a rate.
     const rows = strengthRows([
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
     ]);
     const trend = presentTrend(rows, ['2026-07-22'], { scope: 'battalion' });
     expect(trend.series).toHaveLength(1);
     expect(trend.series[0].name).toBe('Battalion');
-    expect(trend.series[0].values[0]).toBeCloseTo(90);
+    expect(trend.series[0].values[0]).toBe(90);
+  });
+
+  test('sums the companies that filed', () => {
+    const rows = strengthRows([
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
+      { date: '2026-07-22', session: 'FPS', company: 'Braves', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 60 },
+    ]);
+    expect(presentTrend(rows, ['2026-07-22'], { scope: 'battalion' }).series[0].values[0]).toBe(150);
+  });
+
+  test('a day no company filed is a gap, not a headcount of zero', () => {
+    const rows = strengthRows([
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
+    ]);
+    const trend = presentTrend(rows, ['2026-07-22', '2026-07-23'], { scope: 'battalion' });
+    expect(trend.series[0].values).toEqual([90, null]);
   });
 });
 
 describe('presentTrend companies scope', () => {
   test('a company that did not file that day is null, not zero', () => {
     const rows = strengthRows([
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
     ]);
     const trend = presentTrend(rows, ['2026-07-22'], { scope: 'companies' });
     const archer = trend.series.find((series) => series.name === 'Archer');
     const braves = trend.series.find((series) => series.name === 'Braves');
-    expect(archer.values[0]).toBeCloseTo(90);
+    expect(archer.values[0]).toBe(90);
     expect(braves.values[0]).toBeNull();
   });
 
   test('returns all five companies even when only one filed', () => {
     const rows = strengthRows([
-      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
     ]);
     const trend = presentTrend(rows, ['2026-07-22'], { scope: 'companies' });
     expect(trend.series.map((series) => series.name).sort()).toEqual(
