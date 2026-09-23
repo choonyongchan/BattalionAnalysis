@@ -145,6 +145,20 @@ describe('dutyTrend', () => {
     });
     expect(trend.series[0].values[0]).toBe(2);
   });
+
+  test('count trends report zero when no parade state covers the day', () => {
+    const strength = strengthRows([
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
+    ]);
+    const personnel = personnelRows([
+      { date: '2026-07-22', session: 'FPS', company: 'Archer', four_d: '1101', reason_category: 'Att C' },
+    ]);
+    const trend = dutyTrend(personnel, strength, DUTY_CLASS.ATT_C, ['2026-07-22', '2026-07-23'], {
+      scope: 'battalion',
+      asRate: false,
+    });
+    expect(trend.series[0].values).toEqual([1, 0]);
+  });
 });
 
 describe('tierPresence', () => {

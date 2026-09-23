@@ -25,7 +25,7 @@ import { Leaderboard } from '../../components/Leaderboard.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../../format.js';
 import { Bar, ChartCard, GroupedBar, Heatmap, Line } from '../../charts/index.js';
 import { COMPANIES, SUBUNIT_POSITIONS, UNASSIGNED } from '../../model/domain.js';
-import { positionKey, toPositionCells } from '../../model/platoon.js';
+import { toPositionCells } from '../../model/platoon.js';
 import { ALL_COMPANIES, scopeDataset, scopeSubmissions } from '../../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
 import { GRANULARITIES } from '../../model/buckets.js';
@@ -191,7 +191,7 @@ export function TrendSection({ title, coverage, trendFn, range, controls }) {
           }))}
           weekends={range.weekends}
           holidays={range.holidays}
-          valueName="per 100"
+          valueName="soldiers"
         />
       </ChartCard>
       {!scopedCompany && effectiveScope === 'companies' ? (
@@ -202,7 +202,7 @@ export function TrendSection({ title, coverage, trendFn, range, controls }) {
 }
 
 /**
- * The parade-state rate trend of one duty class.
+ * The parade-state count trend of one duty class.
  * @param {{title: string, data: !Object, dutyClass: (string|!Array<string>), range: !Object}} props The
  *     card title, the scoped dataset, the duty class, and the range.
  * @returns {!preact.VNode} The card.
@@ -211,9 +211,13 @@ export function DutyTrend({ title, data, dutyClass, range }) {
   return (
     <TrendSection
       title={title}
-      coverage="Rate per 100 accountable; a company not filing that day is a gap."
+      coverage="Count of soldiers; a day with no parade-state coverage is reported as zero."
       trendFn={(scope, dates) =>
-        dutyTrend(data.personnel, data.strength, dutyClass, dates, { scope, session: 'FPS' })
+        dutyTrend(data.personnel, data.strength, dutyClass, dates, {
+          scope,
+          session: 'FPS',
+          asRate: false,
+        })
       }
       range={range}
     />
@@ -248,8 +252,8 @@ export function episodeCells(episodes, dutyClass) {
  * The companies number and name their platoons differently (Archer 1-3, Cougar 7-9,
  * Stallion PNR/MTR/SCR/SIG), so the columns are a platoon's position within its company —
  * Coy HQ, then 1st to 4th Pl — and each cell is labelled with the company's own name for
- * it. The key under the grid spells every column out, and anything that fits no position
- * is counted in the coverage line rather than drawn under the wrong one.
+ * Anything that fits no position is counted in the coverage line rather than drawn under
+ * the wrong one.
  * @param {{cells: Array<{row: string, column: string, value: number}>, title?: string,
  *     coverage?: string, valueName?: string, empty?: string}} props The cells, keyed by
  *     company and platoon as written, from `episodeCells` or another source, and the
@@ -276,7 +280,6 @@ export function PlatoonHeatmap({
         columns={SUBUNIT_POSITIONS}
         cells={anything ? positioned.cells : []}
         valueName={valueName}
-        columnKey={positionKey()}
         height={340}
       />
     </ChartCard>
