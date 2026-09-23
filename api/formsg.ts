@@ -4,7 +4,7 @@
  * `FORMSG_POST_URI` must byte-match the URL registered in FormSG, because the signature covers it.
  * FormSG retries any non-2xx, so a payload that can never succeed answers 4xx.
  */
-import formsgSdk from '@opengovsg/formsg-sdk';
+import { createRequire } from 'node:module';
 import { getDb } from '../db/index.ts';
 import { reportSickFormsg } from '../db/schema.ts';
 import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
@@ -23,6 +23,21 @@ export interface Deps {
     cryptoV3: any;
   };
 }
+
+/**
+ * Loads the FormSG SDK through CommonJS.
+ *
+ * `@opengovsg/formsg-sdk@8` points its `import` condition at `dist/esm/index.js` but ships no
+ * `"type": "module"` beside it, so Node parses that file as CommonJS and the function dies at
+ * module load with `SyntaxError: Cannot use import statement outside a module`. Its `require`
+ * condition resolves to `cjs-entry.cjs`, a real `.cjs` file that loads cleanly; the package's
+ * `exports` map blocks importing that path directly, so it has to be reached via `require`.
+ *
+ * Bun loads the ESM build leniently, which is why the tests never saw this.
+ */
+const formsgSdk = createRequire(import.meta.url)('@opengovsg/formsg-sdk') as (config: {
+  mode: string;
+}) => Deps['sdk'];
 
 /** Anything shaped like an NRIC or FIN; the same shape `test/repo-hygiene.test.ts` checks. */
 const NRIC_SHAPE = /\b[STFGM]\d{7}[A-Z]\b/i;
