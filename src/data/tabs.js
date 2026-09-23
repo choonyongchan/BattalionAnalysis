@@ -91,6 +91,12 @@ export const PERSONNEL_HEADERS = [
 export const ROSTER_HEADERS = ['parade_response_id', 'date', 'session', 'company', 'role', 'rank', 'name', 'vacant'];
 
 /**
+ * The five repeated "Status Given" answers, under the form's own `#n` titles.
+ * @type {string[]}
+ */
+export const FORMSG_STATUS_HEADERS = [1, 2, 3, 4, 5].map((n) => 'Status Given #' + n);
+
+/**
  * Headers read from "Report Sick FormSG Responses".
  *
  * Deliberately excludes both NRIC columns. The dashboard has no use for an NRIC, so it
@@ -106,6 +112,8 @@ export const FORMSG_HEADERS = [
   'Report Sick Type',
   'Reason for Reporting Sick (Keep Brief)',
   'I am experiencing _____________________ symptoms.',
+  'Outcome given by the doctor/MO',
+  ...FORMSG_STATUS_HEADERS,
 ];
 
 /**

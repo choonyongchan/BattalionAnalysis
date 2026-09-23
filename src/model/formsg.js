@@ -278,6 +278,9 @@ function normalisePlatoonCell_(cell) {
  * `text` keeps the joined form, because the symptom lexicon works better across both
  * fields than across either alone — a soldier who picks "Others" often names the symptom
  * in the reason.
+ *
+ * `outcome` is the doctor's outcome as stored (`MC`, `Status`, `Both`, `None`, or '' when
+ * not yet recorded), and `statuses` the non-blank "Status Given #n" answers.
  * @param {Array<!Object>} rows Records from the FormSG tab.
  * @returns {Array<!Object>} Normalised submissions, oldest first.
  */
@@ -302,6 +305,10 @@ export function toSubmissions(rows) {
         company: companyFrom_(row['Unit & Coy']),
         unitText: toText(row['Unit & Coy']),
         reportSickType: toText(row['Report Sick Type']),
+        outcome: toText(row['Outcome given by the doctor/MO']),
+        statuses: [1, 2, 3, 4, 5]
+          .map((n) => toText(row['Status Given #' + n]))
+          .filter((status) => status !== ''),
         reason,
         symptomAnswer,
         text,

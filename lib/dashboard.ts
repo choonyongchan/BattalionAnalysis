@@ -26,6 +26,7 @@ import {
 import { PERM_STATUS_NUM_DAYS } from '../src/model/domain.js';
 import {
   FORMSG_HEADERS,
+  FORMSG_STATUS_HEADERS,
   HOLIDAY_HEADERS,
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
@@ -294,6 +295,12 @@ async function formSgTab(db: Db): Promise<Row[]> {
       reportSickType: reportSickFormsg.reportSickType,
       reason: reportSickFormsg.reason,
       symptoms: reportSickFormsg.symptoms,
+      outcome: reportSickFormsg.outcome,
+      status1: reportSickFormsg.status1,
+      status2: reportSickFormsg.status2,
+      status3: reportSickFormsg.status3,
+      status4: reportSickFormsg.status4,
+      status5: reportSickFormsg.status5,
     })
     .from(reportSickFormsg)
     .orderBy(asc(reportSickFormsg.timestamp));
@@ -306,6 +313,10 @@ async function formSgTab(db: Db): Promise<Row[]> {
     'Report Sick Type': r.reportSickType,
     'Reason for Reporting Sick (Keep Brief)': r.reason,
     'I am experiencing _____________________ symptoms.': r.symptoms,
+    'Outcome given by the doctor/MO': r.outcome,
+    ...Object.fromEntries(
+      [r.status1, r.status2, r.status3, r.status4, r.status5].map((status, i) => [FORMSG_STATUS_HEADERS[i], status]),
+    ),
   }));
 }
 

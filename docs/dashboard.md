@@ -239,10 +239,12 @@ strength block's own split, so a company at 90% missing half its officers shows 
   While open, the page re-reads `/api/dashboard` every minute the tab is visible and as
   soon as a hidden tab is shown again, swapping the data in without leaving the page. That
   read is also where an ended session is noticed: the login screen returns.
-- **No FormSG doctor outcome.** `report_sick_formsg.outcome`, `mc_days` and the five
-  status columns are mapped at ingest but arrive blank on every submission (0 of 39 in
-  Sep 26): soldiers file the form before they see the MO. Nothing charts them until the form
-  collects the outcome, and `genuine` is never charted, for the reason below.
+- **The Sankey's outcome is FormSG's, and often blank.** The Report-Sick Flow's outcome and
+  Status columns read each submission's own `report_sick_formsg.outcome` and `status_1…5`,
+  never the parade state's Att C / Status episodes. Rows imported from the Sheet have none
+  (its tab never carried those questions), and a soldier who files before seeing the MO
+  leaves them blank, so both land on `Outcome: Not recorded`. `mc_days` and the status
+  days are not charted, and `genuine` is never charted, for the reason below.
 - **No inference about intent.** The leaderboards rank by episode count and days lost.
   They report what was recorded and nothing else — a soldier managing a chronic condition
   and a soldier avoiding training appear the same way, and the difference is a

@@ -1,9 +1,9 @@
 /**
  * Tests for the report-sick Sankey.
  *
- * The diagram is count-only: nothing is matched by name or 4D. Each stage's total pours
- * into the next in order, so the cases worth having are the imbalances — more parade-state
- * reports than forms, more forms than reports, and more outcomes than reports.
+ * Parade state to FormSG is count-only: nothing is matched by name or 4D, so the cases
+ * worth having there are the imbalances. From FormSG on, each submission is followed by its
+ * own type, outcome and Status answers.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -47,20 +47,26 @@ function row(fourD, category, overrides) {
 }
 
 /**
- * Builds normalised FormSG submissions, one per type answer.
- * @param {Array<string>} types Each submission's 'Report Sick Type' answer.
+ * Builds normalised FormSG submissions, one per spec.
+ * @param {Array<string|{type: string, outcome?: string, statuses?: Array<string>}>} specs
+ *     Each submission's 'Report Sick Type' answer, or that plus its outcome and Statuses.
  * @returns {Array<!Object>} Normalised submissions.
  */
-function submissions(types) {
+function submissions(specs) {
   return toSubmissions(
-    types.map((type, index) => ({
-      Timestamp: '2026-07-20T08:00:00',
-      RANK: 'REC',
-      '[Myinfo] Name': 'FORM ' + index,
-      '4D Number (REC Only)': String(9000 + index),
-      'Unit & Coy': '40 SAR / Archer',
-      'Report Sick Type': type,
-    }))
+    specs.map((spec, index) => {
+      const { type, outcome = '', statuses = [] } = typeof spec === 'string' ? { type: spec } : spec;
+      return {
+        Timestamp: '2026-07-20T08:00:00',
+        RANK: 'REC',
+        '[Myinfo] Name': 'FORM ' + index,
+        '4D Number (REC Only)': String(9000 + index),
+        'Unit & Coy': '40 SAR / Archer',
+        'Report Sick Type': type,
+        'Outcome given by the doctor/MO': outcome,
+        ...Object.fromEntries(statuses.map((status, i) => ['Status Given #' + (i + 1), status])),
+      };
+    })
   );
 }
 
@@ -116,30 +122,39 @@ describe('reportSickFlow — type, outcome, status', () => {
     });
   });
 
-  test('outcomes fill in order MC, Status, then None recorded for the rest', () => {
-    const episodes = episodesOf([row('1101', 'Att C'), row('1102', 'Status', { reason: 'Excuse RMJ' })]);
-    const flow = flowOf(episodes, submissions(['RSO', 'RSI', 'RSI']));
+  test('each submission flows from its own type to its own FormSG outcome', () => {
+    const flow = flowOf(
+      [],
+      submissions([
+        { type: 'RSO', outcome: 'MC' },
+        { type: 'RSI', outcome: 'Status', statuses: ['Excuse RMJ'] },
+        { type: 'RSI', outcome: 'Both', statuses: ['Light Duty'] },
+        { type: 'RSI', outcome: 'None' },
+        { type: 'RSI' },
+      ])
+    );
     expect(linkValue(flow, 'Type: RSO', 'Outcome: MC')).toBe(1);
     expect(linkValue(flow, 'Type: RSI', 'Outcome: Status')).toBe(1);
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: None recorded')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: MC and Status')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: No MC or Status')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: Not recorded')).toBe(1);
     expect(linkValue(flow, 'Outcome: Status', 'Status: Excuse RMJ')).toBe(1);
+    expect(linkValue(flow, 'Outcome: MC and Status', 'Status: Light Duty')).toBe(1);
+    expect(flow.coverage).toMatchObject({ mc: 1, status: 1, both: 1, none: 1, notRecorded: 1 });
   });
 
-  test('outcomes past the reported-sick count are not drawn and are reported', () => {
+  test('parade-state MC and Status episodes do not feed the outcome stage', () => {
     const episodes = episodesOf([row('1101', 'Att C'), row('1102', 'Att C'), row('1103', 'Status', { reason: 'LD' })]);
     const flow = flowOf(episodes, submissions(['RSI']));
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: MC')).toBe(1);
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: Status')).toBe(0);
-    expect(flow.coverage.outcomesNotShown).toBe(2);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: Not recorded')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: MC')).toBe(0);
+    expect(flow.coverage.mc).toBe(0);
   });
 
-  test('status buckets never carry more than the Status outcome received', () => {
-    const episodes = episodesOf([row('1101', 'Status', { reason: 'Excuse RMJ, Heavy Load' })]);
-    const flow = flowOf(episodes, submissions(['RSI']));
-    const bucketTotal = flow.links
-      .filter((link) => link.source === 'Outcome: Status')
-      .reduce((sum, link) => sum + link.value, 0);
-    expect(bucketTotal).toBe(1);
+  test('a submission with several Statuses is carried to one bucket only', () => {
+    const flow = flowOf([], submissions([{ type: 'RSI', outcome: 'Status', statuses: ['Excuse RMJ, Heavy Load', 'LD'] }]));
+    const bucketLinks = flow.links.filter((link) => link.source === 'Outcome: Status');
+    expect(bucketLinks).toEqual([{ source: 'Outcome: Status', target: 'Status: Excuse RMJ', value: 1 }]);
   });
 });
 
@@ -165,6 +180,6 @@ describe('reportSickFlow — range and empty inputs', () => {
     expect(stageOf('Reporting sick')).toBe('reporting');
     expect(stageOf('Reported sick')).toBe('reported');
     expect(stageOf('Type: RSI')).toBe('type');
-    expect(stageOf('Outcome: None recorded')).toBe('outcome');
+    expect(stageOf('Outcome: Not recorded')).toBe('outcome');
   });
 });

@@ -303,7 +303,7 @@ export function Overview() {
 
       <Card
         title="Report-Sick Flow"
-        note="Counts only, not matched by name: each stage's total fills the next in order."
+        note="Parade state to FormSG is counts only, not matched by name; type, outcome and Status follow each FormSG submission."
       >
         <SankeyCard
           episodes={episodes}
@@ -336,10 +336,9 @@ function SankeyCard({ episodes, submissions, from, to }) {
       </ChartCard>
       <Coverage>
         {fmtInt(c.reportingSick)} reporting sick on the parade state, {fmtInt(c.reportedSick)} reported
-        sick on FormSG, then {fmtInt(c.mc)} MC and {fmtInt(c.status)} Status.
-        {c.outcomesNotShown > 0
-          ? ' ' + fmtInt(c.outcomesNotShown) + ' outcomes exceed the reported-sick count and are not drawn.'
-          : ''}
+        sick on FormSG. Of those, the form records {fmtInt(c.mc)} MC, {fmtInt(c.status)} Status,{' '}
+        {fmtInt(c.both)} both and {fmtInt(c.none)} neither; {fmtInt(c.notRecorded)} have no outcome
+        recorded yet.
       </Coverage>
     </>
   );

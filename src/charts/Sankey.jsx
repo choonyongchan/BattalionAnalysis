@@ -7,7 +7,7 @@
  * would spend the whole ramp on labels the diagram already prints beside each node.
  *
  * **An absence is drawn neutral, never as another category.** `sankey.js` refuses to drop
- * an unmatched event to tidy the diagram: "Type not recorded", "None recorded", "FormSG
+ * an unmatched event to tidy the diagram: "Type not recorded", "Not recorded", "FormSG
  * only" for the companies that file no forms at all — these get their own branches, and
  * they are findings about the recording, not findings about the battalion's health. A
  * neutral grey says "nothing was written down here"; a sixth categorical hue would say
