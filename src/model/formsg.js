@@ -132,6 +132,41 @@ export function submissionCounts(submissions) {
 }
 
 /**
+ * Counts FormSG submissions by company.
+ * @param {Array<!Object>} submissions Normalised submissions.
+ * @returns {Array<{company: string, count: number}>} Companies, highest count first.
+ */
+export function submissionCountByCompany(submissions) {
+  const counts = new Map();
+  submissions.forEach((submission) => {
+    if (COMPANIES.includes(submission.company)) {
+      counts.set(submission.company, (counts.get(submission.company) || 0) + 1);
+    }
+  });
+  return COMPANIES.map((company) => ({ company, count: counts.get(company) || 0 }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count || a.company.localeCompare(b.company));
+}
+
+/**
+ * Counts FormSG submissions by company and inferred platoon.
+ * @param {Array<!Object>} submissions Normalised submissions.
+ * @returns {Array<{company: string, platoon: string, count: number}>} Counts, highest first.
+ */
+export function submissionCountByPlatoon(submissions) {
+  const counts = new Map();
+  submissions.forEach((submission) => {
+    if (!COMPANIES.includes(submission.company)) return;
+    const key = submission.company + '\u0000' + submissionPlatoonOf(submission);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return Array.from(counts, ([key, count]) => {
+    const [company, platoon] = key.split('\u0000');
+    return { company, platoon, count };
+  }).sort((a, b) => b.count - a.count || a.company.localeCompare(b.company) || a.platoon.localeCompare(b.platoon));
+}
+
+/**
  * FormSG submission counts per company x platoon, for the Report Sick heatmap.
  *
  * Company comes from the matched "Unit & Coy" answer; a submission naming no known company
@@ -418,4 +453,3 @@ export function submissionRateByCompany(submissions, strengthRows) {
     };
   }).sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
 }
-

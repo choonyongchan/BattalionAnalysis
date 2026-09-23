@@ -20,8 +20,8 @@ import {
   reportSickTypeOf,
   submissionCounts,
   submissionHeatmapCells,
-  submissionRateByCompany,
-  submissionRateByPlatoon,
+  submissionCountByCompany,
+  submissionCountByPlatoon,
   submissionTrend,
   topSubmitters,
 } from '../model/formsg.js';
@@ -45,35 +45,22 @@ import {
 const DUTY = DUTY_CLASS.REPORT_SICK;
 
 /**
- * Formats a rate-per-100 cell, keeping the em dash the rate functions use for "no
- * strength on record".
- * @param {?number} per100 The rate, or null.
- * @returns {string} The cell text.
- */
-function fmtRate_(per100) {
-  return per100 === null ? '—' : fmtInt(per100);
-}
-
-/**
  * The FormSG-side rankings: who reports sick most through the form, and how the reported-
- * sick rate falls across companies and platoons. These replace the parade-state
- * "Top 10 by Episode Count" and "Companies/Platoons, by Rate" — on this page the form is
+ * sick count falls across companies and platoons. These replace the parade-state
+ * "Top 10 by Episode Count" and "Companies/Platoons, by Count" — on this page the form is
  * the primary source, and the parade-state versions sit one section up as tiles and a
  * trend instead.
  *
  * Platoon is not something FormSG states; it is inferred from the submitter's 4D through
  * the same rule `model/platoon.js` applies elsewhere, and a submission with no usable 4D
  * is placed under HQ. The coverage note on the platoon table says so.
- * @param {{submissions: Array<!Object>, strength: Array<!Object>, range: !Object}} props
- *     FormSG submissions already restricted to the range, Strength Data unfiltered, and
- *     the range to restrict it to.
+ * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
  * @returns {!preact.VNode} The three cards.
  */
-function ReportedSickRankings({ submissions, strength, range }) {
-  const strengthRanged = strength.filter((row) => withinRange(row.date, range.from, range.to));
+function ReportedSickRankings({ submissions }) {
   const top = topSubmitters(submissions, 10);
-  const companies = submissionRateByCompany(submissions, strengthRanged);
-  const platoons = submissionRateByPlatoon(submissions, strengthRanged);
+  const companies = submissionCountByCompany(submissions);
+  const platoons = submissionCountByPlatoon(submissions);
 
   return (
     <>
@@ -82,7 +69,6 @@ function ReportedSickRankings({ submissions, strength, range }) {
           columns={[
             { key: 'rank', label: '#', numeric: true },
             { key: 'name', label: 'Name' },
-            { key: 'fourD', label: '4D' },
             { key: 'company', label: 'Company' },
             { key: 'count', label: 'Count', numeric: true },
           ]}
@@ -91,36 +77,30 @@ function ReportedSickRankings({ submissions, strength, range }) {
         />
       </Card>
       <div class="grid-2">
-        <Card title="Companies, by Rate">
+        <Card title="Companies, by Count">
           <DataTable
             columns={[
               { key: 'company', label: 'Company' },
-              { key: 'per100', label: 'Reported Sick %', numeric: true, sortable: true, sortValue: (r) => r.per100Raw },
               { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
             ]}
             rows={companies.map((row) => ({
               company: row.company,
-              per100: fmtRate_(row.per100),
-              per100Raw: row.per100,
               count: fmtInt(row.count),
               countRaw: row.count,
             }))}
             rowKey={(row) => row.company}
           />
         </Card>
-        <Card title="Platoons, by Rate">
+        <Card title="Platoons, by Count">
           <DataTable
             columns={[
               { key: 'company', label: 'Company' },
               { key: 'platoon', label: 'Platoon' },
-              { key: 'per100', label: 'Reported Sick %', numeric: true, sortable: true, sortValue: (r) => r.per100Raw },
               { key: 'count', label: 'Reported Sick Count', numeric: true, sortable: true, sortValue: (r) => r.countRaw },
             ]}
             rows={platoons.map((row) => ({
               company: row.company,
               platoon: row.platoon,
-              per100: fmtRate_(row.per100),
-              per100Raw: row.per100,
               count: fmtInt(row.count),
               countRaw: row.count,
             }))}
@@ -128,8 +108,7 @@ function ReportedSickRankings({ submissions, strength, range }) {
           />
           <Coverage>
             Platoon is inferred from the submitter's 4D; a submission with no 4D is placed
-            under HQ. The rate divides by the same platoon strength the parade-state
-            rankings use.
+            under HQ. Counts are FormSG submissions in the selected range.
           </Coverage>
         </Card>
       </div>
@@ -256,7 +235,7 @@ export function ReportSick() {
       <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
         <Histogram bins={hourBins(ranged)} />
       </ChartCard>
-      <ReportedSickRankings submissions={ranged} strength={data.strength} range={range} />
+      <ReportedSickRankings submissions={ranged} />
       <SoldierLookup index={index} episodes={episodes} dutyClass={DUTY} />
     </CategoryPage>
   );

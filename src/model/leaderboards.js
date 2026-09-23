@@ -5,17 +5,17 @@
  * episode count and days lost; this module reads that rather than re-deriving it, and
  * adds the three things it does not do: a platoon that covers Hercules and Cougar (whose
  * `platoon` cell is blank on 100% and 96% of rows) via `platoon.js`'s inference, the
- * temporary/permanent split Status leaderboards need, and unit rankings — which reuse
- * `metrics.companyRates` / `unitRates` rather than sorting by count, because **every
- * comparison here is a rate, never a count**: a company of 285 will always out-count one
- * of 25, and ranking on the raw number would only be ranking by size.
+ * temporary/permanent split Status leaderboards need, and count-based unit rankings.
  *
  * Every function here is pure.
  */
 
 import { platoonOf } from './platoon.js';
 import { isPermanentStatus } from './statusBuckets.js';
-import { companyRates, leaderboard, unitRates } from './metrics.js';
+import { classify, isDuty } from './classify.js';
+import { identityOf } from './identity.js';
+import { leaderboard } from './metrics.js';
+import { toIsoDate, toText } from './values.js';
 
 /**
  * Resolves a leaderboard row's platoon through the 4D-inference rule.
@@ -147,22 +147,36 @@ export function topByStatusCount(episodes, limit) {
 }
 
 /**
- * Companies or platoons ranked by absence rate, highest first.
+ * Companies or platoons ranked by absence count, highest first.
  *
  * A thin pass-through to `metrics.companyRates` / `unitRates`, which already rank on
  * `per100` rather than the raw count — kept here so a page reads one ranking function
  * regardless of level instead of branching between two metrics-layer names.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {Array<!Object>} strengthRows Unused; retained for the shared caller shape.
  * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {string} level 'company' or 'platoon'.
- * @returns {Array<!Object>} Units ranked by rate, highest first.
+ * @returns {Array<!Object>} Units ranked by count, highest first.
  */
-export function rankUnits(personnelRows, strengthRows, dutyClass, level) {
-  if (level === 'platoon') {
-    return unitRates(personnelRows, strengthRows, dutyClass).sort(
-      (a, b) => (b.per100 || 0) - (a.per100 || 0)
-    );
-  }
-  return companyRates(personnelRows, strengthRows, dutyClass);
+export function rankUnits(personnelRows, _strengthRows, dutyClass, level) {
+  const counts = new Map();
+  personnelRows
+    .filter((row) => isDuty(dutyClass, classify(row)))
+    .forEach((row) => {
+      const identity = identityOf(row);
+      const unit = toText(row.company);
+      const platoon = platoonOf(row).platoon;
+      if (identity.key === '' || unit === '') return;
+      const key = level === 'platoon' ? unit + '\u0000' + platoon : unit;
+      const soldiers = counts.get(key) || new Set();
+      soldiers.add(identity.key + '@' + (toIsoDate(row.date) || ''));
+      counts.set(key, soldiers);
+    });
+
+  return Array.from(counts, ([key, soldiers]) => {
+    const [company, platoon] = key.split('\u0000');
+    return { company, platoon, days: soldiers.size, count: soldiers.size };
+  }).sort(
+    (a, b) => b.count - a.count || a.company.localeCompare(b.company) || (a.platoon || '').localeCompare(b.platoon || '')
+  );
 }

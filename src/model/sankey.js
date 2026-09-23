@@ -13,8 +13,8 @@
  * **The left join is aggregate, not event-level.** It hands the in-range report-sick
  * episodes and the in-range FormSG submissions to `reconcile.js`'s `reconcileReportSick`,
  * which lines the two sources up *per company* — distinct soldiers on the parade state
- * against distinct soldiers on the form, matched by 4D where both carry it and otherwise
- * by a token-set name — and this diagram sums those per-company rows. So
+ * against distinct soldiers on the form, matched by token-set name — and this diagram
+ * sums those per-company rows. So
  * `Reporting sick -> Reported sick` is the soldiers seen in both sources,
  * `Reporting sick -> No FormSG submission` the parade-state-only remainder, and
  * `Unaccounted -> Reported sick` the soldiers who filed a form with no parade-state line
@@ -44,7 +44,7 @@ import { classify, DUTY_CLASS } from './classify.js';
 import { COMPANIES } from './domain.js';
 import { addDays } from './dates.js';
 import { withinRange } from './dateRange.js';
-import { identityOf } from './identity.js';
+import { namesMatch } from './reconcile.js';
 import { bucketsFor } from './statusBuckets.js';
 import { toIsoDate, toText } from './values.js';
 import { reconcileReportSick } from './reconcile.js';
@@ -110,18 +110,18 @@ function shortType_(reportSickType) {
  *
  * MC wins when both occur, because Att C means excused all duties — the more
  * consequential outcome — and a single flow cannot fork.
- * @param {string} key The event's identity key.
+ * @param {string} name The event's reported name.
  * @param {string} eventDate The event's ISO date.
  * @param {Array<!Object>} personnel Normalised Personnel Data records.
  * @returns {{outcome: string, buckets: string[]}} The outcome, and — for Status — every
  *     bucket its reason names.
  */
-function outcomeFor_(key, eventDate, personnel) {
+function outcomeFor_(name, eventDate, personnel) {
   const windowStart = addDays(eventDate, OUTCOME_MATCH_MIN_DAYS);
   const windowEnd = addDays(eventDate, OUTCOME_MATCH_MAX_DAYS);
 
   const candidates = personnel.filter((row) => {
-    if (identityOf(row).key !== key) {
+    if (!namesMatch(name, row.name)) {
       return false;
     }
     const dutyClass = classify(row);
@@ -221,7 +221,7 @@ export function reportSickFlow({ personnel, episodes, submissions, from, to }) {
     const typeNode = 'Type: ' + shortType_(submission.reportSickType);
     addFlow(NODE_REPORTED, 'reported', typeNode, 'type', 1);
 
-    const { outcome, buckets } = outcomeFor_(submission.key, submission.date, personnel);
+    const { outcome, buckets } = outcomeFor_(submission.name, submission.date, personnel);
     const outcomeNode = 'Outcome: ' + outcome;
     addFlow(typeNode, 'type', outcomeNode, 'outcome', 1);
 
@@ -257,7 +257,7 @@ export function reportSickFlow({ personnel, episodes, submissions, from, to }) {
       ),
       statusMultiLabelled: statusBucketTotal > statusOutcomeTotal,
       matchRule:
-        'Reconciled per company by 4D else token-set name; left-side counts are distinct ' +
+        'Reconciled per company by token-set name; left-side counts are distinct ' +
         'soldiers, not events. Type and outcome are per FormSG submission, so that branch ' +
         'can be wider. Outcomes cover the FormSG branch only.',
     },

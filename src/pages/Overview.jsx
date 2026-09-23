@@ -164,7 +164,8 @@ export function Overview() {
   }
 
   const strength = battalionStrength(data.strength, today, SESSION);
-  const duty = dutyCountsOn(data.personnel, today, SESSION);
+  const hasParadeState = strength.companiesReporting.length > 0;
+  const duty = hasParadeState ? dutyCountsOn(data.personnel, today, SESSION) : null;
   const reportedSickToday = submissions.filter((submission) => submission.date === today).length;
   const filingEntries = scopeFilings(filingsOn(filings, today, SESSION), company.value);
 
@@ -204,15 +205,15 @@ export function Overview() {
 
       <TileRow>
         <Tile label="Total soldiers" value={fmtInt(strength.accountable)} />
-        <Tile label="Present soldiers" value={fmtInt(strength.present)} />
+        <Tile label="Present soldiers" value={fmtInt(hasParadeState ? strength.present : 0)} />
         <Tile label="% present" value={fmtPercent(strength.percentPresent / 100)} />
-        <Tile label="Reporting sick" value={fmtInt(countOf(duty, DUTY_CLASS.REPORT_SICK))} foot="Parade state" />
+        <Tile label="Reporting sick" value={fmtInt(duty ? countOf(duty, DUTY_CLASS.REPORT_SICK) : 0)} foot="Parade state" />
         <Tile label="Reported sick" value={fmtInt(reportedSickToday)} foot="FormSG" />
         <Tile
           label="MC / MA"
-          value={fmtInt(MC_MA.reduce((sum, dutyClass) => sum + countOf(duty, dutyClass), 0))}
+          value={fmtInt(duty ? MC_MA.reduce((sum, dutyClass) => sum + countOf(duty, dutyClass), 0) : 0)}
         />
-        <Tile label="On status" value={fmtInt(countOf(duty, DUTY_CLASS.STATUS))} />
+        <Tile label="On status" value={fmtInt(duty ? countOf(duty, DUTY_CLASS.STATUS) : 0)} />
       </TileRow>
       <Coverage>{coverageLine}</Coverage>
 
@@ -302,7 +303,7 @@ export function Overview() {
 
       <Card
         title="Report-Sick Flow"
-        note="Reconciled per company by 4D, else name; type and outcome are per FormSG submission."
+        note="Reconciled per company by name; type and outcome are per FormSG submission."
       >
         <SankeyCard
           personnel={data.personnel}

@@ -26,7 +26,6 @@ export function Leaderboard({ rows, metric }) {
   const base = [
     { key: 'rank', label: '#', numeric: true },
     { key: 'name', label: 'Name' },
-    { key: 'fourD', label: '4D' },
     { key: 'company', label: 'Company' },
     { key: 'platoon', label: 'Platoon' },
   ];

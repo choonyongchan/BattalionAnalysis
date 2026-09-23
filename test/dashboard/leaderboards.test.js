@@ -1,10 +1,7 @@
 /**
  * Tests for the leaderboards and unit rankings.
  *
- * The case worth having throughout is the one the dashboard's own editorial rule exists
- * for: a ranking must not simply reward being a large unit. `rankUnits` is exercised
- * against a small unit with a high rate and a large one with a low rate, and the small
- * one must win.
+ * Unit rankings use raw counts, so a larger count should rank first.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -126,7 +123,7 @@ describe('topByStatusCount', () => {
 });
 
 describe('rankUnits', () => {
-  test('a small unit with a high rate outranks a large unit with a low rate', () => {
+  test('a large unit with a larger count outranks a small unit', () => {
     const strength = strengthRows([
       { date: '2026-07-20', session: 'FPS', company: 'Small', platoon: '1', unit_type: 'PLATOON', total_strength: 10 },
       { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', unit_type: 'PLATOON', total_strength: 200 },
@@ -142,6 +139,6 @@ describe('rankUnits', () => {
       })),
     ]);
     const ranked = rankUnits(personnel, strength, DUTY_CLASS.ATT_C, 'company');
-    expect(ranked[0].company).toBe('Small');
+    expect(ranked[0].company).toBe('Big');
   });
 });

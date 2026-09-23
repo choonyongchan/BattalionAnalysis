@@ -168,7 +168,7 @@ export function presentTrend(strengthRows, dates, options) {
         name: company,
         values: perDate.map((byCompany) => {
           const entry = byCompany.get(company);
-          return entry ? entry.present : null;
+          return entry ? entry.present : 0;
         }),
       })),
     };
@@ -185,7 +185,7 @@ export function presentTrend(strengthRows, dates, options) {
           // parade state is missing data, so it stays a gap — the same rule the percentage
           // got for free from its `accountable > 0` guard.
           const strength = battalionStrength(strengthRows, date, session);
-          return strength.companiesReporting.length === 0 ? null : strength.present;
+          return strength.companiesReporting.length === 0 ? 0 : strength.present;
         }),
       },
     ],
@@ -262,7 +262,7 @@ export function dutyTrend(personnelRows, strengthRows, dutyClass, dates, options
         values: perDate.map((day) => {
           const entry = day.strength.get(company);
           if (!entry) {
-            return null;
+            return asRate ? null : 0;
           }
           const count = day.duty.get(company) || 0;
           if (!asRate) {
@@ -281,6 +281,9 @@ export function dutyTrend(personnelRows, strengthRows, dutyClass, dates, options
         name: 'Battalion',
         values: dates.map((date) => {
           const strength = battalionStrength(strengthRows, date, session);
+          if (strength.companiesReporting.length === 0) {
+            return asRate ? null : 0;
+          }
           // Several classes sum, as the Overview's MC / MA tile has always summed them.
           const counts = dutyCountsOn(personnelRows, date, session).counts;
           const count = dutyList(dutyClass).reduce((sum, name) => sum + (counts[name] || 0), 0);

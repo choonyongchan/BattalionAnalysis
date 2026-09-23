@@ -431,7 +431,7 @@ export function EpisodeLeaderboard({ range, dutyClass, metric }) {
 }
 
 /**
- * The company and platoon rate rankings, side by side.
+ * The company and platoon count rankings, side by side.
  * @param {{data: !Object, dutyClass: (string|!Array<string>)}} props The scoped dataset and duty class.
  * @returns {!preact.VNode} The cards.
  */
@@ -441,22 +441,21 @@ export function UnitRankings({ data, dutyClass }) {
 
   return (
     <div class="grid-2">
-      <Card title="Companies, by Rate">
+      <Card title="Companies, by Count">
         {companies.length === 0 ? (
           <EmptyState>No data in range.</EmptyState>
         ) : (
           <DataTable
             columns={[
               { key: 'company', label: 'Company' },
-              { key: 'per100', label: 'Rate per 100', numeric: true },
-              { key: 'days', label: 'Days', numeric: true },
+              { key: 'count', label: 'Count', numeric: true },
             ]}
-            rows={companies.map((row) => ({ ...row, per100: fmtInt(row.per100), days: fmtInt(row.days) }))}
+            rows={companies.map((row) => ({ ...row, count: fmtInt(row.count) }))}
             rowKey={(row) => row.company}
           />
         )}
       </Card>
-      <Card title="Platoons, by Rate">
+      <Card title="Platoons, by Count">
         {platoons.length === 0 ? (
           <EmptyState>No data in range.</EmptyState>
         ) : (
@@ -464,9 +463,9 @@ export function UnitRankings({ data, dutyClass }) {
             columns={[
               { key: 'company', label: 'Company' },
               { key: 'platoon', label: 'Platoon' },
-              { key: 'per100', label: 'Rate per 100', numeric: true },
+              { key: 'count', label: 'Count', numeric: true },
             ]}
-            rows={platoons.map((row) => ({ ...row, per100: fmtInt(row.per100) }))}
+            rows={platoons.map((row) => ({ ...row, count: fmtInt(row.count) }))}
             rowKey={(row) => row.company + row.platoon}
           />
         )}

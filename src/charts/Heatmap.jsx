@@ -190,7 +190,11 @@ function option_(props, palette) {
           show: placed.some((entry) => entry.cell.platoon),
           formatter: (params) => {
             const cell = params.data.cell;
-            return cell.platoon ? cell.platoon + '\n' + fmtInt(cell.value) : '';
+            const label =
+              cell.platoon && cell.platoon !== 'Coy HQ' && /^[0-9]+$/.test(cell.platoon)
+                ? 'Plt ' + cell.platoon
+                : cell.platoon;
+            return label ? label + '\n' + fmtInt(cell.value) : '';
           },
           color: palette.ink,
           fontSize: 11,

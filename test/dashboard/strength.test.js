@@ -2,8 +2,7 @@
  * Tests for the daily strength picture: totals, rank tiers, and the two trend series.
  *
  * The case worth having throughout is the gap: only 5 of 45 real parade days carry all
- * six companies, so a day a company did not file must read as missing data, never as a
- * headcount of zero.
+ * six companies, so count trends explicitly report zero when a company did not file.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -59,17 +58,17 @@ describe('presentTrend battalion scope', () => {
     expect(presentTrend(rows, ['2026-07-22'], { scope: 'battalion' }).series[0].values[0]).toBe(150);
   });
 
-  test('a day no company filed is a gap, not a headcount of zero', () => {
+  test('a day no company filed reports zero, not a residual headcount', () => {
     const rows = strengthRows([
       { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
     ]);
     const trend = presentTrend(rows, ['2026-07-22', '2026-07-23'], { scope: 'battalion' });
-    expect(trend.series[0].values).toEqual([90, null]);
+    expect(trend.series[0].values).toEqual([90, 0]);
   });
 });
 
 describe('presentTrend companies scope', () => {
-  test('a company that did not file that day is null, not zero', () => {
+  test('a company that did not file that day reports zero', () => {
     const rows = strengthRows([
       { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 200, total_present: 90 },
     ]);
@@ -77,7 +76,7 @@ describe('presentTrend companies scope', () => {
     const archer = trend.series.find((series) => series.name === 'Archer');
     const braves = trend.series.find((series) => series.name === 'Braves');
     expect(archer.values[0]).toBe(90);
-    expect(braves.values[0]).toBeNull();
+    expect(braves.values[0]).toBe(0);
   });
 
   test('returns all five companies even when only one filed', () => {
@@ -92,7 +91,7 @@ describe('presentTrend companies scope', () => {
 });
 
 describe('dutyTrend', () => {
-  test('battalion scope reports a rate per 100 accountable', () => {
+  test('battalion scope reports a raw count', () => {
     const strength = strengthRows([
       { date: '2026-07-22', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100, total_present: 90 },
     ]);
@@ -100,7 +99,7 @@ describe('dutyTrend', () => {
       { date: '2026-07-22', session: 'FPS', company: 'Archer', four_d: '1101', reason_category: 'Att C' },
     ]);
     const trend = dutyTrend(personnel, strength, DUTY_CLASS.ATT_C, ['2026-07-22'], { scope: 'battalion' });
-    expect(trend.series[0].values[0]).toBeCloseTo(1);
+    expect(trend.series[0].values[0]).toBe(1);
   });
 
   test('companies scope credits the count to the soldier\'s own company only', () => {

@@ -50,14 +50,26 @@ describe('reconcileReportSick', () => {
   const episode = (over) => ({ key: '', name: '', fourD: '', company: 'Archer', ...over });
   const submission = (over) => ({ key: '', name: '', fourD: '', company: 'Archer', ...over });
 
-  test('a shared 4D number is a match with nothing flagged', () => {
+  test('matching names reconcile regardless of their 4D numbers', () => {
     const rows = reconcileReportSick(
       [episode({ key: '4D:1234', name: 'TAN AH KOW', fourD: '1234' })],
-      [submission({ key: '4D:1234', name: 'TAN AH KOW', fourD: '1234' })]
+      [submission({ key: '4D:5678', name: 'TAN AH KOW', fourD: '5678' })]
     );
     expect(rows).toEqual([
       { company: 'Archer', paradeCount: 1, formsgCount: 1, matched: 1, paradeOnly: [], formsgOnly: [] },
     ]);
+  });
+
+  test('different names do not reconcile through a shared 4D number', () => {
+    const rows = reconcileReportSick(
+      [episode({ key: '4D:1234', name: 'TAN AH KOW', fourD: '1234' })],
+      [submission({ key: '4D:1234', name: 'LIM AH KOW', fourD: '1234' })]
+    );
+    expect(rows[0]).toMatchObject({
+      matched: 0,
+      paradeOnly: ['TAN AH KOW'],
+      formsgOnly: ['LIM AH KOW'],
+    });
   });
 
   test('a fuzzy name match with no 4D still reconciles', () => {

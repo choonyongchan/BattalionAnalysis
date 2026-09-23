@@ -6,10 +6,8 @@
  * how many distinct soldiers each source has, how many are the same soldier, and the
  * names that appear in one source but not the other.
  *
- * Matching is two-tier. First the shared identity key — the 4D number where both sides
- * have it, otherwise the normalised name — which is exact. Then, for whoever is left, a
- * token-set name match that tolerates a nickname present on one side only, a different
- * token order, and a rank left in the name field.
+ * Matching uses names only. 4D numbers are not a statistical identity for this report,
+ * so they must not reconcile a parade-state entry with a FormSG submission.
  *
  * This is a flagging aid, not an authoritative join. A surname plus a single given name
  * can collide between two soldiers, and true homonyms are indistinguishable here. Every
@@ -76,7 +74,7 @@ export function namesMatch(a, b) {
 }
 
 /**
- * A person's display name, falling back to the 4D number and then the identity key.
+ * A person's display name, falling back to a stable internal key when no name exists.
  * @param {!Object} record An episode or a submission.
  * @returns {string} The best available label.
  */
@@ -85,21 +83,23 @@ function labelOf_(record) {
   if (name !== '') {
     return name;
   }
-  const fourD = String(record.fourD == null ? '' : record.fourD).trim();
-  return fourD !== '' ? '4D:' + fourD : record.key || '';
+  return '';
 }
 
 /**
- * Reduces records to one entry per distinct soldier, keyed by identity.
+ * Reduces records to one entry per distinct named soldier.
  * @param {Array<!Object>} records Episodes or submissions for one company.
  * @returns {Array<{key: string, name: string}>} Distinct persons, first spelling kept.
  */
 function distinctPersons_(records) {
   const byKey = new Map();
   const anonymous = [];
-  records.forEach((record) => {
-    const person = { key: record.key || '', name: labelOf_(record) };
-    if (person.key === '') {
+  records.forEach((record, index) => {
+    const name = labelOf_(record);
+    const nameKey = nameTokens(name).join(' ');
+    const person = { key: nameKey, name };
+    if (nameKey === '') {
+      person.key = 'anonymous:' + index;
       anonymous.push(person);
     } else if (!byKey.has(person.key)) {
       byKey.set(person.key, person);
@@ -129,29 +129,23 @@ function byCompany_(records, blankLabel) {
 /**
  * Matches parade-state persons to FormSG persons within one company.
  *
- * Exact identity key first, then a greedy name match over whoever is unmatched on each
- * side — the first still-unmatched FormSG person whose name matches.
+ * A greedy name match over the people on each side — the first still-unmatched FormSG
+ * person whose name matches.
  * @param {Array<{key: string, name: string}>} parade Distinct parade-state persons.
  * @param {Array<{key: string, name: string}>} formsg Distinct FormSG persons.
  * @returns {{matched: number, paradeOnly: Array<string>, formsgOnly: Array<string>}} The tally.
  */
 function matchPersons_(parade, formsg) {
-  const formsgKeys = new Set(formsg.map((person) => person.key));
   const claimed = new Set();
   let matched = 0;
   const paradeOnly = [];
 
   parade.forEach((person) => {
-    if (person.key !== '' && formsgKeys.has(person.key) && !claimed.has(person.key)) {
-      claimed.add(person.key);
-      matched += 1;
-      return;
-    }
     const hit = formsg.find(
-      (other) => !claimed.has(other.key || other) && namesMatch(person.name, other.name)
+      (other) => !claimed.has(other) && namesMatch(person.name, other.name)
     );
     if (hit) {
-      claimed.add(hit.key || hit);
+      claimed.add(hit);
       matched += 1;
     } else {
       paradeOnly.push(person.name);
@@ -159,7 +153,7 @@ function matchPersons_(parade, formsg) {
   });
 
   const formsgOnly = formsg
-    .filter((person) => !claimed.has(person.key || person))
+    .filter((person) => !claimed.has(person))
     .map((person) => person.name);
 
   return { matched, paradeOnly, formsgOnly };

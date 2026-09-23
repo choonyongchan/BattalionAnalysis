@@ -25,7 +25,7 @@ function rosterRows(specs) {
 }
 
 describe('rosterOn', () => {
-  test('a fully filed company returns all seven roles, filed', () => {
+  test('a fully filed company returns all six non-HQ roles, filed', () => {
     const rows = rosterRows(
       ['CDO', 'CDS', 'COS', 'PDSHQ', 'PDS1', 'PDS2', 'PDS3'].map((role) => ({
         parade_response_id: 'Archer_2026-07-22_FPS',
@@ -38,11 +38,11 @@ describe('rosterOn', () => {
       }))
     );
     const roster = rosterOn(rows, '2026-07-22', 'Archer', 'FPS');
-    expect(roster).toHaveLength(7);
+    expect(roster).toHaveLength(6);
     expect(roster.every((entry) => entry.filed)).toBe(true);
   });
 
-  test('a company filing only COS shows the other six roles as not filed', () => {
+  test('a company filing only COS shows the other five roles as not filed', () => {
     const rows = rosterRows([
       { parade_response_id: 'Hercules_2026-07-22_FPS', date: '2026-07-22', session: 'FPS', company: 'Hercules', role: 'COS', rank: 'PTE', name: 'LEROY' },
     ]);
@@ -84,7 +84,7 @@ describe('orbatTree', () => {
     const tree = orbatTree(rows, '2026-07-22', { company: 'Archer' });
     const cds = tree.children[0].children[0];
     expect(cds.role).toBe('CDS');
-    expect(cds.children.map((child) => child.role)).toEqual(['COS', 'PDSHQ', 'PDS1', 'PDS2', 'PDS3']);
+    expect(cds.children.map((child) => child.role)).toEqual(['COS', 'PDS1', 'PDS2', 'PDS3']);
   });
 
   test("each company's PDS slots follow its own platoon numbering", () => {
@@ -98,25 +98,24 @@ describe('orbatTree', () => {
       return node.children[0].children[0].children.map((child) => child.role).slice(1);
     };
     expect(tree.children).toHaveLength(5);
-    expect(pdsOf('Archer')).toEqual(['PDSHQ', 'PDS1', 'PDS2', 'PDS3']);
-    expect(pdsOf('Braves')).toEqual(['PDSHQ', 'PDS4', 'PDS5', 'PDS6']);
-    expect(pdsOf('Cougar')).toEqual(['PDSHQ', 'PDS7', 'PDS8', 'PDS9']);
-    expect(pdsOf('Stallion')).toEqual(['PDSHQ', 'PDSPNR', 'PDSMTR', 'PDSSCR', 'PDSSIG']);
-    expect(pdsOf('Hercules')).toEqual(['PDSHQ', 'PDSSIG', 'PDSOPR+ASA', 'PDSMED']);
+    expect(pdsOf('Archer')).toEqual(['PDS1', 'PDS2', 'PDS3']);
+    expect(pdsOf('Braves')).toEqual(['PDS4', 'PDS5', 'PDS6']);
+    expect(pdsOf('Cougar')).toEqual(['PDS7', 'PDS8', 'PDS9']);
+    expect(pdsOf('Stallion')).toEqual(['PDSPNR', 'PDSMTR', 'PDSSCR', 'PDSSIG']);
+    expect(pdsOf('Hercules')).toEqual(['PDSSIG', 'PDSOPR+ASA', 'PDSMED']);
   });
 
-  test('a Cougar PDS 8 and a Coy HQ PDS land in their slots', () => {
+  test('a Cougar PDS 8 lands in its slot and Coy HQ is excluded', () => {
     const base = { parade_response_id: 'Cougar_2026-07-22_FPS', date: '2026-07-22', session: 'FPS', company: 'Cougar' };
     const roster = rosterOn(
       rosterRows([
         { ...base, role: 'PDS8', rank: '3SG', name: 'EIGHT' },
-        { ...base, role: 'PDSCOYHQ', rank: '2SG', name: 'HQ' },
       ]),
       '2026-07-22',
       'Cougar'
     );
     expect(roster.find((entry) => entry.role === 'PDS8')).toMatchObject({ filed: true, name: 'EIGHT' });
-    expect(roster.find((entry) => entry.role === 'PDSHQ')).toMatchObject({ filed: true, name: 'HQ' });
+    expect(roster.find((entry) => entry.role === 'PDSHQ')).toBeUndefined();
   });
 
   test('the battalion tree contains all five companies, including ones that filed nothing', () => {

@@ -91,7 +91,12 @@ export function subunitPosition(company, platoon) {
  * @returns {string[]} Roles such as `CDO`, `PDSHQ`, `PDS7` or `PDSOPR+ASA`.
  */
 export function commandRolesOf(company) {
-  return [...COMMAND_ROLES, ...(COMPANY_SUBUNITS[company] || []).map((unit) => 'PDS' + unit)];
+  return [
+    ...COMMAND_ROLES,
+    ...(COMPANY_SUBUNITS[company] || [])
+      .filter((unit) => unit !== 'HQ')
+      .map((unit) => 'PDS' + unit),
+  ];
 }
 
 /**
