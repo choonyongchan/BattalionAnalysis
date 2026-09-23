@@ -34,10 +34,14 @@ export interface Deps {
  * `exports` map blocks importing that path directly, so it has to be reached via `require`.
  *
  * Bun loads the ESM build leniently, which is why the tests never saw this.
+ *
+ * The handle is named `require` on purpose: Vercel traces a function's dependencies statically,
+ * and it only recognises `require('<literal>')`. Calling `createRequire(...)(...)` inline reads
+ * as dynamic, so the package is left out of the bundle and the function fails at runtime with
+ * `Cannot find module '@opengovsg/formsg-sdk'`.
  */
-const formsgSdk = createRequire(import.meta.url)('@opengovsg/formsg-sdk') as (config: {
-  mode: string;
-}) => Deps['sdk'];
+const require = createRequire(import.meta.url);
+const formsgSdk = require('@opengovsg/formsg-sdk') as (config: { mode: string }) => Deps['sdk'];
 
 /** Anything shaped like an NRIC or FIN; the same shape `test/repo-hygiene.test.ts` checks. */
 const NRIC_SHAPE = /\b[STFGM]\d{7}[A-Z]\b/i;
