@@ -77,9 +77,28 @@ export async function readJson<T = unknown>(request: Request): Promise<ParsedBod
  */
 export function serverError(error: unknown, context: string): Response {
   const reference = Math.random().toString(36).slice(2, 10);
-  const message = error instanceof Error ? error.stack || error.message : String(error);
-  console.error(`[${context}] ${reference}: ${message}`);
+  console.error(`[${context}] ${reference}: ${describeError(error)}`);
   return json(500, { error: 'Internal error.', reference });
+}
+
+/**
+ * Renders a thrown value for the log, followed by its `cause` chain.
+ *
+ * Drizzle wraps a failed query as "Failed query: <sql>" and keeps the driver's error, the one
+ * that says why it failed, in `cause`; without the chain the log names the query and not the
+ * reason. The chain is cut at a few links in case a cause refers back to itself.
+ *
+ * @param error Whatever was thrown.
+ * @returns The stack (or message) of the error and of each cause, one per paragraph.
+ */
+function describeError(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current !== undefined; depth++) {
+    parts.push(current instanceof Error ? current.stack || current.message : String(current));
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return parts.join('\nCaused by: ');
 }
 
 /**

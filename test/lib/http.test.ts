@@ -1,6 +1,6 @@
 /** The shared route helpers. */
-import { describe, expect, test } from 'bun:test';
-import { json, methodNotAllowed, readJson } from '../../lib/http.ts';
+import { describe, expect, spyOn, test } from 'bun:test';
+import { json, methodNotAllowed, readJson, serverError } from '../../lib/http.ts';
 
 describe('json', () => {
   test('sets the status and a JSON content type', async () => {
@@ -56,5 +56,25 @@ describe('readJson', () => {
     const parsed = await readJson(withBody('   '));
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.response.status).toBe(400);
+  });
+});
+
+describe('serverError', () => {
+  test('logs the cause chain, where a wrapped database error keeps its real reason', async () => {
+    /*
+     * Drizzle wraps every failure as "Failed query: <sql>" and puts the driver's error --
+     * the one that says why -- in `cause`. Logging only the wrapper hid a production outage.
+     */
+    const log = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const driver = new Error('password authentication failed for user "dashboard_read"');
+      const response = serverError(new Error('Failed query: select 1', { cause: driver }), 'api/test');
+      const line = String(log.mock.calls[0]?.[0]);
+      expect(line).toContain('Failed query: select 1');
+      expect(line).toContain('password authentication failed');
+      expect(await response.json()).not.toHaveProperty('error', expect.stringContaining('password'));
+    } finally {
+      log.mockRestore();
+    }
   });
 });
