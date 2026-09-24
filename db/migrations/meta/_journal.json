@@ -15,6 +15,13 @@
       "when": 1790051591004,
       "tag": "0001_dashboard_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790254446525,
+      "tag": "0002_settings",
+      "breakpoints": true
     }
   ]
 }

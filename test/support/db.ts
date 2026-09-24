@@ -44,6 +44,7 @@ const TABLES = [
   'report_sick_formsg',
   'public_holidays',
   'rotations',
+  'settings',
 ];
 
 /** Connection-string variables that name databases the tests must never truncate. */

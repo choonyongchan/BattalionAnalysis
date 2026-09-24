@@ -2,8 +2,8 @@
  * Drizzle schema for the Neon database: the source of truth for tables, enums and migrations.
  *
  * Two write paths: `lib/pipeline.ts` (WhatsApp parade states) and `api/formsg.ts` (report sick).
- * `public_holidays` and `rotations` are dashboard settings, maintained by SQL (seeded by
- * `scripts/import-sheet.ts`). The dashboard reads everything through `api/dashboard.ts`.
+ * `settings` holds the Settings page's sections, written only by `api/settings.ts`.
+ * The dashboard reads everything through `api/dashboard.ts`.
  * NRIC is deliberately absent; identity is `name_key`. Do not add NRIC columns.
  */
 import { sql } from 'drizzle-orm';
@@ -13,6 +13,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -246,3 +247,15 @@ export const rotations = pgTable(
     check('rotations_ordered', sql`${t.startDate} <= ${t.endDate}`),
   ],
 );
+
+/**
+ * One row per settings section (`src/model/settings/defaults.js`), edited on the Settings page.
+ * No row means the section's default. `version` makes saves optimistic: a save names the
+ * version it edited and loses to any save in between.
+ */
+export const settings = pgTable('settings', {
+  section: text('section').primaryKey(),
+  value: jsonb('value').notNull(),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
+});
