@@ -1,6 +1,6 @@
 -- The role api/dashboard.ts connects as: read-only, and unable to read a message body.
 --
--- The dashboard charts parade states, report-sick submissions and the two settings tables.
+-- The dashboard charts parade states, report-sick submissions and the settings.
 -- It never writes, and it never needs raw_messages.body (NRICs, diagnoses), so this role
 -- gets SELECT on exactly what lib/dashboard.ts reads, and only the id and received_at
 -- columns of raw_messages.
@@ -32,8 +32,7 @@ GRANT SELECT ON
   personnel_rows,
   command_roster_rows,
   report_sick_formsg,
-  public_holidays,
-  rotations
+  settings
 TO dashboard_read;
 --> statement-breakpoint
 GRANT SELECT (id, received_at) ON raw_messages TO dashboard_read;
@@ -41,4 +40,4 @@ GRANT SELECT (id, received_at) ON raw_messages TO dashboard_read;
 -- Verification, run as dashboard_read:
 --   SELECT id, received_at FROM raw_messages LIMIT 1;   -- must SUCCEED
 --   SELECT body FROM raw_messages LIMIT 1;              -- must FAIL: permission denied
---   DELETE FROM public_holidays;                        -- must FAIL: permission denied
+--   DELETE FROM settings;                               -- must FAIL: permission denied

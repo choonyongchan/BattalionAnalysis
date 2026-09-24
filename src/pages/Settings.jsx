@@ -1,39 +1,19 @@
 /**
  * What the dashboard is reading, and how much of the battalion it covers.
  *
- * Read-only, and deliberately so: the dashboard reads Neon as a role that cannot write
- * (`docs/architecture_patterns.md`), so a wrong holiday or an overlapping rotation is
- * fixed in the database with SQL, not here. This page's job is to make a problem visible
- * and name the exact table and columns to fill when a settings table is empty.
+ * Settings are no longer maintained by SQL: holidays and rotations are edited under
+ * Settings → Calendar (Task 9 adds the editors). This page's job is to make a problem
+ * visible, not to fix it.
  */
 
 import { dataset } from '../app/state.js';
 import { Banner, Card, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { TABS } from '../data/tabs.js';
 import { toHolidays } from '../model/calendarMarks.js';
 import { dataQuality } from '../model/quality.js';
 import { rotationIssues, rotationSpan, toRotations } from '../model/rotations.js';
 import { weekdayOf } from '../model/dates.js';
-
-/**
- * The panel shown when a settings table has no rows: which table to fill, and how.
- * @param {{tabName: string, table: string, example: string}} props The panel title, the
- *     Neon table, and an example INSERT.
- * @returns {!preact.VNode} The panel.
- */
-function EmptySettingsPanel({ tabName, table, example }) {
-  return (
-    <Card title={tabName}>
-      <Banner tone="warning">
-        The <strong>{table}</strong> table has no rows yet. Add them in the Neon SQL editor as
-        the database owner, then reload the dashboard:
-      </Banner>
-      <p class="fine">{example}</p>
-    </Card>
-  );
-}
 
 /**
  * The Public Holidays panel: a table of what loaded, each with its weekday.
@@ -45,7 +25,7 @@ function HolidaysPanel({ rows }) {
   if (holidays.length === 0) {
     return (
       <Card title="Public Holidays">
-        <EmptyState>No public holidays loaded for the range this dashboard has read.</EmptyState>
+        <EmptyState>No public holidays are set.</EmptyState>
       </Card>
     );
   }
@@ -78,7 +58,7 @@ function RotationsPanel({ rows }) {
   if (rotations.length === 0) {
     return (
       <Card title="Rotations">
-        <EmptyState>No rotation schedule loaded. Rotational grouping is unavailable.</EmptyState>
+        <EmptyState>No rotations are set. Rotational grouping is unavailable.</EmptyState>
       </Card>
     );
   }
@@ -215,24 +195,8 @@ export function Settings() {
       </header>
 
       <div class="grid-2">
-        {data.available.holidays ? (
-          <HolidaysPanel rows={data.holidays} />
-        ) : (
-          <EmptySettingsPanel
-            tabName={TABS.HOLIDAYS}
-            table="public_holidays"
-            example="INSERT INTO public_holidays (date, name) VALUES ('2026-08-09', 'National Day');"
-          />
-        )}
-        {data.available.rotations ? (
-          <RotationsPanel rows={data.rotations} />
-        ) : (
-          <EmptySettingsPanel
-            tabName={TABS.ROTATIONS}
-            table="rotations"
-            example="INSERT INTO rotations (name, start_date, end_date) VALUES ('Rotation 1', '2026-07-01', '2026-09-30');"
-          />
-        )}
+        <HolidaysPanel rows={data.holidays} />
+        <RotationsPanel rows={data.rotations} />
       </div>
 
       <DataQualityPanel quality={quality} />

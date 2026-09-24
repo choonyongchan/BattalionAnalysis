@@ -4,8 +4,8 @@
  * Reads a CSV export of each tab (File → Download → CSV, once per tab) from one directory,
  * matching each file by the tab name it ends with, e.g. `Battalion - Strength Data.csv`.
  * Parade states already in Neon win: a submission whose `parade_response_id` exists is left
- * alone, children and all. FormSG responses dedupe on `Response ID`, holidays on date,
- * rotations on (name, start date). Re-running inserts nothing new.
+ * alone, children and all. FormSG responses dedupe on `Response ID`. Re-running inserts
+ * nothing new.
  *
  * The message-body column of "Parade State Responses" and both NRIC columns are never
  * read. Output is counts and row numbers only, never cell contents.
@@ -13,6 +13,9 @@
  * Each Sheet value is stored so that `lib/dashboard.ts` rebuilds the same cell the Sheet
  * held: `platoon` becomes `unit_label`, `reason` becomes `duty_type` verbatim, and the 999
  * `num_days` sentinel becomes `is_permanent`.
+ *
+ * Holidays and rotations are not imported: they are settings now, edited under
+ * Settings → Calendar.
  *
  * Usage:  bun --env-file=.env.local scripts/import-sheet.ts <csv-dir> [--dry-run]
  */
@@ -23,9 +26,7 @@ import {
   commandRosterRows,
   paradeSubmissions,
   personnelRows,
-  publicHolidays,
   reportSickFormsg,
-  rotations,
   strengthRows,
 } from '../db/schema.ts';
 import { IMPORTED_MODEL, UNTIMED_MODEL } from '../lib/dashboard.ts';
@@ -396,33 +397,6 @@ export function mapFormSg(row: SheetRow): Record<string, unknown> | null {
 }
 
 /**
- * Maps a "Public Holidays" row.
- *
- * @param row The Sheet row.
- * @returns The insert, or null without a readable date.
- */
-export function mapHoliday(row: SheetRow): Record<string, unknown> | null {
-  // The backup's rows hold `date<TAB>name` in the date cell, with the name cell empty.
-  const [dateCell, tabbedName] = (row.date ?? '').split('\t');
-  const date = sheetDate(dateCell);
-  return date ? { date, name: orNull(row.name) ?? orNull(tabbedName) } : null;
-}
-
-/**
- * Maps a "Rotations" row.
- *
- * @param row The Sheet row.
- * @returns The insert, or null without a name or with unreadable or reversed dates.
- */
-export function mapRotation(row: SheetRow): Record<string, unknown> | null {
-  const name = orNull(row.name);
-  const startDate = sheetDate(row.start_date);
-  const endDate = sheetDate(row.end_date);
-  if (!name || !startDate || !endDate || startDate > endDate) return null;
-  return { name, startDate, endDate };
-}
-
-/**
  * Maps every row of a flat tab, tallying rejections by CSV row number.
  *
  * @param rows The Sheet rows.
@@ -533,8 +507,6 @@ async function main(): Promise<void> {
     responses: readTab(dir, 'Parade State Responses'),
   });
   const formSg = mapAll(readTab(dir, 'Report Sick FormSG Responses'), mapFormSg);
-  const holidays = mapAll(readTab(dir, 'Public Holidays'), mapHoliday);
-  const rotationRows = mapAll(readTab(dir, 'Rotations'), mapRotation);
 
   let db: Db | null = null;
   if (!dryRun) db = (await import('../db/index.ts')).getDb();
@@ -544,8 +516,6 @@ async function main(): Promise<void> {
   report('Command Roster', tallies.roster!, null);
   console.log(`Parade submissions: ${groups.size} importable${db ? `, inserted ${await insertParadeStates(db, groups)}` : ''}`);
   report('Report Sick FormSG Responses', formSg.tally, db && (await insertNew(db, reportSickFormsg, formSg.values)));
-  report('Public Holidays', holidays.tally, db && (await insertNew(db, publicHolidays, holidays.values)));
-  report('Rotations', rotationRows.tally, db && (await insertNew(db, rotations, rotationRows.values)));
   if (dryRun) console.log('Dry run: nothing was written.');
 }
 

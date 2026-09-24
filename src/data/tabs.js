@@ -28,8 +28,6 @@ export const TABS = {
   ROSTER: 'Command Roster',
   FORMSG: 'Report Sick FormSG Responses',
   SUBMISSIONS: 'Parade State Responses',
-  HOLIDAYS: 'Public Holidays',
-  ROTATIONS: 'Rotations',
 };
 
 /**
@@ -126,18 +124,6 @@ export const FORMSG_HEADERS = [
 export const SUBMISSION_HEADERS = ['Timestamp', 'parade_response_id'];
 
 /**
- * Headers read from "Public Holidays".
- * @type {string[]}
- */
-export const HOLIDAY_HEADERS = ['date', 'name'];
-
-/**
- * Headers read from "Rotations".
- * @type {string[]}
- */
-export const ROTATION_HEADERS = ['name', 'start_date', 'end_date'];
-
-/**
  * FormSG headers the dashboard must never request.
  *
  * Named rather than merely omitted so `test/dashboard/schema.test.js` can assert their
@@ -159,14 +145,12 @@ export const FORBIDDEN_SUBMISSION_HEADERS = ['Drop your Parade State here'];
 /**
  * Tabs the dashboard works without, and what to say when one is absent.
  *
- * A battalion that has not set up the report-sick form, or has not created the two
- * settings tabs, should get a working dashboard with a note rather than an error naming a
- * tab they have never heard of.
+ * A battalion that has not set up the report-sick form, or has not set up the calendar,
+ * should get a working dashboard with a note rather than an error naming a tab they have
+ * never heard of.
  * @type {!Object<string, string>}
  */
 export const OPTIONAL_TABS = {
   [TABS.FORMSG]: 'Report-sick submissions are unavailable.',
   [TABS.SUBMISSIONS]: 'Parade-state filing times are unavailable.',
-  [TABS.HOLIDAYS]: 'Public holidays are not marked on any chart.',
-  [TABS.ROTATIONS]: 'Rotational grouping is unavailable.',
 };

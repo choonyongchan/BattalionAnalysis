@@ -227,27 +227,6 @@ export const reportSickFormsg = pgTable(
   ],
 );
 
-/** A public holiday the dashboard marks on its charts; a blank name falls back to the Singapore map. */
-export const publicHolidays = pgTable('public_holidays', {
-  date: date('date', { mode: 'string' }).primaryKey(),
-  name: text('name'),
-});
-
-/** One rotation window the dashboard groups by. */
-export const rotations = pgTable(
-  'rotations',
-  {
-    id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
-    name: text('name').notNull(),
-    startDate: date('start_date', { mode: 'string' }).notNull(),
-    endDate: date('end_date', { mode: 'string' }).notNull(),
-  },
-  (t) => [
-    uniqueIndex('rotations_natural_key').on(t.name, t.startDate),
-    check('rotations_ordered', sql`${t.startDate} <= ${t.endDate}`),
-  ],
-);
-
 /**
  * One row per settings section (`src/model/settings/defaults.js`), edited on the Settings page.
  * No row means the section's default. `version` makes saves optimistic: a save names the

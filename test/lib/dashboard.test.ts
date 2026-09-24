@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { handle as handleFormsg } from '../../api/formsg.ts';
 import type { Db } from '../../db/index.ts';
-import { commandRosterRows, publicHolidays, rotations } from '../../db/schema.ts';
+import { commandRosterRows } from '../../db/schema.ts';
 import {
   loadTabs,
   personnelNumDays,
@@ -35,7 +35,7 @@ import { FAKE_NRIC, FORM_KEYS, POST_URI, SICK_SPECS, sgtDay, testSdk, webhookReq
 import { allEntries, companyTotals, expectedCounts, expectedKey, renderEntry, renderParadeState } from '../support/paradeState.ts';
 import { SCENARIOS } from '../support/scenarios.ts';
 
-const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS', string>;
+const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS', string>;
 
 describe('platoonOf', () => {
   test.each([
@@ -123,8 +123,6 @@ describe('toTab', () => {
 
 describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’s own write paths', () => {
   const SPECS = SCENARIOS.map(({ spec }) => spec);
-  const HOLIDAY = { date: '2026-08-09', name: 'National Day' };
-  const ROTATION = { name: 'R1', startDate: '2026-07-01', endDate: '2026-09-30' };
   let db: Db;
   let tabs: Awaited<ReturnType<typeof loadTabs>>;
 
@@ -136,8 +134,6 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     for (const spec of SICK_SPECS) {
       await handleFormsg(webhookRequest(spec), { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
     }
-    await db.insert(publicHolidays).values(HOLIDAY);
-    await db.insert(rotations).values(ROTATION);
     tabs = await loadTabs(db);
   }, DB_TIMEOUT_MS * 3);
 
@@ -206,12 +202,8 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     expect(JSON.stringify(tabs)).not.toContain(FAKE_NRIC);
   });
 
-  test('the submissions tab lists each parade state once; holidays and rotations come through', () => {
+  test('the submissions tab lists each parade state once', () => {
     expect(records(TABS.SUBMISSIONS).map((row) => row.parade_response_id).sort()).toEqual(SPECS.map(expectedKey).sort());
-    expect(records(TABS.HOLIDAYS)).toEqual([HOLIDAY]);
-    expect(records(TABS.ROTATIONS)).toEqual([
-      { name: ROTATION.name, start_date: ROTATION.startDate, end_date: ROTATION.endDate },
-    ]);
   });
 
   test('no NRIC header, and no message text, can leave the database', () => {

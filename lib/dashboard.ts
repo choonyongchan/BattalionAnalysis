@@ -17,20 +17,16 @@ import {
   commandRosterRows,
   paradeSubmissions,
   personnelRows,
-  publicHolidays,
   rawMessages,
   reportSickFormsg,
-  rotations,
   strengthRows,
 } from '../db/schema.ts';
 import { PERM_STATUS_NUM_DAYS } from '../src/model/domain.js';
 import {
   FORMSG_HEADERS,
   FORMSG_STATUS_HEADERS,
-  HOLIDAY_HEADERS,
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
-  ROTATION_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
   TABS as SHEET_TABS,
@@ -44,10 +40,7 @@ export type Row = Record<string, unknown>;
 export type Tabs = Record<string, unknown[][]>;
 
 /** The tab names, typed: the JSDoc on the browser module does not carry through. */
-const TABS = SHEET_TABS as Record<
-  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS',
-  string
->;
+const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS', string>;
 
 /** `parade_submissions.model` on a submission `scripts/import-sheet.ts` brought in from the Sheet. */
 export const IMPORTED_MODEL = 'sheet';
@@ -344,43 +337,18 @@ async function submissionsTab(db: Db): Promise<Row[]> {
 }
 
 /**
- * Reads the Public Holidays tab.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function holidaysTab(db: Db): Promise<Row[]> {
-  return db.select({ date: publicHolidays.date, name: publicHolidays.name }).from(publicHolidays).orderBy(asc(publicHolidays.date));
-}
-
-/**
- * Reads the Rotations tab.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function rotationsTab(db: Db): Promise<Row[]> {
-  return db
-    .select({ name: rotations.name, start_date: rotations.startDate, end_date: rotations.endDate })
-    .from(rotations)
-    .orderBy(asc(rotations.startDate));
-}
-
-/**
  * Reads every tab the dashboard charts.
  *
  * @param db A handle connected as `dashboard_read`.
  * @returns Tab name to values, header row first.
  */
 export async function loadTabs(db: Db): Promise<Tabs> {
-  const [strength, personnel, roster, formSg, submissions, holidays, rotationRows] = await Promise.all([
+  const [strength, personnel, roster, formSg, submissions] = await Promise.all([
     strengthTab(db),
     personnelTab(db),
     rosterTab(db),
     formSgTab(db),
     submissionsTab(db),
-    holidaysTab(db),
-    rotationsTab(db),
   ]);
   return {
     [TABS.STRENGTH]: toTab(STRENGTH_HEADERS, strength),
@@ -388,7 +356,5 @@ export async function loadTabs(db: Db): Promise<Tabs> {
     [TABS.ROSTER]: toTab(ROSTER_HEADERS, roster),
     [TABS.FORMSG]: toTab(FORMSG_HEADERS, formSg),
     [TABS.SUBMISSIONS]: toTab(SUBMISSION_HEADERS, submissions),
-    [TABS.HOLIDAYS]: toTab(HOLIDAY_HEADERS, holidays),
-    [TABS.ROTATIONS]: toTab(ROTATION_HEADERS, rotationRows),
   };
 }

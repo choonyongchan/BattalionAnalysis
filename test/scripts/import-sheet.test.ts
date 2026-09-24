@@ -10,10 +10,8 @@ import {
   groupParadeStates,
   mapAll,
   mapFormSg,
-  mapHoliday,
   mapPersonnel,
   mapRoster,
-  mapRotation,
   mapStrength,
   parseCsv,
   sheetDate,
@@ -195,29 +193,5 @@ describe('mapFormSg', () => {
   test('needs a response id and a timestamp', () => {
     expect(mapFormSg({ ...row, 'Response ID': '' })).toBeNull();
     expect(mapFormSg({ ...row, Timestamp: '' })).toBeNull();
-  });
-});
-
-describe('settings tabs', () => {
-  test('holidays and rotations map, and bad rows are tallied by CSV row number', () => {
-    expect(mapHoliday({ date: '9/8/2026', name: 'National Day' })).toEqual({ date: '2026-08-09', name: 'National Day' });
-    expect(mapHoliday({ date: "2026-01-01\tNew Year's Day", name: '' })).toEqual({
-      date: '2026-01-01',
-      name: "New Year's Day",
-    });
-    expect(mapRotation({ name: 'R1', start_date: '2026-07-01', end_date: '2026-09-30' })).toEqual({
-      name: 'R1',
-      startDate: '2026-07-01',
-      endDate: '2026-09-30',
-    });
-    const { values, tally } = mapAll(
-      [
-        { name: 'R1', start_date: '2026-07-01', end_date: '2026-09-30' },
-        { name: 'R2', start_date: '2026-10-01', end_date: '2026-09-30' },
-      ],
-      mapRotation,
-    );
-    expect(values).toHaveLength(1);
-    expect(tally).toEqual({ read: 2, rejected: [3] });
   });
 });

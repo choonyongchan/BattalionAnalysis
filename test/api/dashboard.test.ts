@@ -9,6 +9,7 @@ import { SESSION_COOKIE, SESSION_TTL_MS, issueSession } from '../../lib/session.
 const PASSWORD = 'dashboard-pw';
 const URL = 'https://example.vercel.app/api/dashboard';
 const TABS = { 'Strength Data': [['parade_response_id']] };
+const SETTINGS = { values: {}, meta: {} };
 
 /**
  * Builds deps over a reader that counts its calls.
@@ -20,6 +21,7 @@ function setup(overrides: Partial<Deps> = {}) {
   const calls = { load: 0 };
   const deps: Deps = {
     loadTabs: async () => (calls.load++, TABS),
+    loadSettings: async () => SETTINGS,
     dashboardPassword: PASSWORD,
     hasDatabase: true,
     now: () => new Date('2026-09-22T01:00:00Z'),
@@ -75,7 +77,7 @@ describe('api/dashboard', () => {
     const response = await handle(request('GET', PASSWORD), deps);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(await response.json()).toEqual({ ok: true, generatedAt: '2026-09-22T01:00:00.000Z', tabs: TABS });
+    expect(await response.json()).toEqual({ ok: true, generatedAt: '2026-09-22T01:00:00.000Z', tabs: TABS, settings: SETTINGS });
   });
 
   test('a wrong or missing password is refused before anything is read', async () => {

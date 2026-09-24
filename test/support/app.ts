@@ -9,6 +9,7 @@ import { handle as handleParade, type Deps as ParadeDeps } from '../../api/parad
 import { handle as handleSession } from '../../api/session.ts';
 import type { Db } from '../../db/index.ts';
 import { loadTabs } from '../../lib/dashboard.ts';
+import { readSettings } from '../../lib/settings.ts';
 import {
   deleteMessage,
   editMessage,
@@ -68,7 +69,12 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {})
       const path = new URL(request.url).pathname;
       if (path === '/api/parade') return handleParade(request, paradeDeps(db, options));
       if (path === '/api/dashboard') {
-        return handleDashboard(request, { loadTabs: () => loadTabs(db), dashboardPassword: DASHBOARD_PASSWORD, hasDatabase: true });
+        return handleDashboard(request, {
+          loadTabs: () => loadTabs(db),
+          loadSettings: () => readSettings(db),
+          dashboardPassword: DASHBOARD_PASSWORD,
+          hasDatabase: true,
+        });
       }
       if (path === '/api/session') {
         return handleSession(request, { dashboardPassword: DASHBOARD_PASSWORD });

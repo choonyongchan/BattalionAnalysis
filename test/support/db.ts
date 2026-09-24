@@ -42,8 +42,6 @@ const TABLES = [
   'command_roster_rows',
   'section_counts',
   'report_sick_formsg',
-  'public_holidays',
-  'rotations',
   'settings',
 ];
 
