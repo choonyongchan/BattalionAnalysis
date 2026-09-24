@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { handle, type Deps } from '../../api/formsg.ts';
+import { handle, type Deps } from '../../api/reportsick.ts';
 import type { Db } from '../../db/index.ts';
 import { reportSickFormsg } from '../../db/schema.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
@@ -58,7 +58,7 @@ describe('requests that are refused, and write nothing', () => {
     ['no secret key configured', () => webhookRequest(SPEC), { secretKey: undefined }, 503],
     ['no post URI configured', () => webhookRequest(SPEC), { postUri: undefined }, 503],
     ['no signature header', () => webhookRequest(SPEC, { signature: null }), {}, 401],
-    ['a signature made for another URI', () => webhookRequest(SPEC, { signedFor: 'https://elsewhere.test/api/formsg' }), {}, 401],
+    ['a signature made for another URI', () => webhookRequest(SPEC, { signedFor: 'https://elsewhere.test/api/reportsick' }), {}, 401],
     ['authenticate() returning false', () => webhookRequest(SPEC), { sdk: sdkWhoseAuthenticateReturns(false) }, 401],
     ['authenticate() returning a truthy non-true', () => webhookRequest(SPEC), { sdk: sdkWhoseAuthenticateReturns({ ok: 1 }) }, 401],
     ['a payload encrypted to another form', () => webhookRequest(SPEC), { secretKey: testSdk.crypto.generate().secretKey }, 400],

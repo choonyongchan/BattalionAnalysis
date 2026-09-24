@@ -30,6 +30,7 @@ export const TABS = {
   SUBMISSIONS: 'Parade State Responses',
   HOLIDAYS: 'Public Holidays',
   ROTATIONS: 'Rotations',
+  SFT: 'SFT Responses',
 };
 
 /**
@@ -138,6 +139,27 @@ export const HOLIDAY_HEADERS = ['date', 'name'];
 export const ROTATION_HEADERS = ['name', 'start_date', 'end_date'];
 
 /**
+ * Headers read from "SFT Responses", one row per self-regulated fitness training session.
+ *
+ * `group_ic` is the rank and name the soldier typed for their group's IC; the SFT page
+ * clusters it to size each group. The two acknowledgement checkboxes are not read — nothing
+ * charts them.
+ * @type {string[]}
+ */
+export const SFT_HEADERS = [
+  'Timestamp',
+  'date',
+  'RANK',
+  'name',
+  'company',
+  'group_ic',
+  'PES Status',
+  'exercises',
+  'sfabt_type',
+  'location',
+];
+
+/**
  * FormSG headers the dashboard must never request.
  *
  * Named rather than merely omitted so `test/dashboard/schema.test.js` can assert their
@@ -169,4 +191,5 @@ export const OPTIONAL_TABS = {
   [TABS.SUBMISSIONS]: 'Parade-state filing times are unavailable.',
   [TABS.HOLIDAYS]: 'Public holidays are not marked on any chart.',
   [TABS.ROTATIONS]: 'Rotational grouping is unavailable.',
+  [TABS.SFT]: 'SFT submissions are unavailable.',
 };

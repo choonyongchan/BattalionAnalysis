@@ -59,7 +59,7 @@ const REPORTED = new Set<Column>(['reportSickType', 'outcome']);
  * @param answer The answer entry.
  * @returns The answer text, or '' when there is none.
  */
-function answerText(answer: FormSgAnswer): string {
+export function answerText(answer: FormSgAnswer): string {
   if (answer.answerArray?.length) return answer.answerArray.filter(Boolean).join('; ');
   return (answer.answer ?? '').trim();
 }

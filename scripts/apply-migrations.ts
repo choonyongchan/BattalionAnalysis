@@ -9,7 +9,8 @@
  * bookkeeping `drizzle-kit migrate` does, so the two stay interchangeable:
  *   - statements are split on the `--> statement-breakpoint` marker drizzle-kit writes;
  *   - applied migrations are recorded in `drizzle.__drizzle_migrations`, keyed by the
- *     SHA-256 of the migration file, which is how drizzle-kit decides what is pending.
+ *     SHA-256 of the migration file (with LF line endings), which is how drizzle-kit decides
+ *     what is pending.
  *
  * Re-runnable: a migration already recorded is skipped.
  *
@@ -46,7 +47,9 @@ export function readMigrations(): Migration[] {
     readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
   ) as { entries: JournalEntry[] };
   return journal.entries.map((entry) => {
-    const text = readFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8');
+    // Hashed as LF: a Windows checkout with `core.autocrlf` rewrites the file as CRLF, which
+    // would change its hash and make an applied migration look pending.
+    const text = readFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8').replace(/\r\n/g, '\n');
     return { ...entry, text, hash: createHash('sha256').update(text).digest('hex') };
   });
 }

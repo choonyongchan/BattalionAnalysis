@@ -1,6 +1,6 @@
 -- The role api/dashboard.ts connects as: read-only, and unable to read a message body.
 --
--- The dashboard charts parade states, report-sick submissions and the two settings tables.
+-- The dashboard charts parade states, report-sick and SFT submissions and the two settings tables.
 -- It never writes, and it never needs raw_messages.body (NRICs, diagnoses), so this role
 -- gets SELECT on exactly what lib/dashboard.ts reads, and only the id and received_at
 -- columns of raw_messages.
@@ -32,6 +32,7 @@ GRANT SELECT ON
   personnel_rows,
   command_roster_rows,
   report_sick_formsg,
+  sft_formsg,
   public_holidays,
   rotations
 TO dashboard_read;

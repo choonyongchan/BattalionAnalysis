@@ -13,8 +13,9 @@ the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 | Path | Runtime | Owns |
 |---|---|---|
 | `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `public_holidays` and `rotations` are dashboard settings maintained by SQL |
-| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookie), `domain.ts` |
-| `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
+| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/` (`webhook.ts` the shared FormSG route, `sdk.ts`, `decrypt.ts`, one mapper per form: `map.ts` report sick, `sft.ts` SFT), `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookie), `domain.ts` |
+| `api/reportsick.ts` | Vercel Function | FormSG report-sick webhook (`FORMSG_SECRET_KEY`, `FORMSG_POST_URI`): insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
+| `api/sft.ts` | Vercel Function | FormSG Self-Regulated Fitness Training webhook, a separate form with its own key (`FORMSG_SFT_SECRET_KEY`, `FORMSG_SFT_POST_URI`): insert one row into `sft_formsg` (mapped by `lib/formsg/sft.ts`, plus derived `company`, `sft_date` (SGT)) |
 | `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
 | `api/session.ts` | Vercel Function | The dashboard's login: POST the password once for an `HttpOnly`, 12-hour session cookie (`lib/session.ts`); DELETE ends it. The only route the password is sent to |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
@@ -63,8 +64,10 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 ## Rules that hold everywhere
 
 - **One write path per stream.** Parade-state rows are written only by `lib/pipeline.ts`
-  (called from `api/parade.ts`); FormSG rows only by `api/formsg.ts`. Callers never
-  re-implement either.
+  (called from `api/parade.ts`); report-sick rows only by `api/reportsick.ts`; SFT rows only
+  by `api/sft.ts`. Both FormSG routes are thin: verify → decrypt → map → NRIC-shape refusal →
+  insert is `lib/formsg/webhook.ts#handleWebhook`, and each route supplies only its table,
+  mapper and env vars. Callers never re-implement any of these.
 - **Idempotency lives in the database.** Unique constraints (`wa_message_id`, FormSG
   submission id) settle duplicate deliveries in one statement; there are no app-level locks.
 - **`neon-http` has no interactive transactions.** Atomic writes go through `db.batch([...])`,
@@ -72,7 +75,7 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
   computable natural key.
 - **NRICs never reach the dashboard; message bodies reach only the Deposit editor.**
   FormSG NRIC answers resolve to `discard` in `lib/formsg/fields.ts` and have no column in
-  `report_sick_formsg`. `raw_messages.body` leaves the database only through
+  `report_sick_formsg` or `sft_formsg`; the NRIC-shape refusal in `lib/formsg/webhook.ts` guards both. `raw_messages.body` leaves the database only through
   `GET /api/parade?id=`, one message at a time, to a caller holding the dashboard password, so
   a clerk can correct it; the list and every chart never carry it. Nothing logs a body, a parser
   problem or a rejection reason, since all three can quote a personnel line.

@@ -1,7 +1,8 @@
 # Battalion Analysis
 
-Parade states (WhatsApp, or deposited on the dashboard) and report-sick submissions (FormSG)
-into Neon Postgres, and a dashboard over them, deployed on Vercel.
+Parade states (WhatsApp, or deposited on the dashboard), report-sick submissions (FormSG,
+webhook `/api/reportsick`) and Self-Regulated Fitness Training submissions (FormSG, webhook
+`/api/sft`) into Neon Postgres, and a dashboard over them, deployed on Vercel.
 
 ```sh
 bun install

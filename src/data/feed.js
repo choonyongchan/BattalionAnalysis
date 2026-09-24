@@ -16,6 +16,7 @@ import {
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
   ROTATION_HEADERS,
+  SFT_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
   TABS,
@@ -54,6 +55,7 @@ const OPTIONAL_TAB_SPECS = [
   { key: 'submissions', tab: TABS.SUBMISSIONS, headers: SUBMISSION_HEADERS },
   { key: 'holidays', tab: TABS.HOLIDAYS, headers: HOLIDAY_HEADERS },
   { key: 'rotations', tab: TABS.ROTATIONS, headers: ROTATION_HEADERS },
+  { key: 'sft', tab: TABS.SFT, headers: SFT_HEADERS },
 ];
 
 /**

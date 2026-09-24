@@ -209,7 +209,7 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     await unlock(app.origin);
     for (const spec of SICK_SPECS) {
       const signed = webhookRequest(spec);
-      const response = await fetch(`${app.origin}/api/formsg`, { method: 'POST', headers: signed.headers, body: await signed.text() });
+      const response = await fetch(`${app.origin}/api/reportsick`, { method: 'POST', headers: signed.headers, body: await signed.text() });
       expect(response.status).toBe(200);
     }
 

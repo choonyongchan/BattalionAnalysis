@@ -9,7 +9,8 @@
  */
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
-import { handle as handleFormsg } from '../../api/formsg.ts';
+import { handle as handleFormsg } from '../../api/reportsick.ts';
+import { handle as handleSft } from '../../api/sft.ts';
 import type { Db } from '../../db/index.ts';
 import { commandRosterRows, publicHolidays, rotations } from '../../db/schema.ts';
 import {
@@ -27,15 +28,28 @@ import {
   FORBIDDEN_SUBMISSION_HEADERS,
   FORMSG_HEADERS,
   PERSONNEL_HEADERS,
+  SFT_HEADERS,
   STRENGTH_HEADERS,
   TABS as SHEET_TABS,
 } from '../../src/data/tabs.js';
 import { DB_TIMEOUT_MS, hasTestDb, readOnlyTestDb, resetTestDb, TEST_DASHBOARD_DATABASE_URL } from '../support/db.ts';
-import { FAKE_NRIC, FORM_KEYS, POST_URI, SICK_SPECS, sgtDay, testSdk, webhookRequest } from '../support/formsg.ts';
+import {
+  FAKE_NRIC,
+  FORM_KEYS,
+  POST_URI,
+  SFT_FORM_KEYS,
+  SFT_POST_URI,
+  SFT_SPECS,
+  SICK_SPECS,
+  sftWebhookRequest,
+  sgtDay,
+  testSdk,
+  webhookRequest,
+} from '../support/formsg.ts';
 import { allEntries, companyTotals, expectedCounts, expectedKey, renderEntry, renderParadeState } from '../support/paradeState.ts';
 import { SCENARIOS } from '../support/scenarios.ts';
 
-const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS', string>;
+const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS' | 'SFT', string>;
 
 describe('platoonOf', () => {
   test.each([
@@ -136,10 +150,33 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     for (const spec of SICK_SPECS) {
       await handleFormsg(webhookRequest(spec), { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
     }
+    for (const spec of SFT_SPECS) {
+      await handleSft(sftWebhookRequest(spec), { db, secretKey: SFT_FORM_KEYS.secretKey, postUri: SFT_POST_URI, sdk: testSdk });
+    }
     await db.insert(publicHolidays).values(HOLIDAY);
     await db.insert(rotations).values(ROTATION);
     tabs = await loadTabs(db);
   }, DB_TIMEOUT_MS * 3);
+
+  test('SFT Responses has one row per session, under the SFT headers, as the webhook stored it', () => {
+    expect(tabs[TABS.SFT]![0]).toEqual(SFT_HEADERS);
+    const rows = records(TABS.SFT);
+    expect(rows).toHaveLength(SFT_SPECS.length);
+    SFT_SPECS.forEach((spec, index) => {
+      expect(rows[index]).toMatchObject({
+        Timestamp: sgtDateTime(spec.created),
+        date: sgtDay(spec.created),
+        RANK: spec.rank,
+        name: spec.name,
+        company: spec.company,
+        group_ic: spec.groupIc,
+        'PES Status': spec.pes,
+        exercises: spec.exercises.join('; '),
+        sfabt_type: spec.sfabt,
+        location: spec.location,
+      });
+    });
+  });
 
   /**
    * A tab's rows as records keyed by header.

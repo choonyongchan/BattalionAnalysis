@@ -21,6 +21,7 @@ import {
   rawMessages,
   reportSickFormsg,
   rotations,
+  sftFormsg,
   strengthRows,
 } from '../db/schema.ts';
 import { PERM_STATUS_NUM_DAYS } from '../src/model/domain.js';
@@ -31,6 +32,7 @@ import {
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
   ROTATION_HEADERS,
+  SFT_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
   TABS as SHEET_TABS,
@@ -45,7 +47,7 @@ export type Tabs = Record<string, unknown[][]>;
 
 /** The tab names, typed: the JSDoc on the browser module does not carry through. */
 const TABS = SHEET_TABS as Record<
-  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS',
+  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'HOLIDAYS' | 'ROTATIONS' | 'SFT',
   string
 >;
 
@@ -367,13 +369,49 @@ async function rotationsTab(db: Db): Promise<Row[]> {
 }
 
 /**
+ * Reads the SFT Responses tab: one row per self-regulated fitness training session.
+ *
+ * @param db The read-only handle.
+ * @returns Records keyed by the headers in `SFT_HEADERS`.
+ */
+async function sftTab(db: Db): Promise<Row[]> {
+  const rows = await db
+    .select({
+      timestamp: sftFormsg.timestamp,
+      date: sftFormsg.sftDate,
+      rank: sftFormsg.rank,
+      name: sftFormsg.name,
+      company: sftFormsg.company,
+      groupIc: sftFormsg.groupIc,
+      pesStatus: sftFormsg.pesStatus,
+      exercises: sftFormsg.exercises,
+      sfabtType: sftFormsg.sfabtType,
+      location: sftFormsg.location,
+    })
+    .from(sftFormsg)
+    .orderBy(asc(sftFormsg.timestamp));
+  return rows.map((r) => ({
+    Timestamp: sgtDateTime(r.timestamp),
+    date: r.date,
+    RANK: r.rank,
+    name: r.name,
+    company: r.company,
+    group_ic: r.groupIc,
+    'PES Status': r.pesStatus,
+    exercises: r.exercises,
+    sfabt_type: r.sfabtType,
+    location: r.location,
+  }));
+}
+
+/**
  * Reads every tab the dashboard charts.
  *
  * @param db A handle connected as `dashboard_read`.
  * @returns Tab name to values, header row first.
  */
 export async function loadTabs(db: Db): Promise<Tabs> {
-  const [strength, personnel, roster, formSg, submissions, holidays, rotationRows] = await Promise.all([
+  const [strength, personnel, roster, formSg, submissions, holidays, rotationRows, sft] = await Promise.all([
     strengthTab(db),
     personnelTab(db),
     rosterTab(db),
@@ -381,6 +419,7 @@ export async function loadTabs(db: Db): Promise<Tabs> {
     submissionsTab(db),
     holidaysTab(db),
     rotationsTab(db),
+    sftTab(db),
   ]);
   return {
     [TABS.STRENGTH]: toTab(STRENGTH_HEADERS, strength),
@@ -390,5 +429,6 @@ export async function loadTabs(db: Db): Promise<Tabs> {
     [TABS.SUBMISSIONS]: toTab(SUBMISSION_HEADERS, submissions),
     [TABS.HOLIDAYS]: toTab(HOLIDAY_HEADERS, holidays),
     [TABS.ROTATIONS]: toTab(ROTATION_HEADERS, rotationRows),
+    [TABS.SFT]: toTab(SFT_HEADERS, sft),
   };
 }
