@@ -36,8 +36,11 @@ function forgetStoredPassword_() {
 
 forgetStoredPassword_();
 
-/** @type {boolean} Whether a background refresh is already waiting on the server. */
-let refreshing = false;
+/** @type {?Promise<boolean>} The background refresh waiting on the server, if any. */
+let inFlight = null;
+
+/** @type {?Promise<boolean>} The one follow-up refresh queued behind `inFlight`, if any. */
+let queued = null;
 
 /**
  * Opens the dashboard with the password the viewer typed.
@@ -98,16 +101,38 @@ function fail_(error) {
 /**
  * Re-reads the data in the background, leaving the page on screen while it waits.
  *
+ * Only one read is ever in flight. A call made while one is in flight queues a single
+ * follow-up read, started when the current one finishes, and resolves with it: the caller
+ * may have just saved something (a setting, an unlock) that the in-flight read began too
+ * early to see. Further calls before the follow-up starts share it.
+ *
  * Only an ended session changes what the viewer sees: the login screen returns. Any other
  * failure keeps the data already drawn and waits for the next tick, since a dropped
  * connection is not a reason to take the page away.
  * @returns {!Promise<boolean>} True when fresh data replaced the old.
  */
 export function refresh() {
-  if (refreshing) {
-    return Promise.resolve(false);
+  if (queued) {
+    return queued;
   }
-  refreshing = true;
+  if (inFlight) {
+    queued = inFlight.then(() => {
+      queued = null;
+      return refresh();
+    });
+    return queued;
+  }
+  inFlight = readInBackground_().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+/**
+ * One background read: replaces the dataset, or returns to the login screen on a 401.
+ * @returns {!Promise<boolean>} True when fresh data replaced the old.
+ */
+function readInBackground_() {
   return loadAll()
     .then((data) => {
       dataset.value = data;
@@ -118,9 +143,6 @@ export function refresh() {
         fail_(error);
       }
       return false;
-    })
-    .finally(() => {
-      refreshing = false;
     });
 }
 
