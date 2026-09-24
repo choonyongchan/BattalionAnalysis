@@ -1,105 +1,64 @@
 /**
- * What the dashboard is reading, and how much of the battalion it covers.
+ * What this dashboard is set up for, and how much of the battalion it covers.
  *
- * Settings are no longer maintained by SQL: holidays and rotations are edited under
- * Settings → Calendar (Task 9 adds the editors). This page's job is to make a problem
- * visible, not to fix it.
+ * Every viewer sees every setting; a viewer holding the settings password can also change
+ * one, section by section, from the Basic and Advanced tabs below. Each section's card says
+ * when it is still the default. Settings are no longer maintained by SQL: holidays and
+ * rotations are edited under Settings → Calendar, alongside Unit, Thresholds and Session.
  */
 
-import { dataset } from '../app/state.js';
-import { Banner, Card, EmptyState } from '../components/Card.jsx';
-import { DataTable } from '../components/Table.jsx';
+import { useState } from 'preact/hooks';
+import { canEdit, dataset } from '../app/state.js';
+import { Banner, Card } from '../components/Card.jsx';
+import { Segmented } from '../components/Segmented.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { toHolidays } from '../model/calendarMarks.js';
 import { dataQuality } from '../model/quality.js';
-import { rotationIssues, rotationSpan, toRotations } from '../model/rotations.js';
-import { weekdayOf } from '../model/dates.js';
+import { rotationIssues, toRotations } from '../model/rotations.js';
+import { SECTIONS } from '../model/settings/defaults.js';
+import { SectionCard } from './settings/SectionCard.jsx';
+import {
+  CalendarEditor,
+  CalendarView,
+  SessionEditor,
+  SessionView,
+  ThresholdsEditor,
+  ThresholdsView,
+  UnitEditor,
+  UnitView,
+} from './settings/editors.jsx';
+import { UnlockPanel } from './settings/UnlockPanel.jsx';
 
 /**
- * The Public Holidays panel: a table of what loaded, each with its weekday.
- * @param {Array<!Object>} rows Raw "Public Holidays" records.
- * @returns {!preact.VNode} The panel.
+ * The view and editor for each section; a section without an entry is not shown yet.
+ * @type {!Object<string, {View: function(!Object): !preact.VNode, Editor: function(!Object): !preact.VNode}>}
  */
-function HolidaysPanel({ rows }) {
-  const holidays = toHolidays(rows);
-  if (holidays.length === 0) {
-    return (
-      <Card title="Public Holidays">
-        <EmptyState>No public holidays are set.</EmptyState>
-      </Card>
-    );
-  }
-  return (
-    <Card title="Public Holidays" note={fmtInt(holidays.length) + ' loaded'}>
-      <DataTable
-        columns={[
-          { key: 'date', label: 'Date' },
-          { key: 'weekday', label: 'Weekday' },
-          { key: 'name', label: 'Name' },
-        ]}
-        rows={holidays.map((holiday) => ({
-          date: fmtDate(holiday.date),
-          weekday: weekdayOf(holiday.date).name,
-          name: holiday.name,
-        }))}
-        rowKey={(row, index) => row.date + index}
-      />
-    </Card>
-  );
-}
+const EDITORS = {
+  unit: { View: UnitView, Editor: UnitEditor },
+  calendar: { View: CalendarView, Editor: CalendarEditor },
+  thresholds: { View: ThresholdsView, Editor: ThresholdsEditor },
+  session: { View: SessionView, Editor: SessionEditor },
+};
+
+/** @type {!Array<{name: string, label: string}>} The two tabs. */
+const TIERS = [
+  { name: 'basic', label: 'Basic' },
+  { name: 'advanced', label: 'Advanced' },
+];
 
 /**
- * The Rotations panel: the schedule, its outer span, and any gap/overlap/invalid issues.
- * @param {Array<!Object>} rows Raw "Rotations" records.
- * @returns {!preact.VNode} The panel.
+ * Section names whose empty-state note the Calendar card already shows, so the Data Quality
+ * panel below must not repeat it.
+ * @type {!Array<string>}
  */
-function RotationsPanel({ rows }) {
-  const rotations = toRotations(rows);
-  if (rotations.length === 0) {
-    return (
-      <Card title="Rotations">
-        <EmptyState>No rotations are set. Rotational grouping is unavailable.</EmptyState>
-      </Card>
-    );
-  }
-  const issues = rotationIssues(rotations);
-  const span = rotationSpan(rotations);
-  return (
-    <Card
-      title="Rotations"
-      note={span ? fmtDate(span.start) + ' – ' + (span.end ? fmtDate(span.end) : 'ongoing') : ''}
-    >
-      <DataTable
-        columns={[
-          { key: 'name', label: 'Name' },
-          { key: 'start', label: 'Start' },
-          { key: 'end', label: 'End' },
-        ]}
-        rows={rotations.map((rotation) => ({
-          name: rotation.name,
-          start: fmtDate(rotation.start),
-          end: rotation.end ? fmtDate(rotation.end) : 'Ongoing',
-        }))}
-        rowKey={(row) => row.name}
-      />
-      {issues.length > 0 ? (
-        <div class="band">
-          {issues.map((issue, index) => (
-            <Banner tone={issue.kind === 'invalid' ? 'error' : 'warning'} key={index}>
-              {issue.message}
-            </Banner>
-          ))}
-        </div>
-      ) : (
-        <p class="caption">No gaps or overlaps found.</p>
-      )}
-    </Card>
-  );
-}
+const CALENDAR_NOTE_KEYS = ['Public Holidays', 'Rotations'];
 
 /**
  * The data-quality panel: row counts, tab availability, date spans, and the named
  * findings from `model/quality.js`.
+ *
+ * Omits the "no public holidays"/"no rotations" notes: with `canEdit`, the Basic tab's
+ * Calendar card already shows those two empty states, so repeating them here as banners
+ * would say the same thing twice on one page.
  * @param {!Object} quality The result of `dataQuality`.
  * @returns {!preact.VNode} The panel.
  */
@@ -128,6 +87,10 @@ function DataQualityPanel({ quality }) {
       value: fmtFraction(quality.attCDuration.blank, quality.attCDuration.total),
     },
   ];
+
+  const optionalTabNotes = Object.entries(quality.optionalTabs).filter(
+    ([tab]) => !CALENDAR_NOTE_KEYS.includes(tab)
+  );
 
   return (
     <Card title="Data Quality">
@@ -160,9 +123,9 @@ function DataQualityPanel({ quality }) {
         </Banner>
       ) : null}
 
-      {Object.keys(quality.optionalTabs).length > 0 ? (
+      {optionalTabNotes.length > 0 ? (
         <div class="band">
-          {Object.entries(quality.optionalTabs).map(([tab, note]) => (
+          {optionalTabNotes.map(([tab, note]) => (
             <Banner tone="warning" key={tab}>
               {note}
             </Banner>
@@ -178,28 +141,58 @@ function DataQualityPanel({ quality }) {
  * @returns {!preact.VNode} The page.
  */
 export function Settings() {
+  const [tier, setTier] = useState('basic');
   const data = dataset.value;
   if (!data) {
     return null;
   }
-
   const quality = dataQuality(data);
+  const sections = SECTIONS.filter((section) => section.tier === tier && EDITORS[section.name]);
+  const calendarIssues = rotationIssues(toRotations(data.rotations));
 
   return (
     <div class="page">
       <header class="pagehead">
         <div>
           <h1 class="pagehead__title">Settings</h1>
-          <p class="pagehead__sub">What the dashboard is reading, and how much it covers.</p>
+          <p class="pagehead__sub">What this dashboard is set up for, and how much of the battalion it covers.</p>
         </div>
+        <Segmented options={TIERS} value={tier} onChange={setTier} label="Settings tier" radio />
       </header>
 
+      {canEdit.value ? null : <UnlockPanel />}
+
+      {tier === 'advanced' ? (
+        <Banner tone="warning">
+          These change how the dashboard runs, and in later releases how messages and forms are read. Review each change before saving.
+        </Banner>
+      ) : null}
+
       <div class="grid-2">
-        <HolidaysPanel rows={data.holidays} />
-        <RotationsPanel rows={data.rotations} />
+        {sections.map(({ name, label }) => (
+          <SectionCard
+            key={name}
+            section={name}
+            title={label}
+            value={data.settings[name]}
+            meta={data.settingsMeta[name]}
+            View={EDITORS[name].View}
+            Editor={EDITORS[name].Editor}
+          />
+        ))}
       </div>
 
-      <DataQualityPanel quality={quality} />
+      {tier === 'basic' && calendarIssues.length > 0 ? (
+        <div class="band">
+          {calendarIssues.map((issue, index) => (
+            <Banner tone={issue.kind === 'invalid' ? 'error' : 'warning'} key={index}>
+              {issue.message}
+            </Banner>
+          ))}
+        </div>
+      ) : null}
+
+      {tier === 'basic' ? <DataQualityPanel quality={quality} /> : null}
     </div>
   );
 }
