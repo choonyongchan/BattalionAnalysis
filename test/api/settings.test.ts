@@ -108,6 +108,48 @@ describe('api/settings refusals, all before the store', () => {
     const { deps } = setup({}, true);
     expect((await handle(request('GET'), deps)).status).toBe(405);
   });
+
+  test('a version past int4 range is a 400, for PUT and DELETE, store untouched', async () => {
+    const { deps: putDeps } = setup({}, true);
+    const putResponse = await handle(
+      request('PUT', { body: { section: 'unit', value: UNIT, version: 2147483648 } }),
+      putDeps,
+    );
+    expect(putResponse.status).toBe(400);
+
+    const { deps: deleteDeps } = setup({}, true);
+    const deleteResponse = await handle(request('DELETE', { query: '?section=unit&version=2147483648' }), deleteDeps);
+    expect(deleteResponse.status).toBe(400);
+  });
+
+  test('a store failure never logs the value it was saving', async () => {
+    const marker = 'SECRET-VALUE-MARKER';
+    const deps: Deps = {
+      store: {
+        save: async () => {
+          throw new Error(`Failed query: insert into settings ...\nparams: ${marker}`);
+        },
+        reset: async () => {
+          throw new Error('should not be called');
+        },
+      },
+      dashboardPassword: READ,
+      settingsPassword: WRITE,
+      now: () => NOW,
+    };
+    const logged: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    };
+    try {
+      const response = await handle(request('PUT', { body: { section: 'unit', value: UNIT, version: 0 } }), deps);
+      expect(response.status).toBe(500);
+    } finally {
+      console.error = original;
+    }
+    expect(logged.join('\n')).not.toContain(marker);
+  });
 });
 
 describe('api/settings writes', () => {
