@@ -34,6 +34,14 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 - [ ] Turn off Plumber; archive the Google Sheet read-only.
 - [ ] Delete stale branches `cleanup/over-engineering-audit`, `dashboard-revamp`, remote `perm-status-num-days-sentinel`.
 
+## Settings, phase 1 rollout
+- [ ] Before merging: check production `public_holidays` has the 2027 holidays; if not, run the old `db/seed-public-holidays.sql` from `main` against production first (the migration carries whatever the table holds into Settings → Calendar, then drops it).
+- [ ] Set `SETTINGS_PASSWORD` on Vercel (long, different from `DASHBOARD_PASSWORD`).
+- [ ] `bun run db:migrate` (applies 0002 settings + copy, 0003 drop).
+- [ ] Re-run `bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql` so `dashboard_read` can select `settings`; keep the printed URL.
+- [ ] Deploy; on production, check Settings → Calendar lists every holiday and rotation that was in the old tables, and the charts still draw holiday lines.
+- [ ] On production, Settings → Calendar must not show "Stored value invalid": a migrated holiday name over 80 characters or rotation name over 40 makes the whole section fall back to defaults; if flagged, shorten the names and save the section.
+
 ## Later
 - [ ] WhatsApp self-notifier for ingestor health (FormSG + WhatsApp success/failure).
 - [ ] Parade-state upload monitor (calendar of which companies submitted) and manual deposit.

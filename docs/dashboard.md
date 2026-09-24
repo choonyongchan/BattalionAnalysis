@@ -102,14 +102,13 @@ The dry run reports rows read and rejected per tab, by CSV row number; check the
 before writing. Parade states already in Neon win, and re-running inserts nothing new. The
 message-body and NRIC columns are never read.
 
-**5. Holidays and rotations.** `public_holidays (date, name)` and `rotations (name,
-start_date, end_date)` are seeded by the import and maintained afterwards with SQL in the
-Neon console. Until they have rows, the Settings page says so, no holiday lines are drawn,
-and there is no rotational grouping. Everything else works without them.
-
-`db/seed-public-holidays.sql` holds the MOM-gazetted Singapore holidays for 2025-2027,
-including each in-lieu Monday. Paste it into the Neon SQL editor (it is idempotent and
-never overwrites a name edited by hand), and extend it as new years are gazetted.
+**5. Holidays and rotations.** Holidays and rotations are edited under Settings → Calendar
+by someone holding the settings password (`SETTINGS_PASSWORD`), not by SQL. Until they are
+set, the Settings page says so, no holiday lines are drawn on any chart, and there is no
+rotational grouping. Everything else works without them. The Unit, Thresholds and Session
+sections are also edited there: the Basic tab holds Unit, Calendar and Thresholds (what a
+new batch or battalion sets up); the Advanced tab holds Session (how long a login lasts and
+how often an open dashboard re-reads).
 
 **Then share the password with the CO, S1 and S3.** Not by anything that keeps a searchable
 copy forever if you can help it.

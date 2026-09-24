@@ -12,11 +12,12 @@ the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 
 | Path | Runtime | Owns |
 |---|---|---|
-| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `public_holidays` and `rotations` are dashboard settings maintained by SQL |
-| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookie), `domain.ts` |
+| `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `settings` holds one JSONB row per Settings-page section. `.gitattributes` pins `db/migrations/*.sql` bytes, because `scripts/apply-migrations.ts` records each file's SHA-256 and a line-ending change on checkout would make an applied migration look pending |
+| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/`, `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookies), `settings.ts` (read, save and reset settings sections), `domain.ts` |
 | `api/formsg.ts` | Vercel Function | FormSG webhook: verify signature, decrypt, map, insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
-| `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` |
-| `api/session.ts` | Vercel Function | The dashboard's login: POST the password once for an `HttpOnly`, 12-hour session cookie (`lib/session.ts`); DELETE ends it. The only route the password is sent to |
+| `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` and the settings in force from `lib/settings.ts#readSettings`, plus `canEdit` |
+| `api/settings.ts` | Vercel Function | Saves and resets one settings section: PUT/DELETE, the `settings_session` cookie (from `SETTINGS_PASSWORD`) and a same-origin request; validates with `src/model/settings/validate.js` |
+| `api/session.ts` | Vercel Function | The dashboard's login: POST accepts `DASHBOARD_PASSWORD` (read) or `SETTINGS_PASSWORD` (read-write, which also sets `settings_session`); the session's length comes from the Session settings (`lib/session.ts`); DELETE ends it. The only route a password is sent to |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
 | `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`), or in the background via `bun run whatsapp:service install` (a SYSTEM scheduled task) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
 | `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Deposit page writes through `api/parade.ts`. See `docs/dashboard.md` |
@@ -65,6 +66,9 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 - **One write path per stream.** Parade-state rows are written only by `lib/pipeline.ts`
   (called from `api/parade.ts`); FormSG rows only by `api/formsg.ts`. Callers never
   re-implement either.
+- **One write path for settings.** `settings` rows are written only by `api/settings.ts`.
+  Shared settings code (`src/model/settings/`) is pure JavaScript used by both the browser
+  and the server; the server passes settings as values and never uses `active.js`.
 - **Idempotency lives in the database.** Unique constraints (`wa_message_id`, FormSG
   submission id) settle duplicate deliveries in one statement; there are no app-level locks.
 - **`neon-http` has no interactive transactions.** Atomic writes go through `db.batch([...])`,
@@ -85,14 +89,16 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 - **Fail closed on missing configuration.** A route with an unset secret refuses every request
   that secret would authorise. `api/parade.ts` checks bearer tokens in constant time; it has no
   lockout, so `DASHBOARD_PASSWORD` and `PARADE_INGEST_SECRET` must be long.
-- **The browser holds a session, never the password.** `api/session.ts` exchanges the password
-  for a token signed with `DASHBOARD_PASSWORD` itself, carried in an `HttpOnly`, `Secure`,
-  `SameSite=Strict` cookie: page script cannot read it, and rotating the password ends every
-  open session because the old signatures stop verifying. There is no session store — the token
-  carries its own expiry, which is what makes it work on `neon-http`. A cookie-authorised write
-  must also be same-origin (`Sec-Fetch-Site`, else `Origin` against `Host`), so a forged
-  cross-site form cannot deposit or delete. The relay is not a browser and still uses its bearer
-  token.
+- **The browser holds a session, never a password.** `api/session.ts` exchanges
+  `DASHBOARD_PASSWORD` for a read session cookie, or `SETTINGS_PASSWORD` for a read session
+  plus a `settings_session` cookie, each signed with the password itself and carried
+  `HttpOnly`, `Secure`, `SameSite=Strict`: page script cannot read either, and rotating a
+  password ends every open session because the old signatures stop verifying. There is no
+  session store — each cookie carries its own expiry, which is what makes it work on
+  `neon-http`. A cookie-authorised write must also be same-origin (`Sec-Fetch-Site`, else
+  `Origin` against `Host`), so a forged cross-site form cannot deposit, delete or save
+  settings. `SETTINGS_PASSWORD` left unset, or equal to `DASHBOARD_PASSWORD`, fails closed:
+  nobody can edit settings. The relay is not a browser and still uses its bearer token.
 
 ## Dashboard (`src/`)
 
@@ -109,6 +115,13 @@ Layers, dependency direction strictly downward:
 `model/` is the only layer under test and the only place a wrong number can come from. Every
 colour is a token in `src/theme/tokens.css` (both themes), read by `src/charts/theme.js` at
 paint time. `DESIGN.md` is the visual reference.
+
+`model/settings/` holds the settings model: `defaults.js` (each section's default value and the
+set of section names), `validate.js` (per-section validation, run both in the Settings page's
+form and again in `api/settings.ts` before a save), `resolve.js` (merges a stored section over
+its default, and is what `lib/settings.ts#readSettings` uses on the server), and `active.js`
+(the settings in force for the currently loaded dashboard, which `src/data/feed.js` sets from
+each `/api/dashboard` reply and `src/data/settings.js#unitSettings`/`refreshMs` read).
 
 ## Testing
 

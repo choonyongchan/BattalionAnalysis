@@ -13,6 +13,7 @@ import type { Db } from '../../db/index.ts';
 import { loadAll } from '../../src/data/feed.js';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../src/data/parade.js';
 import { endSession, startSession } from '../../src/data/session.js';
+import { saveSection } from '../../src/data/settings.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
 import { battalionStrength, dutyCountsOn } from '../../src/model/metrics.js';
 import { MESSAGE_STATUS, toMessageRows } from '../../src/model/paradeMessages.js';
@@ -20,7 +21,7 @@ import { loadConfig } from '../../whatsapp/src/config.js';
 import { createMessageHandler } from '../../whatsapp/src/index.js';
 import { createIngestor } from '../../whatsapp/src/ingest.js';
 import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
-import { DASHBOARD_PASSWORD, INGEST_SECRET, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
+import { DASHBOARD_PASSWORD, INGEST_SECRET, SETTINGS_PASSWORD, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
 import { FAKE_NRIC, SICK_SPECS, webhookRequest } from '../support/formsg.ts';
 import { allEntries, companyTotals, expectedKey, renderParadeState, type ParadeSpec, type Section } from '../support/paradeState.ts';
@@ -235,5 +236,24 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     await withOrigin(app.origin, async () => {
       await expect(loadAll()).rejects.toThrow('The session has ended. Enter the password again.');
     });
+  }, E2E_TIMEOUT_MS);
+
+  test('the read-only password cannot save; the settings password can, and every reader sees it', async () => {
+    await unlock(app.origin);
+    const refused = await withOrigin(app.origin, () =>
+      saveSection('calendar', { holidays: [{ date: '2026-08-09', name: 'National Day' }], rotations: [] }, 0),
+    ).catch((error: any) => error);
+    expect(refused.status).toBe(401);
+
+    await unlock(app.origin, SETTINGS_PASSWORD);
+    await withOrigin(app.origin, () =>
+      saveSection('calendar', { holidays: [{ date: '2026-08-09', name: 'National Day' }], rotations: [] }, 0),
+    );
+
+    forgetCookies(app.origin);
+    await unlock(app.origin);
+    const data: any = await withOrigin(app.origin, () => loadAll());
+    expect(data.canEdit).toBe(false);
+    expect(data.holidays).toEqual([{ date: '2026-08-09', name: 'National Day' }]);
   }, E2E_TIMEOUT_MS);
 });

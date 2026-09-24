@@ -212,7 +212,8 @@ icon name, headings, CSS class names and `docs/dashboard.md` follow.
   unset `SETTINGS_PASSWORD`, cross-site write, stale version, invalid value, bearer reading a
   section other than `whatsapp`.
 - Preview responses never contain a message body (asserted like the existing NRIC/body guards).
-- DB suite: migration moves holidays and rotations, converts `company` to text, keeps rows.
+- The calendar copy (0002) is checked on production during rollout (`tasks/todo.md`); the
+  `company` conversion (phase 2) gets a DB test.
 - E2E: save a Status-bucket change and see the dashboard reflect it; add a company and ingest a
   parade state for it; retire a company and see its next parade state stored as `Needs review`
   and its FormSG submission stored with `company` null, while its past rows still chart.
