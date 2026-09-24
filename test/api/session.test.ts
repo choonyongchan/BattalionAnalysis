@@ -8,6 +8,7 @@ import { handle, type Deps } from '../../api/session.ts';
 import { SESSION_COOKIE, verifySession } from '../../lib/session.ts';
 
 const PASSWORD = 'a-long-dashboard-password';
+const EDIT_PASSWORD = 'a-long-settings-password';
 const URL = 'https://example.vercel.app/api/session';
 const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
 
@@ -18,7 +19,7 @@ const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
  * @returns The deps.
  */
 function setup(overrides: Partial<Deps> = {}): Deps {
-  return { dashboardPassword: PASSWORD, now: () => NOW, ...overrides };
+  return { dashboardPassword: PASSWORD, settingsPassword: EDIT_PASSWORD, now: () => NOW, ...overrides };
 }
 
 /**
@@ -105,5 +106,77 @@ describe('api/session', () => {
     const response = await handle(new Request(URL, { method: 'GET' }), setup());
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('POST, DELETE');
+  });
+});
+
+/**
+ * Every `Set-Cookie` a response carries.
+ *
+ * @param response The response.
+ * @returns The header values.
+ */
+function cookiesOf(response: Response): string[] {
+  return response.headers.getSetCookie();
+}
+
+/**
+ * A response's `canEdit` field.
+ *
+ * @param response The response.
+ * @returns The field's value.
+ */
+async function canEditOf(response: Response): Promise<boolean> {
+  return ((await response.json()) as { canEdit: boolean }).canEdit;
+}
+
+describe('api/session, two passwords', () => {
+  test('the settings password opens the dashboard and editing: two cookies, canEdit true', async () => {
+    const response = await handle(login({ password: EDIT_PASSWORD }), setup());
+    expect(response.status).toBe(200);
+    expect(await canEditOf(response)).toBe(true);
+    const cookies = cookiesOf(response);
+    expect(cookies.some((c) => c.startsWith('dashboard_session='))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('settings_session='))).toBe(true);
+  });
+
+  test('the dashboard password opens the dashboard only: one cookie, canEdit false', async () => {
+    const response = await handle(login({ password: PASSWORD }), setup());
+    expect(await canEditOf(response)).toBe(false);
+    expect(cookiesOf(response).some((c) => c.startsWith('settings_session='))).toBe(false);
+  });
+
+  test('a settings password equal to the dashboard password grants no editing', async () => {
+    const response = await handle(login({ password: PASSWORD }), setup({ settingsPassword: PASSWORD }));
+    expect(await canEditOf(response)).toBe(false);
+    expect(cookiesOf(response).some((c) => c.startsWith('settings_session='))).toBe(false);
+  });
+
+  test('with no dashboard password configured, even the settings password is refused', async () => {
+    const response = await handle(login({ password: EDIT_PASSWORD }), setup({ dashboardPassword: undefined }));
+    expect(response.status).toBe(503);
+    expect(cookiesOf(response)).toEqual([]);
+  });
+
+  test('the session lasts as long as the Session settings say', async () => {
+    const hour = 60 * 60 * 1000;
+    const response = await handle(login({ password: PASSWORD }), setup({ sessionTtlMs: async () => hour }));
+    const token = tokenOf(response);
+    expect(verifySession(PASSWORD, token, NOW + hour - 1)).toBe(true);
+    expect(verifySession(PASSWORD, token, NOW + hour + 1)).toBe(false);
+  });
+
+  test('when the settings cannot be read, login still works, for the default 12 hours', async () => {
+    const response = await handle(
+      login({ password: PASSWORD }),
+      setup({ sessionTtlMs: async () => { throw new Error('database asleep'); } })
+    );
+    expect(response.status).toBe(200);
+    expect(verifySession(PASSWORD, tokenOf(response), NOW + 12 * 60 * 60 * 1000 - 1)).toBe(true);
+  });
+
+  test('DELETE clears both cookies', async () => {
+    const response = await handle(new Request(URL, { method: 'DELETE' }), setup());
+    const cookies = cookiesOf(response);
+    expect(cookies.filter((c) => c.includes('Max-Age=0'))).toHaveLength(2);
   });
 });

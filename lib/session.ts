@@ -23,6 +23,9 @@ export const SESSION_COOKIE = 'dashboard_session';
 /** How long a session lasts: a working day, so a commander logs in once. */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
+/** The second cookie, held only by someone who logged in with `SETTINGS_PASSWORD`. */
+export const SETTINGS_COOKIE = 'settings_session';
+
 /** The token format, so a later change can be told apart rather than guessed at. */
 const VERSION = 'v1';
 
@@ -87,20 +90,22 @@ export function verifySession(secret: string, token: string | null, now: number)
  *
  * @param token The token to set.
  * @param ttlMs How long the cookie should live, in milliseconds.
+ * @param name The cookie's name; defaults to the dashboard session.
  * @returns The header value.
  */
-export function sessionCookie(token: string, ttlMs: number): string {
+export function sessionCookie(token: string, ttlMs: number, name: string = SESSION_COOKIE): string {
   const maxAge = Math.floor(ttlMs / 1000);
-  return `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  return `${name}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
 }
 
 /**
  * Builds the `Set-Cookie` header that deletes the session.
  *
+ * @param name The cookie's name; defaults to the dashboard session.
  * @returns The header value.
  */
-export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
+export function clearSessionCookie(name: string = SESSION_COOKIE): string {
+  return `${name}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
 }
 
 /**
@@ -164,4 +169,37 @@ export function isSameOrigin(request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The secret that grants editing: `SETTINGS_PASSWORD`, unless it is unset or the same as
+ * `DASHBOARD_PASSWORD`.
+ *
+ * Equal passwords would make the read-only password read-write without anyone meaning to, so
+ * that configuration grants nobody editing (fail closed).
+ *
+ * @param dashboardPassword The `DASHBOARD_PASSWORD` in force.
+ * @param settingsPassword The `SETTINGS_PASSWORD` in force.
+ * @returns The settings password, or undefined when editing is off.
+ */
+export function editSecret(
+  dashboardPassword: string | undefined,
+  settingsPassword: string | undefined
+): string | undefined {
+  return settingsPassword && settingsPassword !== dashboardPassword ? settingsPassword : undefined;
+}
+
+/**
+ * Whether a request carries a valid editing session.
+ *
+ * The token is signed with `SETTINGS_PASSWORD`, so rotating it ends every edit session while
+ * leaving read sessions alone.
+ *
+ * @param request The incoming request.
+ * @param secret The result of `editSecret`, or undefined when editing is off.
+ * @param now Milliseconds since the epoch.
+ * @returns Whether the settings cookie verifies.
+ */
+export function hasSettingsSession(request: Request, secret: string | undefined, now: number): boolean {
+  return verifySession(secret ?? '', readCookie(request, SETTINGS_COOKIE), now);
 }

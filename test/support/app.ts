@@ -23,6 +23,9 @@ import { FORM_KEYS, POST_URI, testSdk } from './formsg.ts';
 /** The dashboard password the tests configure. */
 export const DASHBOARD_PASSWORD = 'dashboard-test-password-long-enough';
 
+/** The settings (read-write) password the tests configure. */
+export const SETTINGS_PASSWORD = 'settings-test-password-long-enough';
+
 /** The relay secret the tests configure. */
 export const INGEST_SECRET = 'relay-test-secret-long-enough';
 
@@ -73,11 +76,12 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {})
           loadTabs: () => loadTabs(db),
           loadSettings: () => readSettings(db),
           dashboardPassword: DASHBOARD_PASSWORD,
+          settingsPassword: SETTINGS_PASSWORD,
           hasDatabase: true,
         });
       }
       if (path === '/api/session') {
-        return handleSession(request, { dashboardPassword: DASHBOARD_PASSWORD });
+        return handleSession(request, { dashboardPassword: DASHBOARD_PASSWORD, settingsPassword: SETTINGS_PASSWORD });
       }
       if (path === '/api/formsg') {
         // The signature covers the registered URI, not the local one, as behind Vercel's proxy.

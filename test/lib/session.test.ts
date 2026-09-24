@@ -8,7 +8,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   SESSION_COOKIE,
+  SESSION_TTL_MS,
+  SETTINGS_COOKIE,
   clearSessionCookie,
+  editSecret,
+  hasSettingsSession,
   isSameOrigin,
   issueSession,
   readCookie,
@@ -108,5 +112,25 @@ describe('isSameOrigin, the check behind every cookie-authorised write', () => {
     expect(isSameOrigin(from({}))).toBe(false);
     expect(isSameOrigin(from({ host: 'dash.example' }))).toBe(false);
     expect(isSameOrigin(from({ origin: 'not a url', host: 'dash.example' }))).toBe(false);
+  });
+});
+
+describe('editSecret', () => {
+  test('is the settings password only when it is set and differs from the dashboard password', () => {
+    expect(editSecret('read-pw', 'write-pw')).toBe('write-pw');
+    expect(editSecret('read-pw', undefined)).toBeUndefined();
+    expect(editSecret('read-pw', '')).toBeUndefined();
+    expect(editSecret('same-pw', 'same-pw')).toBeUndefined();
+  });
+});
+
+describe('hasSettingsSession', () => {
+  test('verifies the settings cookie against the settings password only', () => {
+    const now = Date.UTC(2026, 8, 24);
+    const token = issueSession('write-pw', SESSION_TTL_MS, now);
+    const request = new Request('https://x.test/', { headers: { cookie: `${SETTINGS_COOKIE}=${token}` } });
+    expect(hasSettingsSession(request, 'write-pw', now)).toBe(true);
+    expect(hasSettingsSession(request, 'read-pw', now)).toBe(false);
+    expect(hasSettingsSession(request, undefined, now)).toBe(false);
   });
 });

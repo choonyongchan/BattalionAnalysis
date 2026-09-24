@@ -77,7 +77,13 @@ describe('api/dashboard', () => {
     const response = await handle(request('GET', PASSWORD), deps);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(await response.json()).toEqual({ ok: true, generatedAt: '2026-09-22T01:00:00.000Z', tabs: TABS, settings: SETTINGS });
+    expect(await response.json()).toEqual({
+      ok: true,
+      generatedAt: '2026-09-22T01:00:00.000Z',
+      tabs: TABS,
+      settings: SETTINGS,
+      canEdit: false,
+    });
   });
 
   test('a wrong or missing password is refused before anything is read', async () => {
@@ -122,5 +128,29 @@ describe('api/dashboard', () => {
     } finally {
       console.error = original;
     }
+  });
+});
+
+describe('api/dashboard, editing', () => {
+  const NOW = new Date('2026-09-22T01:00:00Z');
+
+  /**
+   * A response's `canEdit` field.
+   *
+   * @param response The response.
+   * @returns The field's value.
+   */
+  async function canEditOf(response: Response): Promise<boolean> {
+    return ((await response.json()) as { canEdit: boolean }).canEdit;
+  }
+
+  test('canEdit is true only with a settings cookie signed by the settings password', async () => {
+    const { deps } = setup({ settingsPassword: 'settings-pw' });
+    const read = issueSession(PASSWORD, SESSION_TTL_MS, NOW.getTime());
+    const edit = issueSession('settings-pw', SESSION_TTL_MS, NOW.getTime());
+    const readOnly = await handle(withSession(read), deps);
+    expect(await canEditOf(readOnly)).toBe(false);
+    const both = new Request(URL, { headers: { cookie: `${SESSION_COOKIE}=${read}; settings_session=${edit}` } });
+    expect(await canEditOf(await handle(both, deps))).toBe(true);
   });
 });

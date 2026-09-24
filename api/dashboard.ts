@@ -12,7 +12,7 @@ import { getDb } from '../db/index.ts';
 import { loadTabs, type Tabs } from '../lib/dashboard.ts';
 import { bearerToken, json, methodNotAllowed, sameSecret, serverError } from '../lib/http.ts';
 import { readSettings, type ResolvedSettings } from '../lib/settings.ts';
-import { hasSession } from '../lib/session.ts';
+import { editSecret, hasSession, hasSettingsSession } from '../lib/session.ts';
 
 /** What `handle` needs. */
 export interface Deps {
@@ -21,6 +21,8 @@ export interface Deps {
   /** Reads the settings in force; only called once the caller checks out. */
   loadSettings: () => Promise<ResolvedSettings>;
   dashboardPassword: string | undefined;
+  /** The read-write password, for telling the page whether it may edit. */
+  settingsPassword?: string | undefined;
   /** Whether a read-only connection string is configured. */
   hasDatabase: boolean;
   /** The clock, injected so tests can pin `generatedAt` and a session's expiry. */
@@ -78,9 +80,11 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (!authorised(request, deps)) {
     return reply(401, { ok: false, error: 'unauthorised' });
   }
+  const now = (deps.now ?? (() => new Date()))();
+  const canEdit = hasSettingsSession(request, editSecret(deps.dashboardPassword, deps.settingsPassword), now.getTime());
   try {
     const [tabs, settings] = await Promise.all([deps.loadTabs(), deps.loadSettings()]);
-    return reply(200, { ok: true, generatedAt: (deps.now ?? (() => new Date()))().toISOString(), tabs, settings });
+    return reply(200, { ok: true, generatedAt: now.toISOString(), tabs, settings, canEdit });
   } catch (error) {
     return serverError(error, 'api/dashboard');
   }
@@ -101,6 +105,7 @@ function route(request: Request): Promise<Response> {
     loadTabs: () => loadTabs(db()),
     loadSettings: () => readSettings(db()),
     dashboardPassword: process.env.DASHBOARD_PASSWORD,
+    settingsPassword: process.env.SETTINGS_PASSWORD,
     hasDatabase: Boolean(process.env.DASHBOARD_DATABASE_URL),
   });
 }
