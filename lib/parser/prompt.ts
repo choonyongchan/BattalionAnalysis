@@ -1,20 +1,14 @@
 /**
  * The extraction prompt.
  *
- * Written for the standardised 40 SAR first-parade-state format, which all five companies
- * now file. It is not a port of the Apps Script prompt: that one had to absorb five
- * mutually incompatible company formats, and the compromises it made to do so are exactly
- * what this format removes. Three of its rules were actively lossy and are reversed here --
- * the old prompt folded appointment times into free text, recognised only one phrasing of
- * the in-camp marker, and had no field for a diagnosis at all.
- *
- * The rules below are ordered by how often getting them wrong would be silent rather than
- * loud. Rejection comes first, because a half-parsed message is worse than a refused one.
+ * The model only sees what `deterministic.ts` was unsure of, so the prompt is written for
+ * near-template messages with filing slips, and it follows the same rules as that parser
+ * (`parade_state_template_new.md`) so both yield the same rows. Allowed values (companies,
+ * sections, report-sick types, roles) are enforced by the response schema and not repeated here.
  *
  * NAMES IN THE EXAMPLES ARE SYNTHETIC. This file is committed; no real soldier's name,
  * 4D number or diagnosis may appear in it.
  */
-import { COMPANIES, REASON_CATEGORIES, REPORT_SICK_TYPES } from '../domain.ts';
 
 /**
  * Builds the complete prompt for one message.
@@ -26,116 +20,51 @@ import { COMPANIES, REASON_CATEGORIES, REPORT_SICK_TYPES } from '../domain.ts';
  * @returns The prompt text.
  */
 export function buildPrompt(rawText: string, today: string): string {
-  return `You extract structured data from a 40 SAR parade-state message sent over WhatsApp.
+  return `Extract a 40 SAR first parade state (a WhatsApp message) into the schema.
+Record only what the message states. Never invent a unit, person or appointment; return null for anything not stated. Do not merge or summarise entries.
 
-Record only what the message states. Never invent a unit, a person or an appointment. Never guess a value that is not stated -- return null instead. Do not summarise and do not merge entries.
+## 1. Reject
+Set "rejected": true, a one-sentence "rejection_reason", and leave everything else null or empty when the message is:
+- a LAST PARADE STATE ("LAST PARADE STATE", "LPS", "LP"). Still set session "LPS".
+- not a parade state (chat, an acknowledgement, a caption).
+- not in the standard format: it lacks the section headers ATT C, STATUS, REPORT SICK, MA, OFF/LEAVE, OTHERS.
 
-## 1. REJECT FIRST
+## 2. Header
+- "company": from line 1, "40 SAR ARCHER COMPANY" -> Archer.
+- "session": FIRST PARADE STATE -> FPS.
+- "date": "DATE: DDMMYY" -> "yyyy-MM-dd" ("180926" -> "2026-09-18"). Every date in the message is DDMMYY.
+- "parade_time": "TIME: 0725" -> "07:25"; null if absent.
+The message arrived ${today}. A date more than ~18 months from the parade date is a typo, usually the year digit ("190936" for "190926"): correct it to the nearest plausible year.
 
-Set "rejected": true and give a one-sentence "rejection_reason", leaving every other field null or empty, when the message is any of:
-- a LAST PARADE STATE (header says "LAST PARADE STATE", "LPS" or "LP"). Only first parade states are ingested. Still report session "LPS" so the rejection records what it was.
-- not a parade state at all (ordinary chat, a photo caption, an acknowledgement).
-- a parade state in an older free-form layout, i.e. it does NOT use the six fixed section headers below. Signals of the old layout: labelled blocks such as "S/N:", "R & N:", "R/N:", "Reason:", "Duration:", "Status received:" standing in place of the sections; bracketed diagnoses before the name like "[SHOULDER INJURY] 1234 REC ..."; bullet lines like "- PTE NAME: condition until 010926"; section names such as "ATTC", "MEDICAL STATUS", "MEDICAL APPT", "AL/OIL", "REPORTING SICK", "GUARD DUTY". A message that does use the six section headers is NOT the old layout, even when an "S/N: / R/N: / REASON:" block sits inside one of them (see rule 6).
+## 3. Units
+One entry per strength block, in message order. First "Company" (the "COMPANY:" figures), then each block with its label copied verbatim ("COY HQ", "PL 7", "SIG", "OPR+ASA").
+- "62/66" -> present 62, strength 66. A bare number ("PL 7: 39", "OFFICER: 0") -> present 39, strength null. An absent tier -> null.
+- "section_counts": the number each section header states ("ATT C: 04" -> 4; nothing after the colon -> null), including zeros. This is the header's claim, not your count.
 
-Otherwise set "rejected": false and extract everything below.
+## 4. Personnel
+One entry per line under a section, even when the header's number disagrees with the lines. "unit_label" is the block it sits under; "entry_index" the line's own number or null; "source_line" the line verbatim.
 
-## 2. HEADER
+Line shape: <n>. <4D?> <RANK> <NAME> - <DESCRIPTION> (<DATES>) [OUT|IN] [@ <LOCATION>]
+- "four_d": the ID before the rank ("1401", "S4407"); null if absent. "rank": the rank token; null if none. "name": without 4D or rank.
+- "duty_type": what the person has ("MC", "LD", "EXCUSE FLEGS", "LEAVE", "OIL", "GUARD DUTY", "COURSE"), without day-count, dates, camp marker or location. A "PERM" prefix sets is_permanent and is not part of it.
+- "sub_reason": the why, from a detail in brackets ("4D MC (Fever) (...)") or after a trailing dash ("3D MC (170926-190926) - Fever"). A condition with no duty ("Fever, Flu (160926-180926)" under ATT C) -> sub_reason, duty_type null; do not invent "MC". A bracket holding detail and dates ("(laceration on chin 170926-180926)") -> split them.
+- "report_sick_type": under REPORT SICK only, from the token ("RSO", "RSI", "MR", "FFI", "PENDING").
+- "num_days": the stated day-count ("32D" -> 32; "1.5D" -> 2). Never computed from dates; null if not written.
+- "in_camp": OUT -> false, IN -> true, else null. "location": the text after "@".
 
-- "company": one of ${COMPANIES.join(', ')}. Read from the first line, e.g. "40 SAR ARCHER COMPANY" -> Archer. If the message names no company but says HQ, it is Hercules.
-- "session": "FIRST PARADE STATE" -> FPS. "LAST PARADE STATE" -> LPS (and reject, per rule 1).
-- "date": from "DATE: DDMMYY", converted to ISO "yyyy-MM-dd". DDMMYY always: "180926" -> "2026-09-18".
-- "parade_time": from "TIME: HHMM" on the same line, as "HH:MM". "0725" -> "07:25". Null if absent.
+Dates: "(300826-020926)" -> start and end. "(020926)" -> both that day. "(100926 1030)" -> that day, start_time "10:30"; "TBC" as the time -> start_time null. "(180626 1630-190626 0800)" -> one overnight duty, start 18th 16:30, end 19th. "(SINCE 100726)" -> start_date, end_date null, is_permanent true, num_days null. Dates without brackets still count.
 
-Sanity-check every date you output against the parade date (${today} is when this arrived). A date more than about 18 months from the parade date is a typo in the message, almost always a wrong year digit -- "190936" where "190926" was meant. Correct the year to the nearest plausible one and keep going. Never emit a date in 2036.
+One line, one entry, with one exception: two authorisations joined by a comma, each with its own dates ("5D MC (130926-170926), 2D MC (170926-180926)"), are two entries repeating the person. Several activities sharing one range ("30D EXCUSE HEAVY LOAD, RMJ, SQUATTING (010926-300926)") stay ONE entry with that whole text as duty_type.
 
-## 3. UNITS (strength)
+An "S/N: 01 / R/N: PTE TAN AH KOW / REASON: Fever" block inside a section is one entry (R/N gives rank and name, REASON the detail); "S/N: 00" with no R/N is none.
 
-"units" is one entry per strength block, in the order the message lists them.
+## 5. Command team
+Lines from "CDO:" to the last "PDS …:". "role_kind" CDO, CDS, COS or PDS; for a PDS, "unit_label" is the label after PDS ("PDS 7" -> "7"), else null. Split rank and name as above. An appointment written "-" or left empty -> "is_vacant": true, rank and name null.
 
-- The first entry is always the roll-up, with "unit_label": "Company". It holds the figures under the first "COMPANY:" line.
-- Then one entry per block: "COY HQ", then each platoon or sub-unit exactly as labelled -- "PL 1" ... "PL 9", or named blocks "SIG", "OPR+ASA", "MED", "PNR", "SCR", "MTR". Copy the label verbatim; do not renumber or rename it.
-- Every strength figure is present/strength: "62/66" -> total_present 62, total_strength 66. Leading zeros are not significant: "02/02" -> 2 and 2.
-- Rank tiers are "OFFICER", "WOSPEC", "ENLISTEE". Fill the matching pair for each. If a tier is written as a bare number instead of a fraction ("OFFICER: 0"), treat it as present 0 and strength null -- do not assume they are equal. If a tier is absent, null.
-- "section_counts": one entry per section header inside that block, recording the number the header states. "ATT C: 04" -> stated_count 4. A header with nothing after the colon -> stated_count null. Record all six whenever they appear, even when 0. This is only what the header CLAIMS; it is not your count of the entries.
+## 6. Slips
+Missing or extra spaces, a missing dash, a dash bullet or no number, "1.PTE", blank lines, mixed case and a header with no number are filing slips, not reasons to reject. Extract as usual.
 
-## 4. PERSONNEL
-
-The six section headers are fixed and always mean the same thing:
-${REASON_CATEGORIES.map((c) => `- ${c}`).join('\n')}
-
-Map the header to "reason_category" literally: "ATT C" -> "Att C", "STATUS" -> "Status", "REPORT SICK" -> "Report Sick", "MA" -> "MA", "OFF/LEAVE" -> "Off/Leave", "OTHERS" -> "Others".
-
-One entry per listed line. The number a header states is frequently wrong in both directions -- a header reading "0" may still have lines beneath it, and a header reading "10" may list 8. Always extract the lines that are actually there. (The header's claim is recorded separately in section_counts, so the disagreement is preserved rather than resolved.)
-
-"unit_label" is the block the entry sits under, copied verbatim.
-"entry_index" is the line's own number, or null if it has none.
-"source_line" is the entry's full text, verbatim, so a surprising row can be traced back.
-
-### The line grammar
-
-  <n>. <4D?> <RANK> <NAME> - <DUTY> (<SUB-REASON>) (<DATES>) [OUT|IN] [@ <LOCATION>]
-
-Split it into fields. Never produce one combined remarks string.
-
-- "four_d": the 3-6 character unit ID when present, e.g. "1401", "A2208". It appears before the rank. Null when absent -- some companies never write one.
-- "rank": "REC", "PTE", "CPL", "3SG", "2SG", "1SG", "2LT", "ME2", "CPT", "CPT(DR)". Null if the line starts straight into a name.
-- "name": the person's name, without the rank or the 4D.
-- "duty_type": WHAT the person has. "MC", "LD", "UFD", "EXCUSE FLEGS", "EXCUSE STAY-IN", "EXCUSE HEAVY LOAD", "MA", "ANNUAL LEAVE", "COMPASSIONATE LEAVE", "OFF", "HOSPITALIZATION LEAVE", "IMT", "TP TEST", "EX WALLABY", "GUARD DUTY". Strip the day-count, the dates, the camp marker and the location from it.
-- "sub_reason": WHY, from the parenthesised detail: "3D MC (Fever)" -> duty_type "MC", sub_reason "Fever". "MA (Sleep medicine)" -> duty_type "MA", sub_reason "Sleep medicine". Null when no detail is given.
-  - If the line gives a condition but no duty at all -- "1401 PTE TAN AH KOW - High Fever, Flu, Tonsillitis (160926-180926) OUT" under ATT C -- put the condition in sub_reason and leave duty_type null. Do not invent "MC".
-  - If a parenthesis contains BOTH a detail and the dates -- "2D MC (laceration on chin 170926-180926)" -- split them: sub_reason "laceration on chin", and the dates go to start_date/end_date.
-- "report_sick_type": only under Report Sick. One of ${REPORT_SICK_TYPES.join(', ')}, read from a token like "(RSO)". Null elsewhere.
-
-### Dates and days
-
-- "(300826-020926)" -> start_date "2026-08-30", end_date "2026-09-02".
-- "(020926)" alone -> start_date and end_date both "2026-09-02".
-- "(100926 1030)" -> start_date and end_date "2026-09-10", start_time "10:30".
-- "(180626 1630-190626 0800)" -> an overnight duty: start_date "2026-06-18", end_date "2026-06-19", start_time "16:30", num_days 1. One duty, not two days.
-- "(SINCE 100726)" -> start_date "2026-07-10", end_date null, is_permanent true.
-- No dates at all -> both null.
-- "num_days": the day-count the line STATES, e.g. "32D EXCUSE SWIMMING" -> 32. Take it exactly as written even when it disagrees with the date range beside it; the stated figure is what the unit tracks. Null when no count is written. NEVER calculate it from the dates.
-- "is_permanent": true when the line says "PERM", "PERMANENT" or "SINCE" with no end date. Leave num_days null in that case -- do not use 999 or any other sentinel.
-
-### Camp and location
-
-- "in_camp": false when the line ends with "OUT", true when it ends with "IN". Null when neither appears. The marker may sit before the "@ location", as in "(180926 1610) OUT @ National Skin Centre".
-- "location": the text after "@". Null when absent.
-
-### One line, one authorisation
-
-Where a single line carries two authorisations joined by a comma -- "5D MC (130926-170926), 2D MC (170926-180926)" -- emit two personnel entries, repeating the person's 4D, rank, name, unit_label and reason_category, and varying only the duty fields and dates. Same for a line listing several excuses with one shared date range: one entry per excuse.
-
-## 5. COMMAND TEAM
-
-Lines from "CDO:" down to the last "PDS ...:" become "command_team" entries.
-
-- "role_kind": CDO, CDS, COS or PDS.
-- "unit_label": for a PDS, which sub-unit it commands, taken from the label: "PDS 7" -> "7", "PDS SIG" -> "SIG", "PDS OPR+ASA" -> "OPR+ASA". Null for CDO, CDS and COS.
-- "rank" and "name": split as for personnel.
-- "is_vacant": true when the appointment is written as "-" or left empty, with rank and name null. An unfilled appointment is a fact worth recording, not a line to skip.
-
-## 6. TOLERANCES
-
-Real messages deviate from the format. Extract them anyway; none of these is a reason to reject:
-- missing space after the dash ("3SG WONG AH HUAT -2D MC (...)")
-- no dash at all ("PTE LIM AH SENG 2D Compassionate leave (170926-180926)")
-- a dash bullet instead of a number ("- 2208 PTE TAN AH KOW (RSO) (180926) OUT")
-- an entry with no number and no dash ("2LT KUMAR - IMT")
-- a line with dates but no description ("1. 2LT TAN AH KOW (130926 - 200926)") -- leave duty_type and sub_reason null
-- spaces inside a date range ("(160926 - 180926)")
-- inconsistent capitalisation ("Excuse stay in" and "Excuse Stay-In" are the same duty; keep each line's own text)
-- a section header with no number after the colon
-- blank lines inside a section
-- a strength block with a bare count instead of a fraction ("Plt 7: 39", "COY HQ: 00") -- total_present 39, total_strength null; "Plt 7" is copied as the label
-- an "S/N: 01" / "R/N: PTE TAN AH KOW" / "REASON: Fever" block inside a section -- one entry, with R/N as rank and name and REASON as the detail. "S/N: 00" with no R/N is no entry
-- an appointment whose time is "TBC" ("(260127 TBC)") -- the date, start_time null
-- dates without brackets ("OFF IN LIEU 210926") -- start_date and end_date as usual
-- "PERM" with no dash before it ("PTE TAN AH KOW PERM EX FLEGS") -- the name stops at PERM
-- a fractional day count ("1.5D AL") -- num_days rounded up to a whole day (2)
-- no space after the entry number ("1.PTE TAN AH KOW")
-
-Now extract from this message:
+Message:
 """
 ${rawText}
 """`;

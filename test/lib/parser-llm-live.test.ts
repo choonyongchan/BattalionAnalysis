@@ -54,6 +54,37 @@ describe.skipIf(!parser)(`OpenAiParser against the live API (${parser?.model ?? 
   );
 
   test(
+    'splits lines the way the rule-based parser does',
+    async () => {
+      const message = [
+        '40 SAR ARCHER COMPANY',
+        'FIRST PARADE STATE',
+        'DATE: 180926 TIME: 0725',
+        'COMPANY: 10/10',
+        'COY HQ: 10/10',
+        'ATT C: 0',
+        'STATUS: 3',
+        '1. 1106 REC ALPHA TAN - 30D EXCUSE HEAVY LOAD, RMJ, SQUATTING (010926-300926)',
+        '2. 1108 REC BRAVO LIM - PERM EXCUSE PYROTECHNICS (SINCE 310826)',
+        '3. 3SG CHARLIE ONG - 5D MC (130926-170926), 2D MC (170926-180926)',
+        'REPORT SICK: 0',
+        'MA: 0',
+        'OFF/LEAVE: 0',
+        'OTHERS: 0',
+      ].join('\n');
+      const extraction = await parser!.parse(message, '2026-09-18');
+
+      expect(extraction.personnel.map((p) => [p.name, p.num_days, p.is_permanent, p.start_date, p.end_date])).toEqual([
+        ['ALPHA TAN', 30, false, '2026-09-01', '2026-09-30'],
+        ['BRAVO LIM', null, true, '2026-08-31', null],
+        ['CHARLIE ONG', 5, false, '2026-09-13', '2026-09-17'],
+        ['CHARLIE ONG', 2, false, '2026-09-17', '2026-09-18'],
+      ]);
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  test(
     'rejects a last parade state with a reason',
     async () => {
       const extraction = await parser!.parse(renderParadeState(LAST_PARADE), LAST_PARADE.date);
