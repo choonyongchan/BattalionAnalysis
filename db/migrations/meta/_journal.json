@@ -36,6 +36,13 @@
       "when": 1790254897905,
       "tag": "0004_drop_old_settings_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790263304072,
+      "tag": "0005_settings_grant",
+      "breakpoints": true
     }
   ]
 }
