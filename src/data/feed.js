@@ -117,7 +117,7 @@ const EMPTY_CALENDAR_NOTES = {
  * has always read (`rotations` with `start_date`/`end_date`), so no model code changes.
  * @param {!Object} body The `/api/dashboard` reply.
  * @returns {!Object} Records per tab, `settings`, `settingsMeta`, `holidays`, `rotations`,
- *     `generatedAt`, `notes` and `available`.
+ *     `generatedAt`, `notes`, `available` and `canEdit`.
  * @throws {Error} When a required tab's header row no longer matches.
  */
 export function datasetFromReply(body) {
@@ -130,6 +130,7 @@ export function datasetFromReply(body) {
     available: {},
     settings,
     settingsMeta: (body.settings && body.settings.meta) || {},
+    canEdit: body.canEdit === true,
   };
 
   REQUIRED_TABS.forEach((spec) => {

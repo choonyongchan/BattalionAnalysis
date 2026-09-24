@@ -39,3 +39,10 @@ export const company = signal('ALL');
  * @type {!import('@preact/signals').ReadonlySignal<boolean>}
  */
 export const isReady = computed(() => status.value === 'ready' && dataset.value !== null);
+
+/**
+ * Whether this session may change settings: it logged in, or unlocked editing, with the
+ * settings password. The server decides; this only mirrors its answer.
+ * @type {!import('@preact/signals').ReadonlySignal<boolean>}
+ */
+export const canEdit = computed(() => Boolean(dataset.value && dataset.value.canEdit));

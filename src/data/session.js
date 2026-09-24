@@ -24,7 +24,8 @@ const HTTP_ERRORS = {
 /**
  * Exchanges the password for a session cookie.
  * @param {string} password The password the viewer typed.
- * @returns {!Promise<void>} Resolves once the cookie is set.
+ * @returns {!Promise<{canEdit: boolean}>} Resolves once the cookie is set, with whether this
+ *     session may also change settings.
  * @throws {Error} With a readable message, when the password is refused or the route is
  *     unreachable.
  */
@@ -47,6 +48,8 @@ export async function startSession(password) {
     error.status = response.status;
     throw error;
   }
+  const body = await response.json().catch(() => ({}));
+  return { canEdit: body.canEdit === true };
 }
 
 /**
@@ -58,5 +61,21 @@ export async function endSession() {
     await fetch(API, { method: 'DELETE', credentials: 'same-origin' });
   } catch {
     // The reload follows either way; a dropped connection must not trap the viewer here.
+  }
+}
+
+/**
+ * Unlocks editing for a viewer already reading the dashboard, with the settings password.
+ *
+ * It is the same login call: the settings password also opens the dashboard, so the read
+ * session is simply reissued alongside the edit session.
+ * @param {string} password The settings password the viewer typed.
+ * @returns {!Promise<void>} Resolves once editing is unlocked.
+ * @throws {Error} When the password is wrong, or is the read-only password.
+ */
+export async function unlockEditing(password) {
+  const { canEdit } = await startSession(password);
+  if (!canEdit) {
+    throw new Error('That password opens the dashboard but not editing. Enter the settings password.');
   }
 }

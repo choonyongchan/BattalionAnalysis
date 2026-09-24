@@ -6,20 +6,18 @@
  * injected into this page — can read. Every later call simply carries that cookie.
  *
  * A reload therefore does not ask again: the cookie is still there, and `resume()` finds
- * out by trying to read. The session lasts twelve hours, ends at once when **Lock** is
- * pressed, and stops verifying the moment `DASHBOARD_PASSWORD` is rotated, because the
- * token is signed with it (`lib/session.ts`).
+ * out by trying to read. The session lasts as long as the Session settings say (twelve
+ * hours by default), ends at once when **Lock** is pressed, and stops verifying the moment
+ * `DASHBOARD_PASSWORD` is rotated, because the token is signed with it (`lib/session.ts`).
  *
  * There is no password check in this file, and there must not be one. The check happens in
  * `api/session.ts`, where the caller cannot see or skip it. A check here would be decoration.
  */
 
 import { loadAll } from '../data/feed.js';
+import { refreshMs } from '../data/settings.js';
 import { endSession, startSession } from '../data/session.js';
 import { dataset, loadError, status } from './state.js';
-
-/** @type {number} How often an open dashboard re-reads Neon, in milliseconds. */
-const REFRESH_MS = 60 * 1000;
 
 /**
  * Deletes the password a previous build of this page kept in `localStorage`.
@@ -127,19 +125,26 @@ export function refresh() {
 }
 
 /**
- * Keeps an open dashboard current: re-reads every minute while the tab is visible, and at
- * once when a hidden tab is shown again.
+ * Keeps an open dashboard current: re-reads at the Session settings' interval (every minute
+ * by default) while the tab is visible, and at once when a hidden tab is shown again.
  *
  * A hidden tab does not poll, so a dashboard left open overnight in a background tab costs
  * no reads until someone looks at it.
  * @returns {function(): void} Stops the refreshing.
  */
 export function startAutoRefresh() {
-  const timer = window.setInterval(() => {
+  let timer = 0;
+  /**
+   * Refreshes if the tab is visible, then waits the current interval again.
+   * @returns {void}
+   */
+  function tick() {
     if (document.visibilityState === 'visible') {
       refresh();
     }
-  }, REFRESH_MS);
+    timer = window.setTimeout(tick, refreshMs());
+  }
+  timer = window.setTimeout(tick, refreshMs());
   /**
    * Refreshes when the tab comes back into view.
    * @returns {void}
@@ -151,7 +156,7 @@ export function startAutoRefresh() {
   }
   document.addEventListener('visibilitychange', onVisible);
   return () => {
-    window.clearInterval(timer);
+    window.clearTimeout(timer);
     document.removeEventListener('visibilitychange', onVisible);
   };
 }
