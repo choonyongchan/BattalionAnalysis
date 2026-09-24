@@ -1,6 +1,4 @@
-# Migration files are hashed byte-for-byte into drizzle.__drizzle_migrations
-# (scripts/apply-migrations.ts). Line-ending conversion on checkout changes the hash and
-# makes an applied migration look pending, so checkouts must reproduce the applied bytes.
+# Migration files are hashed into drizzle.__drizzle_migrations (scripts/apply-migrations.ts).
+# The migrator hashes LF-normalised text and also accepts a recorded CRLF hash; -text keeps
+# checkouts on the committed bytes anyway.
 db/migrations/*.sql -text
-# 0001 was applied from a CRLF checkout: its recorded hash is of the CRLF bytes.
-db/migrations/0001_dashboard_settings.sql text eol=crlf

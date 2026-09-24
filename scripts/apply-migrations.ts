@@ -10,7 +10,8 @@
  *   - statements are split on the `--> statement-breakpoint` marker drizzle-kit writes;
  *   - applied migrations are recorded in `drizzle.__drizzle_migrations`, keyed by the
  *     SHA-256 of the migration file (with LF line endings), which is how drizzle-kit decides
- *     what is pending.
+ *     what is pending. A migration whose CRLF form's hash is recorded also counts as applied
+ *     (see `isApplied`).
  *
  * Re-runnable: a migration already recorded is skipped.
  *
@@ -33,8 +34,34 @@ interface JournalEntry {
 /** One migration file, keyed as drizzle-kit records it. */
 export interface Migration extends JournalEntry {
   text: string;
-  /** SHA-256 of the file, the key in `drizzle.__drizzle_migrations`. */
+  /** SHA-256 of the file with LF line endings, the key recorded in `drizzle.__drizzle_migrations`. */
   hash: string;
+}
+
+/**
+ * The SHA-256 of a text, hex-encoded.
+ *
+ * @param text The text to hash.
+ * @returns The hex digest.
+ */
+function sha256(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+/**
+ * Whether a migration is already recorded as applied.
+ *
+ * A migration counts as applied when the recorded hashes contain either its LF hash (what
+ * this script records) or the hash of the same text with CRLF line endings. Files applied
+ * from a CRLF checkout, before hashing normalised line endings, were recorded by their CRLF
+ * bytes; without this they would look pending and run a second time.
+ *
+ * @param migration The migration, as `readMigrations` returns it.
+ * @param recorded The hashes in `drizzle.__drizzle_migrations`.
+ * @returns True when either hash is recorded.
+ */
+export function isApplied(migration: Pick<Migration, 'text' | 'hash'>, recorded: ReadonlySet<string>): boolean {
+  return recorded.has(migration.hash) || recorded.has(sha256(migration.text.replace(/\n/g, '\r\n')));
 }
 
 /**
@@ -50,7 +77,7 @@ export function readMigrations(): Migration[] {
     // Hashed as LF: a Windows checkout with `core.autocrlf` rewrites the file as CRLF, which
     // would change its hash and make an applied migration look pending.
     const text = readFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8').replace(/\r\n/g, '\n');
-    return { ...entry, text, hash: createHash('sha256').update(text).digest('hex') };
+    return { ...entry, text, hash: sha256(text) };
   });
 }
 
@@ -86,7 +113,7 @@ export async function applyMigrations(url: string, log: (line: string) => void =
 
   for (const entry of readMigrations()) {
     const { text, hash } = entry;
-    if (seen.has(hash)) {
+    if (isApplied(entry, seen)) {
       log(`skip  ${entry.tag} (already applied)`);
       continue;
     }
