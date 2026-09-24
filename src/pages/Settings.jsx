@@ -56,9 +56,9 @@ const CALENDAR_NOTE_KEYS = ['Public Holidays', 'Rotations'];
  * The data-quality panel: row counts, tab availability, date spans, and the named
  * findings from `model/quality.js`.
  *
- * Omits the "no public holidays"/"no rotations" notes: with `canEdit`, the Basic tab's
- * Calendar card already shows those two empty states, so repeating them here as banners
- * would say the same thing twice on one page.
+ * Always omits the "no public holidays"/"no rotations" notes, whether or not the viewer can
+ * edit: the Basic tab's Calendar card already shows those two empty states, so repeating
+ * them here as banners would say the same thing twice on one page.
  * @param {!Object} quality The result of `dataQuality`.
  * @returns {!preact.VNode} The panel.
  */
