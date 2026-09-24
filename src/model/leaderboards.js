@@ -15,6 +15,7 @@ import { isPermanentStatus } from './statusBuckets.js';
 import { isDuty } from './classify.js';
 import { leaderboard } from './metrics.js';
 import { toText } from './values.js';
+import { settingOf } from './settings/active.js';
 
 /**
  * Resolves a leaderboard row's platoon through the 4D-inference rule.
@@ -46,7 +47,7 @@ function episodeIsPermanent_(episode) {
  * The most common count-based leaderboards: report sick, MA, and similar.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
  * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
- * @param {number=} limit Rows to return; defaults to 10.
+ * @param {number=} limit Rows to return; defaults to the Thresholds leaderboard size (10).
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     platoon: string, platoonInferred: boolean, count: number}>} Most episodes first,
  *     ties broken by name.
@@ -54,7 +55,7 @@ function episodeIsPermanent_(episode) {
 export function topByCount(episodes, dutyClass, limit) {
   return leaderboard(episodes, dutyClass)
     .sort((a, b) => b.episodes - a.episodes || a.name.localeCompare(b.name))
-    .slice(0, limit || 10)
+    .slice(0, limit || settingOf('thresholds').leaderboardSize)
     .map((entry) => {
       const { platoon, inferred } = platoonFor_(entry);
       return {
@@ -74,7 +75,7 @@ export function topByCount(episodes, dutyClass, limit) {
  * The MC leaderboard: soldier, company, platoon, number of MCs, and total days.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
  * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
- * @param {number=} limit Rows to return; defaults to 10.
+ * @param {number=} limit Rows to return; defaults to the Thresholds leaderboard size (10).
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     platoon: string, platoonInferred: boolean, count: number, days: number,
  *     meanDays: number}>} Most days lost first, ties broken by name.
@@ -82,7 +83,7 @@ export function topByCount(episodes, dutyClass, limit) {
 export function topByDays(episodes, dutyClass, limit) {
   return leaderboard(episodes, dutyClass)
     .sort((a, b) => b.daysLost - a.daysLost || a.name.localeCompare(b.name))
-    .slice(0, limit || 10)
+    .slice(0, limit || settingOf('thresholds').leaderboardSize)
     .map((entry) => {
       const { platoon, inferred } = platoonFor_(entry);
       return {
@@ -106,7 +107,7 @@ export function topByDays(episodes, dutyClass, limit) {
  * Requirement 5.2 asks for exactly this split rather than a day count, because a
  * permanent excuse does not have a meaningful duration to sum.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
- * @param {number=} limit Rows to return; defaults to 10.
+ * @param {number=} limit Rows to return; defaults to the Thresholds leaderboard size (10).
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     platoon: string, platoonInferred: boolean, temporary: number, permanent: number,
  *     count: number}>} Most statuses held first, ties broken by name.
@@ -138,7 +139,7 @@ export function topByStatusCount(episodes, limit) {
   return Array.from(bySoldier.values())
     .map((entry) => ({ ...entry, count: entry.temporary + entry.permanent }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, limit || 10)
+    .slice(0, limit || settingOf('thresholds').leaderboardSize)
     .map((entry) => {
       const { platoon, inferred } = platoonFor_(entry);
       return { ...entry, platoon, platoonInferred: inferred };

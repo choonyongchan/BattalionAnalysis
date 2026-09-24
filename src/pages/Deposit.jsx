@@ -16,6 +16,7 @@ import { DataTable } from '../components/Table.jsx';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../data/parade.js';
 import { fmtDate, fmtInt } from '../format.js';
 import { MESSAGE_STATUS, describeOutcome, toMessageRows } from '../model/paradeMessages.js';
+import { settingOf } from '../model/settings/active.js';
 
 /** @type {!Object<string, string>} The status class suffix for each status. */
 const STATUS_CLASS = {
@@ -77,7 +78,7 @@ function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, 
           spellcheck={false}
           value={text}
           onInput={(event) => onText(event.currentTarget.value)}
-          placeholder={'40 SAR ARCHER COMPANY\nFIRST PARADE STATE\nDATE: DDMMYY TIME: HHMM\n…'}
+          placeholder={settingOf('unit').name.toUpperCase() + ' ARCHER COMPANY\nFIRST PARADE STATE\nDATE: DDMMYY TIME: HHMM\n…'}
         />
         <Outcome result={result} />
         <div class="deposit__actions">

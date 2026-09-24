@@ -13,6 +13,8 @@ import { Logo } from './Logo.jsx';
 import { MenuIcon } from './icons.jsx';
 import { routeAt } from './routes.js';
 import { startAutoRefresh } from './auth.js';
+import { dataset } from './state.js';
+import { unitSettings } from '../data/settings.js';
 
 /**
  * Renders the sidebar, the top bar shown on narrow screens, and the content column.
@@ -32,6 +34,11 @@ export function Shell({ children }) {
 
   // The shell exists only while the dashboard is unlocked, so it owns the polling.
   useEffect(() => startAutoRefresh(), []);
+
+  const pageTitle = dataset.value ? unitSettings().pageTitle : '';
+  useEffect(() => {
+    if (pageTitle) document.title = pageTitle;
+  }, [pageTitle]);
 
   return (
     <div class="shell">
@@ -62,7 +69,7 @@ export function Shell({ children }) {
             <MenuIcon />
           </button>
           <Logo size={22} />
-          <span class="sidebar__wordmark">{route ? route.label : '40 SAR'}</span>
+          <span class="sidebar__wordmark">{route ? route.label : unitSettings().name}</span>
         </div>
 
         <main class="content" id="view" tabIndex={-1}>

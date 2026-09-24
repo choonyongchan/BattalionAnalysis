@@ -14,6 +14,7 @@ import { LockIcon, MoonIcon, SunIcon, SystemThemeIcon } from './icons.jsx';
 import { navGroups } from './routes.js';
 import { lock } from './auth.js';
 import { cycleTheme, resolvedTheme, themeChoice } from '../theme/useTheme.js';
+import { unitSettings } from '../data/settings.js';
 
 /** @type {!Object<string, {icon: function, label: string}>} How each theme setting reads. */
 const THEME_LABELS = {
@@ -92,7 +93,7 @@ export function Sidebar({ open, onNavigate }) {
       <Link class="sidebar__brand" href="/overview" onClick={onNavigate}>
         <Logo size={44} />
         <span>
-          <span class="sidebar__wordmark">40 SAR</span>
+          <span class="sidebar__wordmark">{unitSettings().name}</span>
           <span class="sidebar__unit">Personnel</span>
         </span>
       </Link>

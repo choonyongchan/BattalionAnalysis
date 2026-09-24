@@ -30,6 +30,7 @@ import { ALL_COMPANIES } from '../model/scope.js';
 import { datesPresent } from '../model/metrics.js';
 import { orbatCoverage, orbatTree, vacanciesOn } from '../model/orbat.js';
 import { fmtDate, fmtFraction } from '../format.js';
+import { settingOf } from '../model/settings/active.js';
 
 /**
  * One role and, indented beneath it, the roles that report to it.
@@ -129,7 +130,7 @@ export function Orbat() {
         </select>
       </PageControls>
 
-      <Card title={whole ? '40 SAR' : company.value}>
+      <Card title={whole ? settingOf('unit').name : company.value}>
         <div class="orbat">
           {companies.map((node) => (
             <CompanyRoster key={node.name} node={node} />

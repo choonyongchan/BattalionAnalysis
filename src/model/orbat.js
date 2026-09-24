@@ -18,6 +18,7 @@
 
 import { COMMAND_ROLES, COMPANIES, commandRolesOf } from './domain.js';
 import { toIsoDate, toText } from './values.js';
+import { settingOf } from './settings/active.js';
 
 /** @type {string} What an unfilled role's node reads. */
 const NOT_FILED = 'Not filed';
@@ -174,7 +175,7 @@ function companyTree_(rows, isoDate, company, session) {
 /**
  * The order-of-battle tree for one date: one company, or the whole battalion.
  *
- * Without `options.company`, the root is '40 SAR' with all five companies as children in
+ * Without `options.company`, the root is named after the Unit setting, with all five companies as children in
  * COMPANIES order — including the ones that filed nothing, which collapse to a single
  * leaf rather than a hollow command chain. That leaf is the point: a battalion-level view
  * that quietly omitted Braves would look complete and would not be.
@@ -193,7 +194,7 @@ export function orbatTree(rows, isoDate, options) {
   }
 
   return {
-    name: '40 SAR',
+    name: settingOf('unit').name,
     role: 'BATTALION',
     filed: true,
     children: COMPANIES.map((name) => {

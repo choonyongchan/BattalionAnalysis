@@ -41,9 +41,7 @@ import { topLabelsOverTime } from '../../model/reasonTrend.js';
 import { locationCounts, locationCoverage } from '../../model/locations.js';
 import { toText } from '../../model/values.js';
 import { isDuty } from '../../model/classify.js';
-
-/** @type {number} Days an Att C episode must exceed to count as long-term MC. */
-const LONG_MC_MIN_DAYS = 13;
+import { settingOf } from '../../model/settings/active.js';
 
 /**
  * The leaderboard each metric draws: its card title, its ranking, and the column set
@@ -51,9 +49,9 @@ const LONG_MC_MIN_DAYS = 13;
  * @type {!Object<string, {title: string, top: function(Array<!Object>, string): Array<!Object>}>}
  */
 const LEADERBOARDS = {
-  count: { title: 'Episode Count', top: (episodes, dutyClass) => topByCount(episodes, dutyClass, 10) },
-  days: { title: 'Days Lost', top: (episodes, dutyClass) => topByDays(episodes, dutyClass, 10) },
-  status: { title: 'Statuses Held', top: (episodes) => topByStatusCount(episodes, 10) },
+  count: { title: 'Episode Count', top: (episodes, dutyClass) => topByCount(episodes, dutyClass) },
+  days: { title: 'Days Lost', top: (episodes, dutyClass) => topByDays(episodes, dutyClass) },
+  status: { title: 'Statuses Held', top: (episodes) => topByStatusCount(episodes) },
 };
 
 /**
@@ -381,20 +379,22 @@ export function LocationsCard({ personnel }) {
 }
 
 /**
- * The long-term MC panel: peak count and roster of episodes exceeding 13 days.
+ * The long-term MC panel: peak count and roster of episodes of at least the Thresholds
+ * long-MC length.
  * @param {{episodes: Array<!Object>, range: !Object}} props All episodes (a long MC that
  *     started before the range still counts toward its peak), and the range.
  * @returns {!preact.VNode} The card.
  */
 export function LongMcCard({ episodes, range }) {
-  const trend = longMcTrend(episodes, range.from, range.to, 'Att C', LONG_MC_MIN_DAYS);
-  const roster = longMcRoster(episodes, 'Att C', LONG_MC_MIN_DAYS);
+  const longMcDays = settingOf('thresholds').longMcDays;
+  const trend = longMcTrend(episodes, range.from, range.to, 'Att C', longMcDays - 1);
+  const roster = longMcRoster(episodes, 'Att C', longMcDays - 1);
   const peak = trend.reduce((max, day) => Math.max(max, day.count), 0);
 
   return (
-    <Card title={'Long-Term MC (≥' + (LONG_MC_MIN_DAYS + 1) + ' days)'} note={fmtInt(peak) + ' soldiers at the peak'}>
+    <Card title={'Long-Term MC (≥' + longMcDays + ' days)'} note={fmtInt(peak) + ' soldiers at the peak'}>
       {roster.length === 0 ? (
-        <EmptyState>No MC in range runs longer than {LONG_MC_MIN_DAYS + 1} days.</EmptyState>
+        <EmptyState>No MC in range lasts {longMcDays} days or longer.</EmptyState>
       ) : (
         <DataTable
           columns={[

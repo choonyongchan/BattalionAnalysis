@@ -26,6 +26,7 @@ import {
 } from './domain.js';
 import { platoonOf } from './platoon.js';
 import { battalionStrength } from './metrics.js';
+import { settingOf } from './settings/active.js';
 
 /**
  * Finds the company named in a free-text unit answer.
@@ -391,7 +392,7 @@ export function submissionTrend(submissions, strengthRows, dates, options) {
  * without a matching parade-state row yet, or the reverse. This module has no episode
  * concept — a FormSG submission is already one event, not a daily snapshot to collapse.
  * @param {Array<!Object>} submissions Normalised submissions from `toSubmissions`.
- * @param {number=} limit Rows to return; defaults to 10.
+ * @param {number=} limit Rows to return; defaults to the Thresholds leaderboard size (10).
  * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
  *     count: number}>} Most submissions first, ties broken by name. No platoon: FormSG's
  *     "Unit & Coy" answer carries no platoon, so one cannot be shown here — see
@@ -416,7 +417,7 @@ export function topSubmitters(submissions, limit) {
   });
   return Array.from(bySoldier.values())
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, limit || 10);
+    .slice(0, limit || settingOf('thresholds').leaderboardSize);
 }
 
 /**
