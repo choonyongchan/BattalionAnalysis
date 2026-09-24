@@ -6,7 +6,9 @@
  * as they go — and a vertical list keeps all three in view while one is open.
  */
 
+import { useEffect, useState } from 'preact/hooks';
 import { Link, useRoute } from 'wouter-preact';
+import { dataset } from './state.js';
 import { Logo } from './Logo.jsx';
 import { LockIcon, MoonIcon, SunIcon, SystemThemeIcon } from './icons.jsx';
 import { navGroups } from './routes.js';
@@ -42,6 +44,40 @@ function NavLink({ route, onNavigate }) {
 }
 
 /**
+ * Says how long ago a moment was, in the coarsest unit that still reads naturally.
+ * @param {number} ms Milliseconds elapsed.
+ * @returns {string} For example "just now", "5 min ago", "3 h ago".
+ */
+function ago(ms) {
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return minutes + ' min ago';
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? hours + ' h ago' : Math.floor(hours / 24) + ' d ago';
+}
+
+/**
+ * A tiny line under the nav saying when the data was last fetched, re-read every minute.
+ * @returns {?preact.VNode} The line, or nothing before the first load.
+ */
+function SyncStatus() {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const stamp = dataset.value && dataset.value.generatedAt;
+  const at = stamp ? new Date(stamp) : null;
+  if (!at || Number.isNaN(at.getTime())) return null;
+  return (
+    <p class="sidebar__sync" title={'Last synced ' + at.toLocaleString()}>
+      Synced {ago(Math.max(0, now - at.getTime()))}
+    </p>
+  );
+}
+
+/**
  * Renders the sidebar.
  * @param {{open: boolean, onNavigate: function(): void}} props Whether the slide-over is
  *     showing on narrow screens, and what to call once a link is followed.
@@ -71,6 +107,8 @@ export function Sidebar({ open, onNavigate }) {
           </div>
         ))}
       </div>
+
+      <SyncStatus />
 
       <div class="sidebar__foot">
         <button

@@ -111,6 +111,12 @@
   color: currentColor;
 }
 
+.sidebar__sync {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
 .sidebar__foot {
   display: flex;
   align-items: center;
