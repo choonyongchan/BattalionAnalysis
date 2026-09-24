@@ -41,6 +41,13 @@ export const OverviewIcon = () => (
   </Glyph>
 );
 
+/** @returns {!preact.VNode} A dumbbell: self-regulated fitness training. */
+export const SftIcon = () => (
+  <Glyph>
+    <path d="M8 12h8M5 8v8M8 6v12M16 6v12M19 8v8" />
+  </Glyph>
+);
+
 /** @returns {!preact.VNode} A medical cross in a rounded square: reporting sick. */
 export const ReportSickIcon = () => (
   <Glyph>

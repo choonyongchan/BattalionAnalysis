@@ -4,12 +4,13 @@ A dashboard over the Neon database the parade-state and FormSG pipelines write t
 
 ## What it is for
 
-Seven pages, in the order a commander reads them:
+The pages, in the order a commander reads them:
 
 | Page | Answers |
 |---|---|
 | **Overview** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? Are my officers there? How many will I have next week, and who is back when? |
 | **Report sick** · **MC / MA** · **Status** | Is it getting worse? Which company? Which platoon? Who, most often? |
+| **SFT** | How many soldiers have done self-regulated fitness training, and how many today? Which company? Where, doing what, and in how big a group? |
 | **Soldier** | How often has this man been out, and how long was each episode? |
 | **ORBAT** | Who is on duty today, from the CDO down, and which chairs were filed vacant? |
 | **Settings** | What is the dashboard reading, and how much of the battalion does it cover? |
@@ -280,3 +281,23 @@ newest first with its key, status, source and receipt time, and can be edited or
 - **Charts.** They read the same tables, so a deposit reaches them on the next refresh.
 - **Local development.** `bun run dev` serves no `/api`, so neither login nor this page can
   reach the server. Use `vercel dev`, or a deployed preview.
+
+## SFT
+
+`src/pages/Sft.jsx`, at `#/sft`, over the SFT FormSG form (`sft_formsg`, written by
+`api/sft.ts`). Numbers come from `src/model/sft.js`.
+
+- **Tiles.** Soldiers who did SFT in the range (unique by normalised name — the form has no
+  4D), sessions in the range, soldiers who did SFT today (ignores the range), and the average
+  group size.
+- **By company.** Soldiers per company as a bar, and a table of soldiers, sessions, groups and
+  average group size per company. A `Company` answer naming no known company is kept under
+  All and dropped for a specific company, as for report sick.
+- **Group size.** A group is everyone naming the same Group IC on one day, and its size counts
+  the IC too (once, if the IC also filed). IC names are typed by hand, so they are
+  consolidated first: ranks and punctuation are stripped and word order ignored
+  (`reconcile.js#namesMatch`), then each word is compared with `fuse.js`, so a one-letter
+  slip ("LIM"/"LIMM") merges while a different given name ("MING"/"LIANG") does not. A
+  session with no IC belongs to no group. A group's company is its members' most common one.
+- **Locations and exercises.** Ranked by sessions; case and spacing variants merge, and a
+  session doing three exercises counts once for each.

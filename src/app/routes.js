@@ -1,5 +1,5 @@
 /**
- * The eight pages, in the order a commander reads them.
+ * The nine pages, in the order a commander reads them.
  *
  * One list, used three times: the sidebar renders it, the router matches it, and the
  * narrow-screen top bar takes its label from it. Adding a page means adding a row here
@@ -7,7 +7,8 @@
  *
  * The grouping is the reading order, not a taxonomy. Overview answers "what is the
  * battalion today". The three medical pages answer the same four questions of report
- * sick, MC and status in turn. People is for looking one person or one duty roster up.
+ * sick, MC and status in turn. Training is self-regulated fitness training. People is for
+ * looking one person or one duty roster up.
  * Deposit and Settings sit at the foot: the first is where a clerk deposits or
  * corrects a parade state, the second is what the rest are reading from.
  */
@@ -19,6 +20,7 @@ import {
   OverviewIcon,
   ReportSickIcon,
   SettingsIcon,
+  SftIcon,
   SoldierIcon,
   StatusIcon,
 } from './icons.jsx';
@@ -26,6 +28,7 @@ import { Overview } from '../pages/Overview.jsx';
 import { ReportSick } from '../pages/ReportSick.jsx';
 import { McMa } from '../pages/McMa.jsx';
 import { Status } from '../pages/Status.jsx';
+import { Sft } from '../pages/Sft.jsx';
 import { Soldier } from '../pages/Soldier.jsx';
 import { Orbat } from '../pages/Orbat.jsx';
 import { Deposit } from '../pages/Deposit.jsx';
@@ -63,6 +66,13 @@ export const ROUTES = [
     label: 'Status',
     group: 'Medical',
     icon: StatusIcon,
+  },
+  {
+    path: '/sft',
+    component: Sft,
+    label: 'SFT',
+    group: 'Training',
+    icon: SftIcon,
   },
   {
     path: '/soldier',

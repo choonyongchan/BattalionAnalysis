@@ -28,6 +28,7 @@ export const TABS = {
   ROSTER: 'Command Roster',
   FORMSG: 'Report Sick FormSG Responses',
   SUBMISSIONS: 'Parade State Responses',
+  SFT: 'SFT Responses',
 };
 
 /**
@@ -124,6 +125,27 @@ export const FORMSG_HEADERS = [
 export const SUBMISSION_HEADERS = ['Timestamp', 'parade_response_id'];
 
 /**
+ * Headers read from "SFT Responses", one row per self-regulated fitness training session.
+ *
+ * `group_ic` is the rank and name the soldier typed for their group's IC; the SFT page
+ * clusters it to size each group. The two acknowledgement checkboxes are not read — nothing
+ * charts them.
+ * @type {string[]}
+ */
+export const SFT_HEADERS = [
+  'Timestamp',
+  'date',
+  'RANK',
+  'name',
+  'company',
+  'group_ic',
+  'PES Status',
+  'exercises',
+  'sfabt_type',
+  'location',
+];
+
+/**
  * FormSG headers the dashboard must never request.
  *
  * Named rather than merely omitted so `test/dashboard/schema.test.js` can assert their
@@ -153,4 +175,5 @@ export const FORBIDDEN_SUBMISSION_HEADERS = ['Drop your Parade State here'];
 export const OPTIONAL_TABS = {
   [TABS.FORMSG]: 'Report-sick submissions are unavailable.',
   [TABS.SUBMISSIONS]: 'Parade-state filing times are unavailable.',
+  [TABS.SFT]: 'SFT submissions are unavailable.',
 };

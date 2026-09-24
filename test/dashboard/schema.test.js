@@ -10,12 +10,18 @@ import {
   FORBIDDEN_HEADERS,
   FORBIDDEN_SUBMISSION_HEADERS,
   FORMSG_HEADERS,
+  SFT_HEADERS,
   SUBMISSION_HEADERS,
 } from '../../src/data/tabs.js';
 
 describe('sensitive columns are never requested', () => {
   test('no NRIC column appears in the FormSG request', () => {
     FORBIDDEN_HEADERS.forEach((header) => expect(FORMSG_HEADERS).not.toContain(header));
+  });
+
+  test('no NRIC column appears in the SFT request', () => {
+    FORBIDDEN_HEADERS.forEach((header) => expect(SFT_HEADERS).not.toContain(header));
+    expect(SFT_HEADERS.some((header) => /nric/i.test(header))).toBe(false);
   });
 
   test('the message body does not appear in the submissions request', () => {

@@ -10,7 +10,8 @@
     "db:migrate": "bun --env-file=.env.local scripts/apply-migrations.ts",
     "whatsapp": "bun --env-file=.env.whatsapp whatsapp/src/supervisor.js",
     "whatsapp:bridge": "bun --env-file=.env.whatsapp whatsapp/src/index.js",
-    "whatsapp:reset-auth": "bun whatsapp/scripts/reset-auth.js"
+    "whatsapp:reset-auth": "bun whatsapp/scripts/reset-auth.js",
+    "whatsapp:service": "bun whatsapp/scripts/service.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -1,7 +1,8 @@
 /**
  * Drizzle schema for the Neon database: the source of truth for tables, enums and migrations.
  *
- * Two write paths: `lib/pipeline.ts` (WhatsApp parade states) and `api/formsg.ts` (report sick).
+ * Three write paths: `lib/pipeline.ts` (WhatsApp parade states), `api/reportsick.ts` (report
+ * sick) and `api/sft.ts` (self-regulated fitness training).
  * `settings` holds the Settings page's sections, written only by `api/settings.ts`.
  * The dashboard reads everything through `api/dashboard.ts`.
  * NRIC is deliberately absent; identity is `name_key`. Do not add NRIC columns.
@@ -225,6 +226,33 @@ export const reportSickFormsg = pgTable(
   (t) => [
     check('report_sick_formsg_mc_days_sane', sql`${t.mcDays} is null or ${t.mcDays} between 0 and 180`),
   ],
+);
+
+/** One FormSG Self-Regulated Fitness Training submission; `response_id` dedupes redelivery. */
+export const sftFormsg = pgTable(
+  'sft_formsg',
+  {
+    responseId: text('response_id').primaryKey(),
+    timestamp: timestamp('timestamp', tz).notNull(),
+    rank: text('rank'),
+    name: text('name'),
+    nameKey: text('name_key').notNull(),
+    /** The form's `Company` answer as given; `company` is what it names. */
+    unitCoy: text('unit_coy'),
+    company: companyEnum('company'),
+    groupIc: text('group_ic'),
+    pesStatus: text('pes_status'),
+    informedCommander: boolean('informed_commander'),
+    /** Checkbox selections joined with `; `. */
+    exercises: text('exercises'),
+    sfabtType: text('sfabt_type'),
+    windowConfirmed: boolean('window_confirmed'),
+    location: text('location'),
+    /** Singapore-local date of `timestamp`. */
+    sftDate: date('sft_date', { mode: 'string' }).notNull(),
+    receivedAt: timestamp('received_at', tz).notNull().defaultNow(),
+  },
+  (t) => [index('sft_formsg_date_idx').on(t.sftDate)],
 );
 
 /**

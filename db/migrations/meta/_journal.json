@@ -19,15 +19,22 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1790254446525,
-      "tag": "0002_settings",
+      "when": 1790254845020,
+      "tag": "0002_sft_formsg",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
+      "when": 1790254870000,
+      "tag": "0003_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
       "when": 1790254897905,
-      "tag": "0003_drop_old_settings_tables",
+      "tag": "0004_drop_old_settings_tables",
       "breakpoints": true
     }
   ]

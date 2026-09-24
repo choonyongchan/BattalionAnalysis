@@ -14,6 +14,7 @@ import {
   OPTIONAL_TABS,
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
+  SFT_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
   TABS,
@@ -52,6 +53,7 @@ const REQUIRED_TABS = [
 const OPTIONAL_TAB_SPECS = [
   { key: 'formSg', tab: TABS.FORMSG, headers: FORMSG_HEADERS },
   { key: 'submissions', tab: TABS.SUBMISSIONS, headers: SUBMISSION_HEADERS },
+  { key: 'sft', tab: TABS.SFT, headers: SFT_HEADERS },
 ];
 
 /**

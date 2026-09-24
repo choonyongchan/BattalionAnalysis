@@ -25,7 +25,7 @@ export type Column =
  * @param title A question title or answer option.
  * @returns Lower-cased, with underscore and whitespace runs each collapsed to one.
  */
-function normaliseTitle(title: string): string {
+export function normaliseTitle(title: string): string {
   return title.toLowerCase().replace(/_+/g, '_').replace(/\s+/g, ' ').trim();
 }
 

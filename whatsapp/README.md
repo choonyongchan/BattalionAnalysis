@@ -71,7 +71,8 @@ reveals its JID. Copy that into `WA_GROUP_ID` and restart.
 **4. Dry run.** Still with `DRY_RUN=1`, post a real parade state and some chatter in the group. You should see
 exactly one `DRY_RUN` line, and the chatter logged at `debug` with a rejection reason.
 
-**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, and restart with `bun run whatsapp`.
+**5. Go live.** Set `DRY_RUN=0`, restore `LOG_LEVEL=info`, stop the foreground run (Ctrl+C), and move it to the
+background with `bun run whatsapp:service install` — see [Task Scheduler](#task-scheduler-the-outer-layer).
 
 ## Running it permanently on Windows
 
@@ -86,38 +87,44 @@ A clean child exit (code 0), or the "session is dead" exit (code 3), is not rest
 
 ### Task Scheduler (the outer layer)
 
-The supervisor gives up after 3 fast crashes, so something must relaunch *it*. Pair once interactively with
-`bun run whatsapp` (the QR needs a terminal), stop it, then register the task from an elevated PowerShell in the
-repo root:
+The supervisor gives up after 3 fast crashes, so something must relaunch *it*: a Windows scheduled task, managed
+with one command. Nothing extra to install — it uses the built-in Task Scheduler.
+
+**Going live:**
+
+1. Pair once interactively with `bun run whatsapp` (the QR needs a terminal) and finish the dry run above.
+2. In `.env.whatsapp`, set `DRY_RUN=0` and `LOG_LEVEL=info`, and check `WA_GROUP_ID` is set.
+3. Open an **Administrator** terminal in the repo root and run `bun run whatsapp:service install`. It first stops
+   any `bun run whatsapp` still running in a terminal, so two sockets never share `auth/`.
+4. Run `bun run whatsapp:service status` and confirm the log shows `connected to WhatsApp`. To follow the log
+   live: `Get-Content whatsapp\data\bridge.log -Wait -Tail 20`.
+
+**Day to day** (everything except `status` needs an Administrator terminal):
 
 ```powershell
-New-Item -ItemType Directory -Force whatsapp\data | Out-Null
-$bun  = (Get-Command bun).Source
-$act  = New-ScheduledTaskAction -Execute cmd.exe -WorkingDirectory $PWD `
-          -Argument "/c `"`"$bun`" --env-file=.env.whatsapp whatsapp\src\supervisor.js >> whatsapp\data\bridge.log 2>&1`""
-$trig = @(
-  New-ScheduledTaskTrigger -AtStartup
-  New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
-)
-$set  = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) `
-          -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-          -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
-$cred = Get-Credential $env:USERNAME
-Register-ScheduledTask WhatsAppBridge -Action $act -Trigger $trig -Settings $set `
-  -User $cred.UserName -Password $cred.GetNetworkCredential().Password
-powercfg /change standby-timeout-ac 0   # a sleeping PC receives nothing
+bun run whatsapp:service install   # register + start; safe to re-run
+bun run whatsapp:service status    # task state + last log lines
+bun run whatsapp:service stop      # disable the watchdog and kill the bridge
+bun run whatsapp:service start
+bun run whatsapp:service restart   # e.g. after editing .env.whatsapp
+bun run whatsapp:service uninstall
 ```
 
-What each piece buys:
+`stop`, `restart` and `uninstall` kill only this bridge's bun processes (`whatsapp/src/supervisor.js` and
+`index.js`), never other bun processes such as the Vite dev server.
 
+`install` (`scripts/service.js`) registers the `WhatsAppBridge` scheduled task and disables sleep on AC power
+(a sleeping PC receives nothing). What each piece buys:
+
+- **Runs as SYSTEM** — starts at boot (e.g. after Windows Update) with nobody logged in, and needs no stored
+  password.
 - **Every-5-minutes trigger + `IgnoreNew`** is the watchdog: while the bridge runs, each tick is a no-op; once
   it is dead for any reason (supervisor gave up, killed, OOM), the next tick relaunches it. Worst-case gap is
   5 minutes, and no messages are lost — Baileys delivers what arrived while offline on reconnect.
 - **`ExecutionTimeLimit` zero** — the default kills any task after 72 hours.
-- **User + password** — "run whether logged on or not", so it survives reboots (Windows Update) with nobody
-  logged in.
 - A dead session (exit 3) is relaunched too and fails the same way each tick; `whatsapp\data\bridge.log` says to
-  re-pair. Stop it with `Disable-ScheduledTask WhatsAppBridge; Get-Process bun | Stop-Process`.
+  re-pair: `bun run whatsapp:service stop`, `bun run whatsapp:reset-auth`, `bun run whatsapp` (scan the QR, then
+  Ctrl+C), `bun run whatsapp:service start`.
 
 `whatsapp\data\bridge.log` is never rotated; truncate it by hand if it ever matters.
 
@@ -140,42 +147,33 @@ the socket keeps running. Nothing in the reconnect logic reacts to it.
 
 ## What gets relayed
 
-Chatter never reaches the database, and neither does any session other than the **first** parade. Two gates,
-both cheap:
+Only **first parade states** reach the database. Chatter does not, and neither does a last parade state. The gates,
+in order, all cheap:
 
-**Structural gates** — ≥ 8 non-empty lines, ≥ 200 characters, and the anchor phrase `/parade\s*state/i`. The
-thresholds were calibrated against real parade-state messages, the smallest of which runs about 32 lines /
-970 characters. `"Why is your parade state late?"` carries the anchor phrase but is one short line, so it
-is rejected here.
+1. **No last-parade marker in the header**: `LAST PARADE`, `LPS` or a bare `LP` as a whole word rejects the
+   message outright, even if it also says `FPS`.
+2. **A first-parade marker in the header**: `FIRST PARADE` (with or without `STATE`), `FPS`, or a bare `FP` as
+   a whole word, in any case. There is no fallback. A header that says only `PARADE STATE`, or only `PS`, is
+   rejected even with a morning timing, because it doesn't say which parade it is.
+3. **Bulk**: ≥ 8 non-empty lines and ≥ 200 characters. The smallest real parade state runs about 32 lines /
+   970 characters. `"Why is your parade state late?"` and `"40 SAR ARCHER COY FPS"` fail here or earlier.
+4. **At least one present/strength line**: a label, a colon and a `present/strength` pair ending the line
+   (`COMPANY: 197/210`, `[OFFICER]: 05/07`). Every parade state has these (template rule R10). A long
+   reminder that mentions `FIRST PARADE STATE` has none, so it is rejected. A `DD/MM/YY` date does not count.
 
-A header that carries only `FPS` or `FP` as a whole token clears the structural gate even without the literal
-words "PARADE STATE" — some companies label a first parade state that tersely. A bare `PS`, or `LP` / `LPS`
-(a last parade state), does not. The ≥ 8 lines / ≥ 200 characters minimums still apply, so a terse one-liner
-is still rejected.
+The header is the first 5 non-empty lines, where every company puts its company, date, session and timing.
+Looking only there means a stray `FP` or `LP` in the body (someone's initials, say) cannot change the verdict.
 
-**First-parade gate** — the message must either carry an explicit `FIRST PARADE` / `FPS` / `FP` marker in its
-header, or have a timing before `12:00` in its header. The header is the first 5 non-empty lines, which is
-where every company puts its company / date / session / timing block; confining the search there keeps stray
-four-digit numbers — and a stray `FP` — in the body out of the check. The timing pattern uses digit lookaround
-so it reads `0738` out of `220626 FP 0738` without ever matching inside the `DDMMYY` date, and still matches
-when glued to a suffix (`0930HRS`).
+All four real samples in `parade-state-example/` carry `FIRST PARADE STATE` and are accepted.
 
-Of the five real samples, four carry an explicit marker (`FIRST PARADE STATE`, or the bare `FIRST PARADE` in
-`stallion.txt`); `braves.txt` is labelled only `PARADE STATE` and qualifies on its `0738` timing. A last parade
-state has neither a first-parade marker nor a morning timing, so it is rejected.
-
-**There used to be a third stage:** a score over six layout signals, needing three matches to accept. It is
+**There used to be a scoring stage:** a score over six layout signals, needing three matches to accept. It is
 gone. Deciding whether a message is really a parade state is what `extract` and `validate` (`lib/parser/`) do,
-and they do it by reading the message rather than guessing from its shape — so the score was a second, weaker
-copy of a judgement already being made downstream. What it added was a way to drop a genuine parade state whose
-layout was merely unusual, with the rejection recorded nowhere but a debug log. A message that clears these two
-gates but is not a parade state is still stored in `raw_messages`; `parseOne` (`lib/pipeline.ts`) calls `validate`
-on what `extract` returned, and a non-empty reason goes into that row's `error` column via `markFailed`, which
-also stamps `processed_at` so the row is not retried. The reason sits beside the message it came from, which is
-visible in the database.
+and they do it by reading the message rather than guessing from its shape. The strength-line check above is
+not a score: it is one yes/no signal that every parade state has. A message that clears these gates but is not a
+parade state is still stored in `raw_messages`, with the reason in that row's `error` column, so a person can
+review it.
 
-To retune, edit `MIN_LINES` / `MIN_CHARS` / `FIRST_PARADE_CUTOFF_HOUR` at the top of `src/signature.js`, then
-run `bun test ./test/whatsapp/`.
+To retune, edit the constants at the top of `src/signature.js`, then run `bun test ./test/whatsapp/`.
 
 ## Idempotency
 
@@ -197,6 +195,7 @@ failed to parse is parsed again, which picks up any rule the parser has learnt s
 | `src/ingest.js` | Relays a message to `api/parade.ts`, retrying network failures and 5xx |
 | `src/config.js` | `.env.whatsapp` validation |
 | `src/logger.js` | pino logger factory |
+| `scripts/service.js` | Installs and controls the background scheduled task (`bun run whatsapp:service`) |
 | `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run whatsapp:reset-auth`) |
 | `../test/whatsapp/` | `bun test ./test/whatsapp/` — signature suite plus the non-network modules |
 
@@ -209,6 +208,7 @@ messages to the retired Apps Script web app, was deleted long ago; `src/ingest.j
 |---|---|
 | QR code appears on every start | `auth/` is not writable, or the device was unlinked in WhatsApp |
 | `session logged out` / `session is dead` | Run `bun run whatsapp:reset-auth`, then `bun run whatsapp`, then scan the QR again |
+| `failed to decrypt message` (`Invalid PreKey ID`, `No SenderKeyRecord`, `No session record`) soon after pairing | Normal for a newly linked device: the sender encrypted before learning its keys. Baileys asks the sender to resend, and the same message id is usually accepted seconds later. Stops once each member has sent once. Only a problem if one sender's messages never get through |
 | Occasional `Bad MAC` in the log, runner keeps running | One inbound message failed to decrypt; Baileys drops it. No action — if it was a parade state, ask the sender to resend |
 | Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the runner, `bun run whatsapp:reset-auth`, `bun run whatsapp`, re-scan |
 | Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun run whatsapp` |
@@ -216,4 +216,5 @@ messages to the retired Apps Script web app, was deleted long ago; `src/ingest.j
 | `relay failed; deposit this parade state on the dashboard` | Three attempts failed. `intake answered 401` means `PARADE_INGEST_SECRET` differs from Vercel's; `intake unreachable` or `5xx` means Vercel or the network was down. Paste the parade state on the dashboard's Parade States page |
 | `parade state stored; needs correcting on the dashboard` | The parser was unsure of a line. Open Parade States on the dashboard; the row shows what to fix, and Edit re-parses it |
 | A real parade state was rejected | Run with `LOG_LEVEL=debug`; the reason names the failing gate |
-| A first parade state was rejected as "not a first parade state" | Its header has no `FIRST PARADE` marker and no timing before 12:00 — check the timing is in the first 5 non-empty lines |
+| A first parade state was rejected as "not a first parade state" | Its first 5 non-empty lines have no `FIRST PARADE` / `FPS` / `FP`. A plain `PARADE STATE` header is no longer enough, so ask the company to label the session |
+| A first parade state was rejected for "no present/strength line" | No line ends in `label: present/strength` (e.g. `COMPANY: 197/210`). Check the strength lines follow the template |

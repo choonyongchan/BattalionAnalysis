@@ -4,7 +4,8 @@
  * mode) -- and optionally served over HTTP on a local port for the end-to-end suite.
  */
 import { handle as handleDashboard } from '../../api/dashboard.ts';
-import { handle as handleFormsg } from '../../api/formsg.ts';
+import { handle as handleReportSick } from '../../api/reportsick.ts';
+import { handle as handleSft } from '../../api/sft.ts';
 import { handle as handleParade, type Deps as ParadeDeps } from '../../api/parade.ts';
 import { handle as handleSession } from '../../api/session.ts';
 import { handle as handleSettings } from '../../api/settings.ts';
@@ -19,7 +20,7 @@ import {
   listMessages,
   type ModelParser,
 } from '../../lib/pipeline.ts';
-import { FORM_KEYS, POST_URI, testSdk } from './formsg.ts';
+import { FORM_KEYS, POST_URI, SFT_FORM_KEYS, SFT_POST_URI, testSdk } from './formsg.ts';
 
 /** The dashboard password the tests configure. */
 export const DASHBOARD_PASSWORD = 'dashboard-test-password-long-enough';
@@ -60,7 +61,8 @@ export interface RunningApp {
 }
 
 /**
- * Serves `/api/parade`, `/api/dashboard` and `/api/formsg` over HTTP on a free local port.
+ * Serves `/api/parade`, `/api/dashboard`, `/api/session`, `/api/settings`, `/api/reportsick` and
+ * `/api/sft` over HTTP on a free local port.
  *
  * @param db The database every route uses.
  * @param options Passed to `paradeDeps`.
@@ -84,9 +86,12 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {})
       if (path === '/api/session') {
         return handleSession(request, { dashboardPassword: DASHBOARD_PASSWORD, settingsPassword: SETTINGS_PASSWORD });
       }
-      if (path === '/api/formsg') {
-        // The signature covers the registered URI, not the local one, as behind Vercel's proxy.
-        return handleFormsg(request, { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
+      // The signature covers the registered URI, not the local one, as behind Vercel's proxy.
+      if (path === '/api/reportsick') {
+        return handleReportSick(request, { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
+      }
+      if (path === '/api/sft') {
+        return handleSft(request, { db, secretKey: SFT_FORM_KEYS.secretKey, postUri: SFT_POST_URI, sdk: testSdk });
       }
       if (path === '/api/settings') {
         return handleSettings(request, {

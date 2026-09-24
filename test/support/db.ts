@@ -42,7 +42,7 @@ const TABLES = [
   'command_roster_rows',
   'section_counts',
   'report_sick_formsg',
-  'settings',
+  'sft_formsg',
 ];
 
 /** Connection-string variables that name databases the tests must never truncate. */

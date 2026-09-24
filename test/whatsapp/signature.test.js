@@ -2,8 +2,8 @@
  * Tests for the parade-state signature matcher.
  *
  * The positive cases in the "first parade gate" block are well-formed parade states
- * built around one header under test. The negative cases are the chatter that must
- * never reach the spreadsheet.
+ * built around one header under test. The negative cases are the chatter, and the
+ * last parade states, that must never reach the database.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -24,6 +24,13 @@ describe('isParadeState - chatter', () => {
     [
       'a long message with the anchor but no structure',
       Array.from({ length: 20 }, () => 'Reminder to submit the parade state on time please.').join('\n'),
+    ],
+    [
+      'a long first-parade reminder with no strength lines',
+      [
+        'Reminder: FIRST PARADE STATE is due by 0600 daily.',
+        ...Array.from({ length: 10 }, (_, i) => `Point ${i}: send it to the ops group, not to me directly.`),
+      ].join('\n'),
     ],
     ['a p.s. aside', 'P.S. bring water'],
     ['a terse FPS one-liner with no body', '40 SAR ARCHER COY FPS'],
@@ -48,7 +55,7 @@ describe('isParadeState - chatter', () => {
 describe('isParadeState - verdict shape', () => {
   test('explains why a near-miss was rejected', () => {
     const result = isParadeState('Why is your parade state late?');
-    expect(result.rejectReason).toContain('too few lines');
+    expect(result.rejectReason).toContain('not a first parade state');
   });
 
   test('a terse FPS one-liner is rejected for bulk, not for the marker', () => {
@@ -62,8 +69,8 @@ describe('isParadeState - first parade gate', () => {
   /**
    * Builds a well-formed parade state around a given header.
    *
-   * The body carries enough signals and bulk to clear every other gate, so the
-   * verdict turns purely on the header.
+   * The body carries enough strength lines and bulk to clear every other gate,
+   * so the verdict turns purely on the header.
    *
    * @param {string} header The header lines under test.
    * @returns {string} A complete parade-state message.
@@ -72,8 +79,7 @@ describe('isParadeState - first parade gate', () => {
     return [
       header,
       '',
-      'TOTAL STRENGTH: 136',
-      'CURRENT STRENGTH: 120',
+      'COMPANY: 120/136',
       'PLATOON 1: 51/55',
       'PLATOON 2: 49/56',
       'COMMANDERS: 20/25',
@@ -84,96 +90,74 @@ describe('isParadeState - first parade gate', () => {
     ].join('\n');
   }
 
-  test('accepts an explicit FIRST PARADE STATE header', () => {
-    expect(isParadeState(withHeader('COUGAR COMPANY FIRST PARADE STATE\nDATE: 220626 @ 1400 Hrs')).accepted).toBe(true);
+  /**
+   * Rewrites every present/strength pair as "present of strength", so no
+   * strength line is left.
+   *
+   * @param {string} text A parade state.
+   * @returns {string} The same text without a present/strength line.
+   */
+  function withoutStrengthLines(text) {
+    return text.replace(/: (\d+)\/(\d+)$/gm, ': $1 of $2');
+  }
+
+  /** @type {Array<[string, string]>} Label and header of each accepted message. */
+  const accepted = [
+    ['FIRST PARADE STATE', '40 SAR COUGAR COMPANY\nFIRST PARADE STATE\nDATE: 220626 TIME: 0530'],
+    ['a bare FIRST PARADE', 'PARADE STATE FOR 220626\nSTALLION COY FIRST PARADE'],
+    ['a terse FPS with no anchor phrase', '40 SAR ARCHER COY FPS\n220626'],
+    ['a lower-case fps', 'archer coy fps\n220626'],
+    ['a bare FP', 'BRAVES COY\n220626 FP 0738'],
+    ['FP with an afternoon timing', 'BRAVES COY FP\n1500'],
+  ];
+
+  for (const [label, header] of accepted) {
+    test(`accepts ${label}`, () => {
+      expect(isParadeState(withHeader(header))).toEqual({ accepted: true, rejectReason: null });
+    });
+  }
+
+  /** @type {Array<[string, string, string]>} Label, header and expected reason fragment. */
+  const rejected = [
+    ['LAST PARADE STATE', '40 SAR BRAVES COMPANY\nLAST PARADE STATE\nDATE: 220626 TIME: 1830', 'last parade'],
+    ['a terse LPS', '40 SAR BRAVES COY LPS\n220626', 'last parade'],
+    ['a bare LP', 'BRAVES COY\n220626 LP 1830', 'last parade'],
+    ['a header naming both parades', 'BRAVES COY FPS / LPS\n220626', 'last parade'],
+    ['an unlabelled PARADE STATE with a morning timing', '40 SAR BRAVES COMPANY PARADE STATE\n220626 0738', 'not a first parade'],
+    ['an unlabelled PARADE STATE with no timing', 'COUGAR COMPANY PARADE STATE\nDATE: 220626', 'not a first parade'],
+    ['a bare PS', 'BRAVES COY PS\n0730', 'not a first parade'],
+  ];
+
+  for (const [label, header, reason] of rejected) {
+    test(`rejects ${label}`, () => {
+      const result = isParadeState(withHeader(header));
+      expect(result.accepted).toBe(false);
+      expect(result.rejectReason).toContain(reason);
+    });
+  }
+
+  test('rejects a first parade state with no present/strength line', () => {
+    const text = withoutStrengthLines(withHeader('ARCHER COY FIRST PARADE STATE'));
+    expect(isParadeState(text).rejectReason).toContain('present/strength');
   });
 
-  test('accepts a bare "FIRST PARADE" marker', () => {
-    expect(isParadeState(withHeader('PARADE STATE FOR 220626\nSTALLION COY FIRST PARADE')).accepted).toBe(true);
-  });
-
-  test('accepts an unlabelled session with a morning timing', () => {
-    expect(isParadeState(withHeader('40 SAR BRAVES COMPANY PARADE STATE\n220626 FP 0738')).accepted).toBe(true);
-  });
-
-  test('rejects a last parade state', () => {
-    const result = isParadeState(withHeader('40 SAR BRAVES COMPANY LAST PARADE STATE\n220626 LP 1830'));
-    expect(result.accepted).toBe(false);
-    expect(result.rejectReason).toContain('first parade state');
-  });
-
-  test('rejects an unlabelled session with an afternoon timing', () => {
-    expect(isParadeState(withHeader('COUGAR COMPANY PARADE STATE\nDATE: 220626 @ 1730 Hrs')).accepted).toBe(false);
-  });
-
-  test('rejects an unlabelled session with no timing at all', () => {
-    expect(isParadeState(withHeader('COUGAR COMPANY PARADE STATE\nDATE: 220626')).accepted).toBe(false);
-  });
-
-  test('accepts a terse "FPS" header with no anchor phrase', () => {
-    expect(isParadeState(withHeader('40 SAR ARCHER COY FPS\n220626')).accepted).toBe(true);
-  });
-
-  test('accepts a terse "FP" header with a morning timing', () => {
-    expect(isParadeState(withHeader('BRAVES COY FP\n0738')).accepted).toBe(true);
-  });
-
-  test('accepts a terse "FP" header even without a morning timing', () => {
-    expect(isParadeState(withHeader('BRAVES COY FP\n1500')).accepted).toBe(true);
-  });
-
-  test('rejects a terse "LPS" header', () => {
-    expect(isParadeState(withHeader('40 SAR BRAVES COY LPS\n220626 LP 1830')).accepted).toBe(false);
-  });
-
-  test('rejects a bare "PS" header', () => {
-    expect(isParadeState(withHeader('BRAVES COY PS\n1830')).accepted).toBe(false);
-  });
-});
-
-describe('first parade timing extraction', () => {
-  test('does not read a timing out of a DDMMYY date', () => {
-    expect(isFirstParade('PARADE STATE\n220626\nCDO: 2LT LEE')).toBe(false);
-  });
-
-  test('reads a timing glued to its suffix', () => {
-    expect(isFirstParade('PARADE STATE\nCAA 220626, 0930HRS')).toBe(true);
-  });
-
-  test('reads a timing separated from its suffix', () => {
-    expect(isFirstParade('PARADE STATE\nCAA 220626, 0930 HRS')).toBe(true);
-  });
-
-  test('treats noon itself as not a first parade', () => {
-    expect(isFirstParade('PARADE STATE\nCAA 220626, 1200 HRS')).toBe(false);
-    expect(isFirstParade('PARADE STATE\nCAA 220626, 1159 HRS')).toBe(true);
-  });
-
-  test('ignores timings below the header block', () => {
-    const text = ['PARADE STATE', 'line 2', 'line 3', 'line 4', 'line 5', '0730'].join('\n');
-    expect(isFirstParade(text)).toBe(false);
+  test('does not read a DD/MM/YY date as a strength line', () => {
+    const text = withoutStrengthLines(withHeader('ARCHER COY FIRST PARADE STATE\nDATE: 22/06/26'));
+    expect(isParadeState(text).rejectReason).toContain('present/strength');
   });
 });
 
 describe('first parade marker', () => {
-  test('reads an "FPS" token in the header', () => {
-    expect(isFirstParade('40 SAR ARCHER COY FPS\nl2\nl3\nl4\nl5')).toBe(true);
+  test('ignores an FP token that appears only below the header block', () => {
+    expect(isFirstParade(['PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'FP 0700'].join('\n'))).toBe(false);
   });
 
-  test('reads a bare "FP" token without needing a valid timing', () => {
-    expect(isFirstParade('BRAVES COY FP\nno timing here\nl3\nl4\nl5')).toBe(true);
+  test('ignores an LP token that appears only below the header block', () => {
+    expect(isFirstParade(['FIRST PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'LP: 2LT LEE'].join('\n'))).toBe(true);
   });
 
-  test('does not treat "LPS" as a first-parade marker', () => {
-    expect(isFirstParade('BRAVES COY LPS\nl2\nl3\nl4\nl5')).toBe(false);
-  });
-
-  test('does not treat a bare "PS" as a first-parade marker', () => {
-    expect(isFirstParade('BRAVES COY PS\nl2\nl3\nl4\nl5')).toBe(false);
-  });
-
-  test('ignores an "FP" token that appears only below the header block', () => {
-    const text = ['PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'FP 0700'].join('\n');
-    expect(isFirstParade(text)).toBe(false);
+  test('does not read FP or LP inside a longer word', () => {
+    expect(isFirstParade('HELP DESK FPSX\nl2')).toBe(false);
+    expect(isFirstParade('ALPHA COY FPS\nl2')).toBe(true);
   });
 });
