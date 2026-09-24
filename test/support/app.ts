@@ -1,5 +1,5 @@
 /**
- * The app's three routes, wired to a test database exactly as each file's `route()` wires them to
+ * The app's routes, wired to a test database exactly as each file's `route()` wires them to
  * production -- the real pipeline, the real dashboard read and the real FormSG SDK (in its test
  * mode) -- and optionally served over HTTP on a local port for the end-to-end suite.
  */
@@ -7,9 +7,10 @@ import { handle as handleDashboard } from '../../api/dashboard.ts';
 import { handle as handleFormsg } from '../../api/formsg.ts';
 import { handle as handleParade, type Deps as ParadeDeps } from '../../api/parade.ts';
 import { handle as handleSession } from '../../api/session.ts';
+import { handle as handleSettings } from '../../api/settings.ts';
 import type { Db } from '../../db/index.ts';
 import { loadTabs } from '../../lib/dashboard.ts';
-import { readSettings } from '../../lib/settings.ts';
+import { readSettings, resetSection, saveSection } from '../../lib/settings.ts';
 import {
   deleteMessage,
   editMessage,
@@ -86,6 +87,16 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {})
       if (path === '/api/formsg') {
         // The signature covers the registered URI, not the local one, as behind Vercel's proxy.
         return handleFormsg(request, { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
+      }
+      if (path === '/api/settings') {
+        return handleSettings(request, {
+          store: {
+            save: (section, value, version) => saveSection(db, section, value, version),
+            reset: (section, version) => resetSection(db, section, version),
+          },
+          dashboardPassword: DASHBOARD_PASSWORD,
+          settingsPassword: SETTINGS_PASSWORD,
+        });
       }
       return new Response('Not found', { status: 404 });
     },
