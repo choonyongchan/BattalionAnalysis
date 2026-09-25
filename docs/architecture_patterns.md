@@ -141,7 +141,7 @@ from raw_messages where parser is not null group by parser;
 `bun test` from the repo root (`./test/`; the WhatsApp bridge's tests are in `./test/whatsapp/`).
 `bun run test:coverage` writes `coverage/lcov.info` (settings in `bunfig.toml`); `.github/workflows/ci.yml`
 runs it on every push and pull request to `main` and uploads it to Codecov (`CODECOV_TOKEN`;
-the DB suites run there only when the `TEST_DATABASE_URL` secret is set).
+the DB suites run there only when the `TEST_DATABASE_URL` secret is set; one run at a time, since they share that branch).
 
 - **Pure suites always run**, offline: the parser, FormSG mapping (with the real SDK in its
   `test` mode), the dashboard model, the bridge's helpers, and every refusal a route makes
