@@ -1,0 +1,1143 @@
+{
+  "id": "395c28f1-6e62-49d7-82d6-fc036a857765",
+  "prevId": "e22b6de9-cea0-4b1a-8156-8be26acfd285",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.command_roster_rows": {
+      "name": "command_roster_rows",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "command_roster_rows_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role_kind": {
+          "name": "role_kind",
+          "type": "role_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_label": {
+          "name": "unit_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_vacant": {
+          "name": "is_vacant",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "command_roster_rows_submission_idx": {
+          "name": "command_roster_rows_submission_idx",
+          "columns": [
+            {
+              "expression": "parade_response_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "command_roster_rows_parade_response_id_parade_submissions_parade_response_id_fk": {
+          "name": "command_roster_rows_parade_response_id_parade_submissions_parade_response_id_fk",
+          "tableFrom": "command_roster_rows",
+          "tableTo": "parade_submissions",
+          "columnsFrom": [
+            "parade_response_id"
+          ],
+          "columnsTo": [
+            "parade_response_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parade_submissions": {
+      "name": "parade_submissions",
+      "schema": "",
+      "columns": {
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company": {
+          "name": "company",
+          "type": "company",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session": {
+          "name": "session",
+          "type": "session",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parade_time": {
+          "name": "parade_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_message_id": {
+          "name": "source_message_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extracted_at": {
+          "name": "extracted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "parade_submissions_natural_key": {
+          "name": "parade_submissions_natural_key",
+          "columns": [
+            {
+              "expression": "company",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "session",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "parade_submissions_source_message_id_raw_messages_id_fk": {
+          "name": "parade_submissions_source_message_id_raw_messages_id_fk",
+          "tableFrom": "parade_submissions",
+          "tableTo": "raw_messages",
+          "columnsFrom": [
+            "source_message_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.personnel_rows": {
+      "name": "personnel_rows",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "personnel_rows_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_label": {
+          "name": "unit_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entry_index": {
+          "name": "entry_index",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason_category": {
+          "name": "reason_category",
+          "type": "reason_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "four_d": {
+          "name": "four_d",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duty_type": {
+          "name": "duty_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sub_reason": {
+          "name": "sub_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_type": {
+          "name": "report_sick_type",
+          "type": "report_sick_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_days": {
+          "name": "num_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_permanent": {
+          "name": "is_permanent",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "in_camp": {
+          "name": "in_camp",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_line": {
+          "name": "source_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "personnel_rows_submission_idx": {
+          "name": "personnel_rows_submission_idx",
+          "columns": [
+            {
+              "expression": "parade_response_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "personnel_rows_parade_response_id_parade_submissions_parade_response_id_fk": {
+          "name": "personnel_rows_parade_response_id_parade_submissions_parade_response_id_fk",
+          "tableFrom": "personnel_rows",
+          "tableTo": "parade_submissions",
+          "columnsFrom": [
+            "parade_response_id"
+          ],
+          "columnsTo": [
+            "parade_response_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "personnel_rows_num_days_non_negative": {
+          "name": "personnel_rows_num_days_non_negative",
+          "value": "\"personnel_rows\".\"num_days\" is null or \"personnel_rows\".\"num_days\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.raw_messages": {
+      "name": "raw_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "raw_messages_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "wa_message_id": {
+          "name": "wa_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parser": {
+          "name": "parser",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parse_ms": {
+          "name": "parse_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "raw_messages_due_idx": {
+          "name": "raw_messages_due_idx",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"raw_messages\".\"processed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "raw_messages_wa_message_id_unique": {
+          "name": "raw_messages_wa_message_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "wa_message_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.report_sick_formsg": {
+      "name": "report_sick_formsg",
+      "schema": "",
+      "columns": {
+        "response_id": {
+          "name": "response_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "four_d": {
+          "name": "four_d",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_coy": {
+          "name": "unit_coy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_time": {
+          "name": "report_sick_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_type": {
+          "name": "report_sick_type",
+          "type": "report_sick_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symptoms": {
+          "name": "symptoms",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genuine": {
+          "name": "genuine",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "outcome",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mc_days": {
+          "name": "mc_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_1": {
+          "name": "status_1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_1_days": {
+          "name": "status_1_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_2": {
+          "name": "status_2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_2_days": {
+          "name": "status_2_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_3": {
+          "name": "status_3",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_3_days": {
+          "name": "status_3_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_4": {
+          "name": "status_4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_4_days": {
+          "name": "status_4_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_5": {
+          "name": "status_5",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_5_days": {
+          "name": "status_5_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company": {
+          "name": "company",
+          "type": "company",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_sick_date": {
+          "name": "report_sick_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "symptom_category": {
+          "name": "symptom_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symptom_other_text": {
+          "name": "symptom_other_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "report_sick_formsg_mc_days_sane": {
+          "name": "report_sick_formsg_mc_days_sane",
+          "value": "\"report_sick_formsg\".\"mc_days\" is null or \"report_sick_formsg\".\"mc_days\" between 0 and 180"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.section_counts": {
+      "name": "section_counts",
+      "schema": "",
+      "columns": {
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_label": {
+          "name": "unit_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason_category": {
+          "name": "reason_category",
+          "type": "reason_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stated_count": {
+          "name": "stated_count",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "section_counts_parade_response_id_parade_submissions_parade_response_id_fk": {
+          "name": "section_counts_parade_response_id_parade_submissions_parade_response_id_fk",
+          "tableFrom": "section_counts",
+          "tableTo": "parade_submissions",
+          "columnsFrom": [
+            "parade_response_id"
+          ],
+          "columnsTo": [
+            "parade_response_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "section_counts_pk": {
+          "name": "section_counts_pk",
+          "columns": [
+            "parade_response_id",
+            "unit_label",
+            "reason_category"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.settings": {
+      "name": "settings",
+      "schema": "",
+      "columns": {
+        "section": {
+          "name": "section",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sft_formsg": {
+      "name": "sft_formsg",
+      "schema": "",
+      "columns": {
+        "response_id": {
+          "name": "response_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_coy": {
+          "name": "unit_coy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company": {
+          "name": "company",
+          "type": "company",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "group_ic": {
+          "name": "group_ic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pes_status": {
+          "name": "pes_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "informed_commander": {
+          "name": "informed_commander",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exercises": {
+          "name": "exercises",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sfabt_type": {
+          "name": "sfabt_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "window_confirmed": {
+          "name": "window_confirmed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sft_date": {
+          "name": "sft_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sft_formsg_date_idx": {
+          "name": "sft_formsg_date_idx",
+          "columns": [
+            {
+              "expression": "sft_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.strength_rows": {
+      "name": "strength_rows",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "strength_rows_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "parade_response_id": {
+          "name": "parade_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_label": {
+          "name": "unit_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_type": {
+          "name": "unit_type",
+          "type": "unit_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_strength": {
+          "name": "total_strength",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_present": {
+          "name": "total_present",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "officer_strength": {
+          "name": "officer_strength",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "officer_present": {
+          "name": "officer_present",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wospec_strength": {
+          "name": "wospec_strength",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wospec_present": {
+          "name": "wospec_present",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enlistee_strength": {
+          "name": "enlistee_strength",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enlistee_present": {
+          "name": "enlistee_present",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "strength_rows_submission_idx": {
+          "name": "strength_rows_submission_idx",
+          "columns": [
+            {
+              "expression": "parade_response_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "strength_rows_parade_response_id_parade_submissions_parade_response_id_fk": {
+          "name": "strength_rows_parade_response_id_parade_submissions_parade_response_id_fk",
+          "tableFrom": "strength_rows",
+          "tableTo": "parade_submissions",
+          "columnsFrom": [
+            "parade_response_id"
+          ],
+          "columnsTo": [
+            "parade_response_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "strength_rows_non_negative": {
+          "name": "strength_rows_non_negative",
+          "value": "\"strength_rows\".\"total_strength\" >= 0 and \"strength_rows\".\"total_present\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.company": {
+      "name": "company",
+      "schema": "public",
+      "values": [
+        "Archer",
+        "Braves",
+        "Cougar",
+        "Stallion",
+        "Hercules"
+      ]
+    },
+    "public.outcome": {
+      "name": "outcome",
+      "schema": "public",
+      "values": [
+        "MC",
+        "Status",
+        "Both",
+        "None"
+      ]
+    },
+    "public.reason_category": {
+      "name": "reason_category",
+      "schema": "public",
+      "values": [
+        "Att C",
+        "Status",
+        "Report Sick",
+        "MA",
+        "Off/Leave",
+        "Others"
+      ]
+    },
+    "public.report_sick_type": {
+      "name": "report_sick_type",
+      "schema": "public",
+      "values": [
+        "RSI",
+        "RSO",
+        "MR",
+        "FFI",
+        "PENDING"
+      ]
+    },
+    "public.role_kind": {
+      "name": "role_kind",
+      "schema": "public",
+      "values": [
+        "CDO",
+        "CDS",
+        "COS",
+        "PDS"
+      ]
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "public",
+      "values": [
+        "FPS",
+        "LPS"
+      ]
+    },
+    "public.unit_type": {
+      "name": "unit_type",
+      "schema": "public",
+      "values": [
+        "Company",
+        "HQ",
+        "PLATOON",
+        "SUBUNIT"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -15,6 +15,7 @@ import './theme/shell.css';
 import './theme/components.css';
 import { Router } from './app/Router.jsx';
 import { resume } from './app/auth.js';
+import { startTelemetry } from './app/telemetry.js';
 import * as state from './app/state.js';
 
 /*
@@ -30,5 +31,6 @@ if (import.meta.env.DEV) {
   window.__dashboard = state;
 }
 
+startTelemetry();
 render(<Router />, document.getElementById('app'));
 resume();

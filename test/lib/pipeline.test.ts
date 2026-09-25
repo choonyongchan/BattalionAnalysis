@@ -97,6 +97,18 @@ describe('parseBody', () => {
     expect(calls).toEqual([DOUBTFUL]);
   });
 
+  test.each([
+    ['the rules settle it', GOOD, null, 'deterministic'],
+    ['the rules are unsure and no model is set', DOUBTFUL, null, 'deterministic'],
+    ['the model reads it', DOUBTFUL, MODEL_READING, 'gpt-test'],
+    ['the model fails', DOUBTFUL, new Error('HTTP 500'), 'gpt-test'],
+  ] as const)('every parse is timed and names its parser when %s', async (_name, text, answer, parser) => {
+    const model = answer === null ? null : fakeModel(answer as Extraction | Error).model;
+    const parsed = await parseBody(text, FULL.date, model);
+    expect(parsed.parser).toBe(parser);
+    expect(Number.isInteger(parsed.parseMs) && parsed.parseMs >= 0).toBe(true);
+  });
+
   test('a failed model call keeps the rules’ reasons and adds its own', async () => {
     const parsed = await parseBody(DOUBTFUL, FULL.date, fakeModel(new Error('HTTP 500')).model);
     const problems = parsed.status === 'needs_review' ? parsed.problems.join(' | ') : '';
@@ -151,7 +163,8 @@ describe.skipIf(!hasTestDb)('against the test database', () => {
 
         expect(outcome).toMatchObject({ status: 'parsed', paradeResponseId: expectedKey(spec), counts: expectedCounts(spec) });
         await expectRowsOf(spec);
-        expect(await message(outcome.id)).toMatchObject({ paradeResponseId: expectedKey(spec), error: null });
+        expect(await message(outcome.id)).toMatchObject({ paradeResponseId: expectedKey(spec), error: null, parser: 'deterministic' });
+        expect((await message(outcome.id))!.parseMs).toBeGreaterThanOrEqual(0);
         const [submission] = await db.select().from(paradeSubmissions);
         expect(submission).toMatchObject({ company: spec.company, date: spec.date, session: 'FPS', model: 'deterministic' });
       },
@@ -173,6 +186,7 @@ describe.skipIf(!hasTestDb)('against the test database', () => {
       expect(outcome.status).toBe('needs_review');
       expect((await message(outcome.id))!.error).toStartWith('Needs review: ');
       expect((await message(outcome.id))!.processedAt).not.toBeNull();
+      expect(await message(outcome.id)).toMatchObject({ parser: 'deterministic', parseMs: expect.any(Number) });
       expect(await countRows(db, 'parade_submissions')).toBe(0);
     }, DB_TIMEOUT_MS);
 

@@ -147,9 +147,12 @@ async function readMessage(
  * @returns 200 when rows exist, 404 for an unknown id, 422 when a person must correct the text.
  */
 function outcomeResponse(outcome: IngestOutcome): Response {
-  if (outcome.status === 'parsed' || outcome.status === 'already_parsed') return reply(200, outcome);
+  if (outcome.status === 'already_parsed') return reply(200, outcome);
   if (outcome.status === 'not_found') return reply(404, { error: 'No such message.' });
-  return reply(422, outcome);
+  // Only the parser, the duration and the status: nothing that could quote a personnel line.
+  console.log('[api/parade] parse', JSON.stringify({ parser: outcome.parser, ms: outcome.parseMs, status: outcome.status }));
+  const timing = { 'Server-Timing': `parse;dur=${outcome.parseMs};desc="${outcome.parser}"` };
+  return json(outcome.status === 'parsed' ? 200 : 422, outcome, { ...NO_STORE, ...timing });
 }
 
 /**

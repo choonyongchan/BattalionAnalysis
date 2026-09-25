@@ -64,6 +64,10 @@ export const rawMessages = pgTable(
     paradeResponseId: text('parade_response_id'),
     error: text('error'),
     processedAt: timestamp('processed_at', tz),
+    /** Which parser last read the body: `deterministic` or the model id. */
+    parser: text('parser'),
+    /** How long that parse took, in milliseconds. */
+    parseMs: integer('parse_ms'),
   },
   (t) => [index('raw_messages_due_idx').on(t.id).where(sql`${t.processedAt} is null`)],
 );

@@ -39,25 +39,33 @@ export type RecordOutcome =
   | { status: 'duplicate'; id: number }
   | { status: 'already_processed'; id: number; paradeResponseId: string | null; error: string | null };
 
-/** How one message's text parsed, before anything is written. */
-export type Parsed =
-  | { status: 'parsed'; extraction: Extraction; paradeResponseId: string; parser: string }
+/**
+ * Which parser last read a message (`deterministic` or the model id) and how long parsing
+ * took, in milliseconds. Stored on `raw_messages` for every parse, successful or not.
+ */
+export type Timing = { parser: string; parseMs: number };
+
+/** A parse outcome and the parser that settled it, before it is timed. */
+type Untimed = (
+  | { status: 'parsed'; extraction: Extraction; paradeResponseId: string }
   | { status: 'rejected'; reason: string }
   | { status: 'needs_review'; problems: string[] }
-  | { status: 'invalid'; reason: string };
+  | { status: 'invalid'; reason: string }
+) & { parser: string };
+
+/** How one message's text parsed, before anything is written. */
+export type Parsed = Untimed & Timing;
 
 /** What became of a message handed to `ingestMessage` or `editMessage`. */
 export type IngestOutcome =
-  | {
+  | ({
       status: 'parsed';
       id: number;
       paradeResponseId: string;
       counts: { strength: number; personnel: number; roster: number; sectionCounts: number };
-    }
+    } & Timing)
   | { status: 'already_parsed'; id: number; paradeResponseId: string }
-  | { status: 'rejected'; id: number; reason: string }
-  | { status: 'needs_review'; id: number; problems: string[] }
-  | { status: 'invalid'; id: number; reason: string }
+  | ({ id: number } & Exclude<Parsed, { status: 'parsed' }>)
   | { status: 'not_found'; id: number };
 
 /** One stored message as the dashboard lists it. Carries no body. */
@@ -119,22 +127,36 @@ export async function recordMessage(
 
 /**
  * Parses message text without touching the database: the rules first, the model when the
- * rules are unsure and a model is configured.
+ * rules are unsure and a model is configured. Times the whole parse.
  *
  * @param body The message text.
  * @param today The receipt date, `yyyy-MM-dd`, that two-digit years resolve against.
  * @param model The model fallback, or null to leave doubtful messages for review.
- * @returns The extraction and its key, or why there is none.
+ * @returns The extraction and its key, or why there is none, with its timing.
  */
 export async function parseBody(body: string, today: string, model: ModelParser | null = null): Promise<Parsed> {
+  const started = performance.now();
+  const parsed = await parseUntimed(body, today, model);
+  return { ...parsed, parseMs: Math.round(performance.now() - started) };
+}
+
+/**
+ * `parseBody` without the timing.
+ *
+ * @param body The message text.
+ * @param today The receipt date, `yyyy-MM-dd`.
+ * @param model The model fallback, or null.
+ * @returns The parse outcome and the parser that settled it.
+ */
+async function parseUntimed(body: string, today: string, model: ModelParser | null): Promise<Untimed> {
   const rules = parseParadeState(body, today);
   if (rules.problems.length === 0) return settleExtraction(rules.extraction, PARSER_NAME);
-  if (!model) return { status: 'needs_review', problems: rules.problems };
+  if (!model) return { status: 'needs_review', problems: rules.problems, parser: PARSER_NAME };
   try {
     return settleExtraction(await model.parse(body, today), model.model);
   } catch (error) {
     const why = error instanceof Error ? error.message : String(error);
-    return { status: 'needs_review', problems: [...rules.problems, `Model fallback failed: ${why}`] };
+    return { status: 'needs_review', problems: [...rules.problems, `Model fallback failed: ${why}`], parser: model.model };
   }
 }
 
@@ -145,10 +167,10 @@ export async function parseBody(body: string, today: string, model: ModelParser 
  * @param parser Which parser returned it, recorded on the submission.
  * @returns The parse outcome.
  */
-function settleExtraction(extraction: Extraction, parser: string): Parsed {
+function settleExtraction(extraction: Extraction, parser: string): Untimed {
   const reason = validate(extraction);
   if (reason !== '') {
-    return extraction.rejected ? { status: 'rejected', reason } : { status: 'invalid', reason };
+    return extraction.rejected ? { status: 'rejected', reason, parser } : { status: 'invalid', reason, parser };
   }
   return {
     status: 'parsed',
@@ -285,7 +307,7 @@ export async function getMessage(db: Db, id: number): Promise<{ id: number; body
  */
 async function settle(db: Db, id: number, parsed: Parsed): Promise<IngestOutcome> {
   if (parsed.status === 'parsed') return write(db, id, parsed);
-  await markFailed(db, id, failureText(parsed));
+  await markFailed(db, id, failureText(parsed), { parser: parsed.parser, parseMs: parsed.parseMs });
   return withId(id, parsed);
 }
 
@@ -306,8 +328,10 @@ async function write(
 ): Promise<IngestOutcome> {
   const key = parsed.paradeResponseId;
   const rows = buildRows(parsed.extraction, { paradeResponseId: key, sourceMessageId: id, model: parsed.parser });
-  await writeSubmission(db, id, key, rows, body);
+  const timing = { parser: parsed.parser, parseMs: parsed.parseMs };
+  await writeSubmission(db, id, key, rows, timing, body);
   return {
+    ...timing,
     status: 'parsed',
     id,
     paradeResponseId: key,
@@ -335,6 +359,7 @@ async function write(
  * @param messageId The raw message being parsed.
  * @param key The submission key.
  * @param rows The rows to write.
+ * @param timing How the message was parsed.
  * @param body Replacement text for the message, when editing; the text is left alone otherwise.
  */
 async function writeSubmission(
@@ -342,6 +367,7 @@ async function writeSubmission(
   messageId: number,
   key: string,
   rows: ReturnType<typeof buildRows>,
+  timing: Timing,
   body?: string,
 ): Promise<void> {
   const statements: unknown[] = [
@@ -372,7 +398,13 @@ async function writeSubmission(
   statements.push(
     db
       .update(rawMessages)
-      .set({ paradeResponseId: key, error: null, processedAt: sql`now()`, ...(body === undefined ? {} : { body }) })
+      .set({
+        paradeResponseId: key,
+        error: null,
+        processedAt: sql`now()`,
+        ...timing,
+        ...(body === undefined ? {} : { body }),
+      })
       .where(eq(rawMessages.id, messageId)),
   );
 
@@ -385,11 +417,12 @@ async function writeSubmission(
  * @param db A read-write database handle.
  * @param messageId The message.
  * @param reason The reason, written verbatim for whoever corrects it.
+ * @param timing How the message was parsed.
  */
-async function markFailed(db: Db, messageId: number, reason: string): Promise<void> {
+async function markFailed(db: Db, messageId: number, reason: string, timing: Timing): Promise<void> {
   await db
     .update(rawMessages)
-    .set({ error: reason.slice(0, 2000), processedAt: sql`now()` })
+    .set({ error: reason.slice(0, 2000), processedAt: sql`now()`, ...timing })
     .where(eq(rawMessages.id, messageId));
 }
 

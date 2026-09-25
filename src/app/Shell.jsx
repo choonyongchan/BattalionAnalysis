@@ -13,6 +13,7 @@ import { Logo } from './Logo.jsx';
 import { MenuIcon } from './icons.jsx';
 import { routeAt } from './routes.js';
 import { startAutoRefresh } from './auth.js';
+import { trackPage } from './telemetry.js';
 import { dataset } from './state.js';
 import { unitSettings } from '../data/settings.js';
 
@@ -30,6 +31,7 @@ export function Shell({ children }) {
   // navigated to, and leaving it open would hide the answer the tap asked for.
   useEffect(() => {
     setRailOpen(false);
+    trackPage(location);
   }, [location]);
 
   // The shell exists only while the dashboard is unlocked, so it owns the polling.

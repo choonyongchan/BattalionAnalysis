@@ -1,5 +1,7 @@
 # Battalion Analysis
 
+[![codecov](https://codecov.io/gh/choonyongchan/BattalionDataAnalysis/graph/badge.svg)](https://codecov.io/gh/choonyongchan/BattalionDataAnalysis)
+
 Parade states (WhatsApp, or deposited on the dashboard), report-sick submissions (FormSG,
 webhook `/api/reportsick`) and Self-Regulated Fitness Training submissions (FormSG, webhook
 `/api/sft`) into Neon Postgres, and a dashboard over them, deployed on Vercel.

@@ -24,3 +24,6 @@ parade-state-example/*
 parade-state-example.txt
 parade_state_template_new.md
 *.csv
+
+# bun test --coverage output.
+coverage/

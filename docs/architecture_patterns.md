@@ -111,7 +111,7 @@ Layers, dependency direction strictly downward:
 |---|---|---|
 | `pages/` | one file per page; `pages/shared/` for the three category pages | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
-| `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`) | `data/`, `theme/` |
+| `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`), Vercel Web Analytics and Speed Insights (`telemetry.js`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
 | `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the `/api/parade` calls (`parade.js`), which take the auth header from the page | `model/` |
 | `model/` | every number and rule; pure functions, no DOM, no network | other `model/` files |
 
@@ -126,9 +126,22 @@ its default, and is what `lib/settings.ts#readSettings` uses on the server), and
 (the settings in force for the currently loaded dashboard, which `src/data/feed.js` sets from
 each `/api/dashboard` reply and `src/data/settings.js#unitSettings`/`refreshMs` read).
 
+Every parse, successful or not, records its parser (`deterministic` or the model id) and
+duration on `raw_messages.parser` / `parse_ms`; `api/parade.ts` also returns them in a
+`Server-Timing` header and logs one line of parser, milliseconds and status. To see where the
+time goes:
+
+```sql
+select parser, count(*), percentile_cont(0.5) within group (order by parse_ms) as median_ms, max(parse_ms)
+from raw_messages where parser is not null group by parser;
+```
+
 ## Testing
 
 `bun test` from the repo root (`./test/`; the WhatsApp bridge's tests are in `./test/whatsapp/`).
+`bun run test:coverage` writes `coverage/lcov.info` (settings in `bunfig.toml`); `.github/workflows/ci.yml`
+runs it on every push and pull request to `main` and uploads it to Codecov (`CODECOV_TOKEN`;
+the DB suites run there only when the `TEST_DATABASE_URL` secret is set).
 
 - **Pure suites always run**, offline: the parser, FormSG mapping (with the real SDK in its
   `test` mode), the dashboard model, the bridge's helpers, and every refusal a route makes

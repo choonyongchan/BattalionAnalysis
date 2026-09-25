@@ -13,9 +13,10 @@
  * given a shape rather than a frozen button.
  */
 
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Logo } from '../app/Logo.jsx';
 import { unlock } from '../app/auth.js';
+import { trackPage } from '../app/telemetry.js';
 import { loadError, status } from '../app/state.js';
 import { LoadingProgress } from '../components/LoadingProgress.jsx';
 
@@ -44,6 +45,8 @@ export function Login() {
   const inputRef = useRef(null);
   const [typed, setTyped] = useState('');
   const busy = status.value === 'loading';
+
+  useEffect(() => trackPage('/login'), []);
 
   /**
    * Sends the typed password and clears the field either way.
