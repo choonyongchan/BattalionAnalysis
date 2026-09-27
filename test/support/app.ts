@@ -5,13 +5,14 @@
  */
 import { handle as handleDashboard } from '../../api/dashboard.ts';
 import { handle as handleReportSick } from '../../api/reportsick.ts';
-import { handle as handleSft } from '../../api/sft.ts';
+import { handle as handleSft, type Deps as SftDeps } from '../../api/sft.ts';
 import { handle as handleParade, type Deps as ParadeDeps } from '../../api/parade.ts';
 import { handle as handleSession } from '../../api/session.ts';
 import { handle as handleSettings } from '../../api/settings.ts';
 import type { Db } from '../../db/index.ts';
 import { loadTabs } from '../../lib/dashboard.ts';
 import { readSettings, resetSection, saveSection } from '../../lib/settings.ts';
+import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../lib/sft.ts';
 import {
   deleteMessage,
   editMessage,
@@ -54,6 +55,27 @@ export function paradeDeps(db: Db, options: { now?: () => Date; model?: ModelPar
   };
 }
 
+/**
+ * The SFT route's dependencies over a real database, as `api/sft.ts#route` builds them.
+ *
+ * @param db The database.
+ * @returns The deps.
+ */
+export function sftDeps(db: Db): SftDeps {
+  return {
+    db,
+    secretKey: SFT_FORM_KEYS.secretKey,
+    postUri: SFT_POST_URI,
+    sdk: testSdk,
+    records: {
+      list: () => listSftRecords(db),
+      update: (id, edit) => updateSftRecord(db, id, edit),
+      remove: (id) => deleteSftRecord(db, id),
+    },
+    dashboardPassword: DASHBOARD_PASSWORD,
+  };
+}
+
 /** A running copy of the app on a local port. */
 export interface RunningApp {
   origin: string;
@@ -91,7 +113,7 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {})
         return handleReportSick(request, { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
       }
       if (path === '/api/sft') {
-        return handleSft(request, { db, secretKey: SFT_FORM_KEYS.secretKey, postUri: SFT_POST_URI, sdk: testSdk });
+        return handleSft(request, sftDeps(db));
       }
       if (path === '/api/settings') {
         return handleSettings(request, {

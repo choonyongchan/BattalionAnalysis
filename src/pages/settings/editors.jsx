@@ -18,7 +18,7 @@ import { MAX_LOGO_CHARS, errorAt } from '../../model/settings/validate.js';
  *     and the input.
  * @returns {!preact.VNode} The field.
  */
-function Field({ label, error, children }) {
+export function Field({ label, error, children }) {
   return (
     <label class="settings-field">
       <span class="field__label">{label}</span>

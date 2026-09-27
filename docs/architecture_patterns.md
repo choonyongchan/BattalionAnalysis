@@ -13,15 +13,15 @@ the Sheet any more: its history was imported once by `scripts/import-sheet.ts`.
 | Path | Runtime | Owns |
 |---|---|---|
 | `db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `settings` holds one JSONB row per Settings-page section. `scripts/apply-migrations.ts` records each migration's SHA-256 of its LF-normalised text, and counts a migration as applied when either that hash or the hash of its CRLF form is recorded (files applied from a CRLF checkout were recorded by their CRLF bytes); `.gitattributes` marks `db/migrations/*.sql` `-text` so checkouts keep the committed bytes |
-| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/` (`webhook.ts` the shared FormSG route, `sdk.ts`, `decrypt.ts`, one mapper per form: `map.ts` report sick, `sft.ts` SFT), `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookies), `settings.ts` (read, save and reset settings sections), `domain.ts` |
+| `lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/` (`webhook.ts` the shared FormSG route, `sdk.ts`, `decrypt.ts`, one mapper per form: `map.ts` report sick, `sft.ts` SFT), `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `sft.ts` (list, correct and delete stored SFT records, for `api/sft.ts`), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookies, and `isDashboardCaller`, the check `api/parade.ts` and `api/sft.ts` both authorise the dashboard with), `settings.ts` (read, save and reset settings sections), `domain.ts` |
 | `api/reportsick.ts` | Vercel Function | FormSG report-sick webhook (`FORMSG_SECRET_KEY`, `FORMSG_POST_URI`): insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
-| `api/sft.ts` | Vercel Function | FormSG Self-Regulated Fitness Training webhook, a separate form with its own key (`FORMSG_SFT_SECRET_KEY`, `FORMSG_SFT_POST_URI`): insert one row into `sft_formsg` (mapped by `lib/formsg/sft.ts`, plus derived `company`, `sft_date` (SGT)) |
+| `api/sft.ts` | Vercel Function | FormSG Self-Regulated Fitness Training webhook, a separate form with its own key (`FORMSG_SFT_SECRET_KEY`, `FORMSG_SFT_POST_URI`): POST inserts one row into `sft_formsg` (mapped by `lib/formsg/sft.ts`, plus derived `company`, `sft_date` (SGT)). GET/PUT/DELETE list, correct and delete records for the Deposit page (`DASHBOARD_PASSWORD` session, same-origin writes; `lib/sft.ts`). A correction is checked by `src/model/sftEdit.js#validateSftEdit` (the page runs it too) and the NRIC-shape refusal, and re-derives `name_key`, `unit_coy`/`company` and `sft_date` as the insert does. FormSG is the only way a record is created |
 | `api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `lib/dashboard.ts#loadTabs` and the settings in force from `lib/settings.ts#readSettings`, plus `canEdit` |
 | `api/settings.ts` | Vercel Function | Saves and resets one settings section: PUT/DELETE, the `settings_session` cookie (from `SETTINGS_PASSWORD`) and a same-origin request; validates with `src/model/settings/validate.js` |
 | `api/session.ts` | Vercel Function | The dashboard's login: POST accepts `DASHBOARD_PASSWORD` (read) or `SETTINGS_PASSWORD` (read-write, which also sets `settings_session`); the session's length comes from the Session settings (`lib/session.ts`); DELETE ends it. The only route a password is sent to |
 | `api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
 | `whatsapp/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run whatsapp` (root `package.json`, env from `.env.whatsapp`), or in the background via `bun run whatsapp:service install` (a SYSTEM scheduled task) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `api/parade.ts`; it holds no database credentials |
-| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Deposit page writes through `api/parade.ts`. See `docs/dashboard.md` |
+| `src/`, `index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `api/dashboard.ts`; the Deposit page writes parade states through `api/parade.ts` and SFT corrections through `api/sft.ts`. See `docs/dashboard.md` |
 | `scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `db/grants*.sql` without psql), `import-sheet.ts` (one-time, idempotent import of the Sheet's CSV exports) |
 
 ## How parade states are parsed
@@ -66,7 +66,8 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
 
 - **One write path per stream.** Parade-state rows are written only by `lib/pipeline.ts`
   (called from `api/parade.ts`); report-sick rows only by `api/reportsick.ts`; SFT rows only
-  by `api/sft.ts`. Both FormSG routes are thin: verify → decrypt → map → NRIC-shape refusal →
+  by `api/sft.ts` (the webhook's insert, and the Deposit page's corrections and deletes through
+  `lib/sft.ts`). Both FormSG routes are thin: verify → decrypt → map → NRIC-shape refusal →
   insert is `lib/formsg/webhook.ts#handleWebhook`, and each route supplies only its table,
   mapper and env vars. Callers never re-implement any of these.
 - **One write path for settings.** `settings` rows are written only by `api/settings.ts`.
@@ -109,10 +110,10 @@ Layers, dependency direction strictly downward:
 
 | Layer | Holds | May import |
 |---|---|---|
-| `pages/` | one file per page; `pages/shared/` for the three category pages | everything below |
+| `pages/` | one file per page; `pages/shared/` for the three category pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
 | `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`), Vercel Web Analytics and Speed Insights (`telemetry.js`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
-| `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the `/api/parade` calls (`parade.js`), which take the auth header from the page | `model/` |
+| `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the Deposit page's `/api/parade` and `/api/sft` calls (`parade.js`, `sft.js`), both through `api.js#callJson`, carrying the session cookie | `model/` |
 | `model/` | every number and rule; pure functions, no DOM, no network | other `model/` files |
 
 `model/` is the only layer under test and the only place a wrong number can come from. Every

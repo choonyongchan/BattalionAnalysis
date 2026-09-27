@@ -14,16 +14,19 @@ import { loadAll } from '../../src/data/feed.js';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../src/data/parade.js';
 import { endSession, startSession } from '../../src/data/session.js';
 import { saveSection } from '../../src/data/settings.js';
+import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../src/data/sft.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
 import { battalionStrength, dutyCountsOn } from '../../src/model/metrics.js';
 import { MESSAGE_STATUS, toMessageRows } from '../../src/model/paradeMessages.js';
+import { toEditForm } from '../../src/model/sftEdit.js';
+import { toSftRecords } from '../../src/model/sft.js';
 import { loadConfig } from '../../whatsapp/src/config.js';
 import { createMessageHandler } from '../../whatsapp/src/index.js';
 import { createIngestor } from '../../whatsapp/src/ingest.js';
 import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
 import { DASHBOARD_PASSWORD, INGEST_SECRET, SETTINGS_PASSWORD, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
-import { FAKE_NRIC, SICK_SPECS, webhookRequest } from '../support/formsg.ts';
+import { FAKE_NRIC, SFT_SPECS, SICK_SPECS, sftWebhookRequest, webhookRequest } from '../support/formsg.ts';
 import { allEntries, companyTotals, expectedKey, renderParadeState, type ParadeSpec, type Section } from '../support/paradeState.ts';
 import { DOUBTFUL_EDITS, SCENARIO_DATE, SCENARIOS } from '../support/scenarios.ts';
 
@@ -218,6 +221,31 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     expect(data.formSg.map((row: any) => row['[Myinfo] Name']).sort()).toEqual(SICK_SPECS.map((spec) => spec.name).sort());
     expect(data.available.formSg).toBe(true);
     expect(JSON.stringify(data)).not.toContain(FAKE_NRIC);
+  }, E2E_TIMEOUT_MS);
+
+  test('SFT: FormSG sends a record, the Deposit page corrects it and deletes one, as the SFT page sees it', async () => {
+    await unlock(app.origin);
+    for (const spec of SFT_SPECS) {
+      const signed = sftWebhookRequest(spec);
+      const response = await fetch(`${app.origin}/api/sft`, { method: 'POST', headers: signed.headers, body: await signed.text() });
+      expect(response.status).toBe(200);
+    }
+    const [wrong, extra] = [SFT_SPECS[0]!, SFT_SPECS[1]!];
+    await withOrigin(app.origin, async () => {
+      const records: any[] = await listSftRecords();
+      expect(records.map((record) => record.responseId).sort()).toEqual(SFT_SPECS.map((spec) => spec.submissionId).sort());
+      const stored = records.find((record) => record.responseId === wrong.submissionId);
+      // The soldier picked the wrong company and misspelt the place.
+      const answer: any = await updateSftRecord(wrong.submissionId, { ...toEditForm(stored), company: 'Cougar', location: 'Camp Track' });
+      expect(answer.status).toBe('updated');
+      await deleteSftRecord(extra.submissionId);
+    });
+
+    const shown: any[] = toSftRecords((await dashboardOn(app.origin, SCENARIO_DATE)).data.sft);
+    expect(shown.length).toBe(SFT_SPECS.length - 1);
+    expect(shown.map((record) => record.name)).not.toContain(extra.name);
+    const moved = shown.filter((record) => record.company === 'Cougar');
+    expect(moved.map((record) => [record.name, record.date, record.location])).toEqual([[wrong.name, '2026-09-18', 'Camp Track']]);
   }, E2E_TIMEOUT_MS);
 
   test('a wrong password opens no session, and no session reads nothing', async () => {

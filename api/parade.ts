@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
 import { OpenAiParser } from '../lib/parser/llm.ts';
 import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
-import { hasSession, isSameOrigin } from '../lib/session.ts';
+import { hasSession, isDashboardCaller } from '../lib/session.ts';
 import {
   deleteMessage,
   editMessage,
@@ -84,15 +84,11 @@ function reply(status: number, body: unknown): Response {
  */
 function callerOf(request: Request, deps: Deps): Caller | null {
   const now = (deps.now ?? (() => Date.now()))();
-  if (hasSession(request, deps.dashboardPassword, now)) {
-    if (request.method === 'GET' || isSameOrigin(request)) return 'dashboard';
-    return null;
-  }
+  if (isDashboardCaller(request, deps.dashboardPassword, now)) return 'dashboard';
+  // A session that was refused (a cross-site write) is not given a second chance as the relay.
+  if (hasSession(request, deps.dashboardPassword, now)) return null;
   const token = bearerToken(request);
-  if (!token) return null;
-  if (deps.dashboardPassword && sameSecret(token, deps.dashboardPassword)) return 'dashboard';
-  if (deps.ingestSecret && sameSecret(token, deps.ingestSecret)) return 'relay';
-  return null;
+  return token && deps.ingestSecret && sameSecret(token, deps.ingestSecret) ? 'relay' : null;
 }
 
 /**

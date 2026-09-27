@@ -27,6 +27,16 @@ function compareValues_(a, b) {
 }
 
 /**
+ * The direction a column sorts in when first picked: its `defaultDir`, else largest first
+ * for a number and A→Z for text.
+ * @param {{numeric?: boolean, defaultDir?: string}} column The column definition.
+ * @returns {string} 'asc' or 'desc'.
+ */
+function firstDirOf_(column) {
+  return column.defaultDir || (column.numeric ? 'desc' : 'asc');
+}
+
+/**
  * The value a row contributes to sorting on a column.
  * @param {{key: string, sortValue?: function(!Object): *}} column The column definition.
  * @param {!Object} row The row.
@@ -39,11 +49,13 @@ function sortValueOf_(column, row) {
 /**
  * Renders a table from column definitions and rows.
  * @param {{columns: Array<{key: string, label: string, numeric?: boolean,
- *     sortable?: boolean, sortValue?: function(!Object): *}>, rows: Array<!Object>,
+ *     sortable?: boolean, sortValue?: function(!Object): *, defaultDir?: string}>,
+ *     rows: Array<!Object>,
  *     rowKey?: function(!Object, number): (string|number)}} props
  *     `columns` names each field to show, whether it right-aligns as a number, and whether
  *     it can be sorted (with an optional `sortValue` reading the raw comparable behind a
- *     pre-formatted cell); `rows` are plain objects read by `columns[].key`; `rowKey`
+ *     pre-formatted cell, and an optional `defaultDir` of 'asc' or 'desc' it first sorts
+ *     in); `rows` are plain objects read by `columns[].key`; `rowKey`
  *     picks a key, defaulting to the row's index.
  * @returns {!preact.VNode} The table, scroll-boxed.
  */
@@ -52,7 +64,7 @@ export function DataTable({ columns, rows, rowKey }) {
   const firstSortable = sortableColumns[0];
   const [sort, setSort] = useState(
     firstSortable
-      ? { key: firstSortable.key, dir: firstSortable.numeric ? 'desc' : 'asc' }
+      ? { key: firstSortable.key, dir: firstDirOf_(firstSortable) }
       : null
   );
 
@@ -61,7 +73,7 @@ export function DataTable({ columns, rows, rowKey }) {
     setSort((current) =>
       current && current.key === column.key
         ? { key: column.key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-        : { key: column.key, dir: column.numeric ? 'desc' : 'asc' }
+        : { key: column.key, dir: firstDirOf_(column) }
     );
   };
 

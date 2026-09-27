@@ -1,11 +1,8 @@
 /**
- * The Deposit page's calls to `/api/parade`, the Vercel intake.
- *
- * Same-origin, like `/api/dashboard`, so the session cookie `api/session.ts` issued goes
- * with every call and nothing here handles a credential. `credentials: 'same-origin'` is
- * the fetch default, and is written out because it is the thing that makes these calls
- * work at all.
+ * The Deposit page's calls to `/api/parade`, the Vercel intake, through `api.js#callJson`.
  */
+
+import { callJson } from './api.js';
 
 /** @type {string} The intake route, served by the same Vercel deployment as this page. */
 const API = '/api/parade';
@@ -22,30 +19,15 @@ const HTTP_ERRORS = {
 };
 
 /**
- * Calls the intake and reads its JSON answer.
- *
- * A 422 is not thrown: it is the parser saying what to correct, which the page shows.
+ * Calls the intake.
  * @param {string} method The HTTP method.
  * @param {string} query The query string, e.g. '?id=4', or ''.
  * @param {!Object=} body The JSON body, if any.
  * @returns {!Promise<!Object>} The parsed answer.
  * @throws {Error} With a readable message, for anything but a 2xx or 422.
  */
-async function call(method, query, body) {
-  let response;
-  try {
-    response = await fetch(API + query, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    throw new Error('Could not reach the intake. Check the connection and try again.');
-  }
-  const answer = await response.json().catch(() => ({}));
-  if (response.ok || response.status === 422) return answer;
-  throw new Error(HTTP_ERRORS[response.status] || answer.error || `The intake answered ${response.status}.`);
+function call(method, query, body) {
+  return callJson(API, method, query, body, HTTP_ERRORS);
 }
 
 /**

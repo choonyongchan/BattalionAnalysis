@@ -16,6 +16,7 @@
  * and a signature needs none.
  */
 import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
+import { bearerToken, sameSecret } from './http.ts';
 
 /** The cookie the token travels in. */
 export const SESSION_COOKIE = 'dashboard_session';
@@ -169,6 +170,25 @@ export function isSameOrigin(request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether a request is the dashboard, allowed to read or change what `/api/parade` and
+ * `/api/sft` manage.
+ *
+ * A session cookie counts on a read, or on a write from this deployment's own origin (see
+ * `isSameOrigin`). A script or a test has no cookie and sends the password as a bearer token.
+ * An unset password matches nothing, so a deployment missing it fails closed.
+ *
+ * @param request The incoming request.
+ * @param password The `DASHBOARD_PASSWORD` in force, or undefined when none is configured.
+ * @param now Milliseconds since the epoch.
+ * @returns Whether the request may act as the dashboard.
+ */
+export function isDashboardCaller(request: Request, password: string | undefined, now: number): boolean {
+  if (hasSession(request, password, now)) return request.method === 'GET' || isSameOrigin(request);
+  const token = bearerToken(request);
+  return Boolean(password && token && sameSecret(token, password));
 }
 
 /**

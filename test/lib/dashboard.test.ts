@@ -32,13 +32,12 @@ import {
   STRENGTH_HEADERS,
   TABS as SHEET_TABS,
 } from '../../src/data/tabs.js';
+import { sftDeps } from '../support/app.ts';
 import { DB_TIMEOUT_MS, hasTestDb, readOnlyTestDb, resetTestDb, TEST_DASHBOARD_DATABASE_URL } from '../support/db.ts';
 import {
   FAKE_NRIC,
   FORM_KEYS,
   POST_URI,
-  SFT_FORM_KEYS,
-  SFT_POST_URI,
   SFT_SPECS,
   SICK_SPECS,
   sftWebhookRequest,
@@ -149,7 +148,7 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
       await handleFormsg(webhookRequest(spec), { db, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk });
     }
     for (const spec of SFT_SPECS) {
-      await handleSft(sftWebhookRequest(spec), { db, secretKey: SFT_FORM_KEYS.secretKey, postUri: SFT_POST_URI, sdk: testSdk });
+      await handleSft(sftWebhookRequest(spec), sftDeps(db));
     }
     tabs = await loadTabs(db);
   }, DB_TIMEOUT_MS * 3);

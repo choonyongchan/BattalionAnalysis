@@ -41,7 +41,7 @@ const NRIC_SHAPE = /\b[STFGM]\d{7}[A-Z]\b/i;
  * @param row The row about to be inserted.
  * @returns The offending column name, or null when the row is clean.
  */
-function nricColumn(row: Record<string, unknown>): string | null {
+export function nricColumn(row: Record<string, unknown>): string | null {
   const hit = Object.entries(row).find(([, v]) => typeof v === 'string' && NRIC_SHAPE.test(v));
   return hit ? hit[0] : null;
 }

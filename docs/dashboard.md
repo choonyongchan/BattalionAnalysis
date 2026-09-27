@@ -225,7 +225,7 @@ strength block's own split, so a company at 90% missing half its officers shows 
 - **No NRIC.** Neon has no NRIC column, and `SingPass Validated NRIC` and `Masked NRIC` are
   never requested.
 - **No writes from the charts.** `/api/dashboard` connects as a role that can only read. The
-  one page that writes, Deposit, writes through `/api/parade` (see below).
+  one page that writes, Deposit, writes through `/api/parade` and `/api/sft` (see below).
 - **No stored password.** The password is sent once, to `/api/session`, and what comes
   back is a signed, 12-hour session token in an `HttpOnly`, `Secure`, `SameSite=Strict`
   cookie. Nothing in the page can read it — not injected script, not the person at the
@@ -265,7 +265,12 @@ strength block's own split, so a company at 90% missing half its officers shows 
 
 ## Deposit
 
-`src/pages/Deposit.jsx`, at `#/deposit`. A clerk pastes a parade state WhatsApp
+`src/pages/Deposit.jsx`, at `#/deposit`. A **Parade State / SFT** toggle in the header
+picks the panel (`src/pages/deposit/`); it opens on Parade State.
+
+### Parade State
+
+`ParadePanel.jsx`. A clerk pastes a parade state WhatsApp
 missed and presses Deposit; below it, every stored message (WhatsApp or manual) is listed
 newest first with its key, status, source and receipt time, and can be edited or deleted.
 
@@ -279,6 +284,25 @@ newest first with its key, status, source and receipt time, and can be edited or
   and every row derived from it are replaced together, and if not, nothing changes and the
   reasons are shown. **Delete** asks once more inline, then removes the message and its rows.
 - **Charts.** They read the same tables, so a deposit reaches them on the next refresh.
+### SFT
+
+`SftPanel.jsx`, over `/api/sft` (`src/data/sft.js`). FormSG is the only way an SFT record is
+created, so nothing is deposited here: every stored record is listed (newest first, sortable,
+with a filter on name, company, Group IC or location), and each can be edited or deleted.
+
+- **Edit** loads the record into a form. Every answer can be corrected: rank, name, company,
+  Group IC, PES status, exercises, SFABT type, location, the submission date and time
+  (Singapore), and both acknowledgements. The server re-derives the name key, `unit_coy` (the
+  soldier's own answer is kept when it already names the chosen company) and the SFT date,
+  as it does when FormSG inserts the record. The page and the server check the correction
+  with the same rules (`src/model/sftEdit.js`): a name is required, the company must be a
+  known one or blank, and the time may not be in the future. An NRIC-shaped value is refused.
+- **Delete** asks once more inline, then removes the record.
+- **Charts.** The SFT page reads the same table, so a correction reaches it on the refresh
+  the panel triggers.
+
+### Both panels
+
 - **Local development.** `bun run dev` serves no `/api`, so neither login nor this page can
   reach the server. Use `vercel dev`, or a deployed preview.
 
