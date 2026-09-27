@@ -112,7 +112,7 @@ function checkTick(value) {
  * @param {*} form The form: every `TEXT_FIELDS` key, `company`, `submittedAt`
  *     (Singapore `YYYY-MM-DDTHH:MM`) and every `ACKNOWLEDGEMENTS` key.
  * @param {number} now Milliseconds since the epoch, so the future can be refused.
- * @returns {{ok: true, value: !Object}|{ok: false, errors: !Object<string, string>}} The
+ * @returns {{ok: true, value: !Object<string, *>}|{ok: false, errors: !Object<string, string>}} The
  *     columns to write, or each field's problem.
  */
 export function validateSftEdit(form, now) {

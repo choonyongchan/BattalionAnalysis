@@ -186,7 +186,7 @@ describe('dashboard calls that are refused, and touch nothing', () => {
 
   test('a refused correction says which field to fix', async () => {
     const response = await handle(put({ token: DASHBOARD_PASSWORD, body: { ...CORRECTION, company: 'Scorpion' } }), deps());
-    expect((await response.json()).errors).toEqual({ company: expect.any(String) });
+    expect(((await response.json()) as { errors: unknown }).errors).toEqual({ company: expect.any(String) });
   });
 
   test('a store failure is a 500 that does not echo personnel text', async () => {
@@ -234,9 +234,9 @@ describe.skipIf(!hasTestDb)('corrections and deletes, against the database', () 
   }
 
   test('the list holds every record, newest first', async () => {
-    const { records } = await (await call('GET')).json();
-    expect(records.map((record: { responseId: string }) => record.responseId)).toEqual(['sft-e', 'sft-d', 'sft-c', 'sft-b', 'sft-a']);
-    expect(Object.keys(records[0])).not.toContain('nameKey');
+    const { records } = (await (await call('GET')).json()) as { records: Array<{ responseId: string }> };
+    expect(records.map((record) => record.responseId)).toEqual(['sft-e', 'sft-d', 'sft-c', 'sft-b', 'sft-a']);
+    expect(Object.keys(records[0]!)).not.toContain('nameKey');
   }, DB_TIMEOUT_MS);
 
   test('a correction rewrites the answers and everything derived from them', async () => {
