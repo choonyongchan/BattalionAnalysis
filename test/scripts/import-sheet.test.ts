@@ -3,22 +3,31 @@
  * Sheet cell survives the trip into Neon and back out through `lib/dashboard.ts` unchanged.
  * Names and 4D numbers are synthetic.
  */
-import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, spyOn, test } from 'bun:test';
+import { reportSickFormsg } from '../../db/schema.ts';
 import { personnelNumDays, personnelReason, platoonOf, rosterRole, UNTIMED_MODEL } from '../../lib/dashboard.ts';
 import {
   csvRecords,
   groupParadeStates,
+  insertNew,
+  insertParadeStates,
   mapAll,
   mapFormSg,
   mapPersonnel,
   mapRoster,
   mapStrength,
   parseCsv,
+  readTab,
+  report,
   sheetDate,
   sheetTimestamp,
   splitResponseId,
   type SheetRow,
 } from '../../scripts/import-sheet.ts';
+import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
 
 describe('parseCsv', () => {
   test('reads quoted commas, doubled quotes and newlines inside a cell', () => {
@@ -194,4 +203,104 @@ describe('mapFormSg', () => {
     expect(mapFormSg({ ...row, 'Response ID': '' })).toBeNull();
     expect(mapFormSg({ ...row, Timestamp: '' })).toBeNull();
   });
+});
+
+/**
+ * Runs `fn` with console.log captured.
+ *
+ * @param fn The code to run.
+ * @returns The lines it logged.
+ */
+function captureLog(fn: () => void): string[] {
+  const log = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    fn();
+    return log.mock.calls.map((args) => String(args[0]));
+  } finally {
+    log.mockRestore();
+  }
+}
+
+describe('readTab', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'import-sheet-'));
+  writeFileSync(join(dir, 'Battalion - STRENGTH DATA.CSV'), 'a,b\n1,2\n');
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  test('finds the tab by the name its file ends with, ignoring case', () => {
+    expect(readTab(dir, 'Strength Data')).toEqual([{ a: '1', b: '2' }]);
+  });
+
+  test('a missing tab reads as no rows and says it was skipped', () => {
+    let rows: SheetRow[] = [{}];
+    expect(captureLog(() => (rows = readTab(dir, 'Command Roster')))).toEqual(['  (no "Command Roster" CSV found; skipped)']);
+    expect(rows).toEqual([]);
+  });
+});
+
+describe('report', () => {
+  test('a clean dry run prints only the count read', () => {
+    expect(captureLog(() => report('Tab', { read: 3, rejected: [] }, null))).toEqual(['Tab: read 3']);
+  });
+
+  test('lists rejected row numbers and what was inserted', () => {
+    expect(captureLog(() => report('Tab', { read: 5, rejected: [2, 4] }, 3))).toEqual([
+      'Tab: read 5, rejected 2 (rows 2, 4), inserted 3',
+    ]);
+  });
+
+  test('lists at most twenty rejected rows', () => {
+    const rejected = Array.from({ length: 25 }, (_, i) => i + 2);
+    const [line] = captureLog(() => report('Tab', { read: 30, rejected }, null));
+    expect(line).toContain('rejected 25 (rows 2, 3,');
+    expect(line).toContain('21, ...)');
+    expect(line).not.toContain('22');
+  });
+});
+
+describe.skipIf(!hasTestDb)('writing the import to Neon', () => {
+  const FIRST = 'Braves_2026-06-22_FPS';
+  const SECOND = 'Braves_2026-06-23_FPS';
+  const { groups } = groupParadeStates({
+    strength: [
+      { parade_response_id: FIRST, platoon: 'Company', unit_type: 'Company', total_strength: '100', total_present: '90' },
+      { parade_response_id: FIRST, platoon: '1', unit_type: 'PLATOON', total_strength: '30', total_present: '27' },
+      { parade_response_id: SECOND, platoon: 'Company', unit_type: 'Company', total_strength: '100', total_present: '95' },
+    ],
+    personnel: [{ parade_response_id: FIRST, platoon: '1', name: 'TEST ONE', reason_category: 'MA', reason: 'Medical Appt' }],
+    roster: [{ parade_response_id: FIRST, role: 'CDO', rank: '2LT', name: 'TEST CDO' }],
+    responses: [],
+  });
+
+  test('inserts each submission with its rows, and a re-run inserts nothing', async () => {
+    const db = await resetTestDb();
+    expect(await insertParadeStates(db, groups)).toBe(2);
+    expect(await countRows(db, 'parade_submissions')).toBe(2);
+    expect(await countRows(db, 'strength_rows', FIRST)).toBe(2);
+    expect(await countRows(db, 'personnel_rows', FIRST)).toBe(1);
+    expect(await countRows(db, 'command_roster_rows', FIRST)).toBe(1);
+    expect(await countRows(db, 'strength_rows', SECOND)).toBe(1);
+
+    expect(await insertParadeStates(db, groups)).toBe(0);
+    expect(await countRows(db, 'strength_rows')).toBe(3);
+  }, DB_TIMEOUT_MS);
+
+  test('FormSG rows go in 200 at a time, and a re-run skips every one', async () => {
+    const db = await resetTestDb();
+    const { values } = mapAll(
+      Array.from({ length: 201 }, (_, i) => ({
+        Timestamp: '2026-06-22 08:15:23',
+        'Response ID': `resp-${i}`,
+        RANK: 'REC',
+        '[Myinfo] Name': 'Test Person',
+        'Unit & Coy': '40 SAR / Archer',
+        'Report Sick Type': 'RSI',
+      })),
+      mapFormSg,
+    );
+    expect(values).toHaveLength(201);
+
+    expect(await insertNew(db, reportSickFormsg, values)).toBe(201);
+    expect(await insertNew(db, reportSickFormsg, values)).toBe(0);
+    expect(await countRows(db, 'report_sick_formsg')).toBe(201);
+  }, DB_TIMEOUT_MS);
 });

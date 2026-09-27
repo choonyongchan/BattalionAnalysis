@@ -102,16 +102,21 @@ export async function ensureMigrationsTable(sql: NeonQueryFunction<false, false>
  *
  * @param url The connection string of the database to migrate.
  * @param log Where progress goes; the test suite passes a no-op.
+ * @param deps Replaced in tests: the query function (default: `neon(url)`) and the
+ *   migrations to apply (default: `readMigrations()`).
  * @returns Nothing; a failure throws.
  */
-export async function applyMigrations(url: string, log: (line: string) => void = console.log): Promise<void> {
-  const sql = neon(url);
+export async function applyMigrations(
+  url: string,
+  log: (line: string) => void = console.log,
+  { sql = neon(url), migrations = readMigrations() }: { sql?: NeonQueryFunction<false, false>; migrations?: Migration[] } = {},
+): Promise<void> {
   await ensureMigrationsTable(sql);
 
   const applied = await sql`select hash from drizzle.__drizzle_migrations`;
   const seen = new Set((applied as Record<string, unknown>[]).map((row) => String(row.hash)));
 
-  for (const entry of readMigrations()) {
+  for (const entry of migrations) {
     const { text, hash } = entry;
     if (isApplied(entry, seen)) {
       log(`skip  ${entry.tag} (already applied)`);

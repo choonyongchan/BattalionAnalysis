@@ -157,14 +157,24 @@ function installSignalForwarding(getChild, markShuttingDown) {
  * Runs the supervision loop until the child exits cleanly, the supervisor is
  * signalled to stop, or the restart cap is hit.
  *
+ * @param {Object=} deps Collaborators, replaced in tests.
+ * @param {function(): {proc: Object, startedAt: number}=} deps.spawnChild Starts
+ *   the bridge.
+ * @param {function(number): Promise<void>=} deps.wait Pauses between restarts.
+ * @param {function(function(): ?Object, function(): void): void=} deps.onStopSignal
+ *   Installs the stop-signal handlers.
+ * @param {import('pino').Logger=} deps.logger The supervisor logger.
  * @returns {Promise<number>} The exit code the supervisor process should use.
  */
-export async function runSupervisor() {
-  const logger = createLogger(process.env.LOG_LEVEL || 'info').child({ component: 'supervisor' });
-
+export async function runSupervisor({
+  spawnChild = startChild,
+  wait = sleep,
+  onStopSignal = installSignalForwarding,
+  logger = createLogger(process.env.LOG_LEVEL || 'info').child({ component: 'supervisor' }),
+} = {}) {
   let child = null;
   let shuttingDown = false;
-  installSignalForwarding(
+  onStopSignal(
     () => child,
     () => {
       shuttingDown = true;
@@ -175,7 +185,7 @@ export async function runSupervisor() {
   logger.info({ entry: BRIDGE_ENTRY }, 'starting the WhatsApp bridge under supervision');
 
   for (;;) {
-    const { proc, startedAt } = startChild();
+    const { proc, startedAt } = spawnChild();
     child = proc;
     logger.info({ pid: proc.pid }, 'bridge started');
 
@@ -210,7 +220,7 @@ export async function runSupervisor() {
       { restarts, max: MAX_RESTARTS, exitCode, signalCode, ranMs },
       `bridge crashed; restart ${restarts}/${MAX_RESTARTS} in ${delay}ms`
     );
-    await sleep(delay);
+    await wait(delay);
   }
 }
 

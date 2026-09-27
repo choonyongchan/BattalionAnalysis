@@ -424,7 +424,7 @@ export function mapAll(
  * @param tab The tab name the file name ends with.
  * @returns The rows, or [] when there is no such file.
  */
-function readTab(dir: string, tab: string): SheetRow[] {
+export function readTab(dir: string, tab: string): SheetRow[] {
   const file = readdirSync(dir).find((name) => name.toLowerCase().endsWith(`${tab.toLowerCase()}.csv`));
   if (!file) {
     console.log(`  (no "${tab}" CSV found; skipped)`);
@@ -440,7 +440,7 @@ function readTab(dir: string, tab: string): SheetRow[] {
  * @param tally Rows read and rejected.
  * @param inserted Rows inserted, or null on a dry run.
  */
-function report(tab: string, tally: Tally, inserted: number | null): void {
+export function report(tab: string, tally: Tally, inserted: number | null): void {
   const rejected = tally.rejected.length
     ? `, rejected ${tally.rejected.length} (rows ${tally.rejected.slice(0, 20).join(', ')}${tally.rejected.length > 20 ? ', ...' : ''})`
     : '';
@@ -456,7 +456,7 @@ function report(tab: string, tally: Tally, inserted: number | null): void {
  * @param values The rows.
  * @returns How many were inserted.
  */
-async function insertNew(db: Db, table: any, values: Array<Record<string, unknown>>): Promise<number> {
+export async function insertNew(db: Db, table: any, values: Array<Record<string, unknown>>): Promise<number> {
   let inserted = 0;
   for (let i = 0; i < values.length; i += 200) {
     const rows = (await db.insert(table).values(values.slice(i, i + 200)).onConflictDoNothing().returning()) as unknown[];
@@ -472,7 +472,7 @@ async function insertNew(db: Db, table: any, values: Array<Record<string, unknow
  * @param groups The groups.
  * @returns How many submissions were inserted.
  */
-async function insertParadeStates(db: Db, groups: Map<string, ParadeGroup>): Promise<number> {
+export async function insertParadeStates(db: Db, groups: Map<string, ParadeGroup>): Promise<number> {
   const existing = new Set(
     (await db.select({ id: paradeSubmissions.paradeResponseId }).from(paradeSubmissions)).map((r) => r.id),
   );
