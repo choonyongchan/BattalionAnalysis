@@ -74,6 +74,12 @@ const BARE_BLOCK_LINE = /^([A-Z][A-Z0-9 +&/]*?)\s*:\s*(\d{1,3})$/i;
 const SUB_FORM_LINE = /^(S\/N|R\s*[/&]\s*N|REASON)\s*:\s*(.*)$/i;
 /** A name with no dash before its status ends where these begin: "(", "2D ", "1.5D ", "PERM". */
 const NAME_END = /\s+-\s*|\s*-\s+|\s*\(|\s+\d+(?:\.\d+)?\s*D\s|\s+(?=PERM(?:ANENT)?\b)/i;
+/** A slash date, "27/09/26" or "27/09/2026", read as DDMMYY. */
+const SLASH_DATE = /\b(\d{1,2})\/(\d{1,2})\/(?:\d{2})?(\d{2})\b/g;
+/** A range written "270926 to 290926". */
+const TO_RANGE = /(\d{6}(?:\s+\d{4})?)\s+TO\s+(?=\d{6})/gi;
+/** The labels of the one-line form "NAME REASON: … LOCATION: … STATUS: …". */
+const INLINE_LABEL = /\s+(REASON|LOCATION|STATUS)\s*:\s*/i;
 
 /**
  * Parses a parade-state message without a model.
@@ -362,6 +368,12 @@ export function parseEntry(
     rest = rest.slice(rankMatch[0].length).trim();
   }
 
+  const labelled = readInlineLabels(rest);
+  if (labelled) {
+    rest = labelled.line;
+    location ??= labelled.location;
+  }
+
   // The name runs up to a spaced dash, a bracket, a day count ("2D ...") or "PERM".
   const end = NAME_END.exec(rest);
   const name = (end ? rest.slice(0, end.index) : rest).trim().replace(/-$/, '').trim();
@@ -373,6 +385,22 @@ export function parseEntry(
   const parts = authorisations(status);
   const entries = parts.map((part) => ({ ...base, ...parseDuty(part, paradeDate, where.reason_category, flag) }));
   return { entries, problems };
+}
+
+/**
+ * Rewrites the one-line form "NAME REASON: Chest pain LOCATION: NTFGH STATUS: 5D MC (dates)"
+ * into the template's "NAME - 5D MC (dates) (Chest pain)".
+ *
+ * @param rest The line after its index, 4D and rank.
+ * @returns The rewritten line and the stated location, or null when the line has no STATUS label.
+ */
+function readInlineLabels(rest: string): { line: string; location: string | null } | null {
+  const parts = rest.split(INLINE_LABEL);
+  const fields: Record<string, string> = {};
+  for (let i = 1; i < parts.length; i += 2) fields[parts[i]!.toUpperCase()] = parts[i + 1]!.trim();
+  if (!fields.STATUS) return null;
+  const reason = fields.REASON ? ` (${fields.REASON})` : '';
+  return { line: `${parts[0]!.trim()} - ${fields.STATUS}${reason}`, location: fields.LOCATION || null };
 }
 
 /**
@@ -435,7 +463,7 @@ function parseDuty(text: string, paradeDate: string, section: string, flag: (why
   bare = bare.replace(/\s+/g, ' ').trim();
 
   const days =
-    /^(\d+(?:\.\d+)?)\s*D(?:AYS?)?\s+/i.exec(bare) ?? /^(PERM(?:ANENT)?)\s+(\d+(?:\.\d+)?)\s*D\s+/i.exec(bare);
+    /^(\d+(?:\.\d+)?)\s*D(?:AYS?)?(?:\s+|(?=[A-Z]))/i.exec(bare) ??/^(PERM(?:ANENT)?)\s+(\d+(?:\.\d+)?)\s*D\s+/i.exec(bare);
   if (days) {
     // "1.5D AL" spans two calendar days, and the column holds whole days.
     duty.num_days = Math.ceil(Number(days[days.length - 1]));
@@ -512,6 +540,7 @@ function readBracket(
   details: string[],
   flag: (why: string) => void,
 ): void {
+  inner = normaliseDates(inner);
   const token = inner.toUpperCase();
   if (REPORT_SICK_TYPES.includes(token as never)) {
     duty.report_sick_type = token;
@@ -533,6 +562,19 @@ function readBracket(
   }
   if (/\d{6}|\d{1,2}\/\d{1,2}/.test(inner)) flag(`Unreadable dates "(${inner})"`);
   else details.push(inner);
+}
+
+/**
+ * Rewrites the date spellings filers use into the template's: "27/09/26" becomes "270926"
+ * and "270926 to 290926" becomes "270926-290926".
+ *
+ * @param text Bracket content.
+ * @returns The content with its dates in template form.
+ */
+function normaliseDates(text: string): string {
+  return text
+    .replace(SLASH_DATE, (_, day: string, month: string, year: string) => `${day.padStart(2, '0')}${month.padStart(2, '0')}${year}`)
+    .replace(TO_RANGE, '$1-');
 }
 
 /**

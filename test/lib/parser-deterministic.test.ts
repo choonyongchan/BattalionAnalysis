@@ -262,10 +262,43 @@ describe('personnel lines', () => {
   });
 });
 
+describe('dates and layouts filers improvise', () => {
+  test('reads slash dates and "to" ranges', () => {
+    expect(one('8. PTE TAN AH KOW - 2D MC (Diarrhoea) (17/09/26-18/09/26) @ Bedok Clinic', 'Att C')).toMatchObject({
+      duty_type: 'MC',
+      sub_reason: 'Diarrhoea',
+      start_date: '2026-09-17',
+      end_date: '2026-09-18',
+      problems: [],
+    });
+    expect(one('1. PTE TAN AH KOW - 3D MC (170926 to 190926)', 'Att C')).toMatchObject({
+      start_date: '2026-09-17',
+      end_date: '2026-09-19',
+      problems: [],
+    });
+  });
+
+  test('reads an inline REASON: / LOCATION: / STATUS: line', () => {
+    const line = '1. 1210 PTE TEO AH LEK REASON: CHEST PAIN LOCATION: SENGKANG GH STATUS: 5DMC (17/09/26 to 21/09/26)';
+    expect(one(line, 'Att C')).toMatchObject({
+      four_d: '1210',
+      rank: 'PTE',
+      name: 'TEO AH LEK',
+      duty_type: 'MC',
+      num_days: 5,
+      sub_reason: 'CHEST PAIN',
+      location: 'SENGKANG GH',
+      start_date: '2026-09-17',
+      end_date: '2026-09-21',
+      problems: [],
+    });
+  });
+});
+
 describe('lines the parser will not guess at', () => {
   test.each([
     ['an unknown duty outside OTHERS', '1. PTE TAN - Dental thing (180926)'],
-    ['dates it cannot read', '1. PTE TAN - MC x3 (16/09/26 - 18/09/26)'],
+    ['dates it cannot read', '1. PTE TAN - MC x3 (16/09 - 18/09)'],
     ['a date outside brackets', '1. PTE TAN - MC 2 days from 170926 to 180926'],
     ['an impossible date', '1. PTE TAN - 2D MC (320926-330926)'],
     ['a name it cannot separate', '1. PTE - 2D MC (160926-170926)'],
