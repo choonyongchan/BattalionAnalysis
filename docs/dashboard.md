@@ -200,6 +200,12 @@ wrongly count the `AFMC` rows (Air Force Medical Centre appointments, filed unde
 **Status is not absence.** `Status` is Attend B / light duty: present, excused specific
 activities. It has its own tile and is never folded into an absentee count.
 
+**The Status page counts what was in force; MC / MA and Report Sick count what began.** On the
+Status page the tiles, heatmap, leaderboard and rankings take every Status episode listed on at
+least one parade in the range, so a status begun weeks earlier still counts on the days it is
+listed, and a single day's range matches that day's trend point. The other medical pages keep
+the episodes whose start date falls in the range.
+
 **Duration is reported, never derived.** Some messages state a day count that contradicts
 their own date range. The dashboard shows the stated figure, records which source each
 duration came from, and flags the disagreement — it does not quietly pick a winner. See

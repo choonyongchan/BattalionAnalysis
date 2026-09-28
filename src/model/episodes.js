@@ -21,6 +21,7 @@ import { classify, extractSymptoms } from './classify.js';
 import { PERM_STATUS_NUM_DAYS } from './domain.js';
 import { identityOf } from './identity.js';
 import { inclusiveDaySpan, isoToUtcMs } from './dates.js';
+import { withinRange } from './dateRange.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 
 /**
@@ -191,6 +192,21 @@ export function buildEpisodes(rows) {
     const byDate = String(a.startDate).localeCompare(String(b.startDate));
     return byDate !== 0 ? byDate : String(a.name).localeCompare(String(b.name));
   });
+}
+
+/**
+ * Whether an episode was in force at some point in a date range.
+ *
+ * Read off the parade dates the soldier was actually listed on, not the stated span, so a
+ * range counts exactly the soldiers the daily trend counts on its days — including a
+ * status begun before the range, which a start-date filter would drop.
+ * @param {!Object} episode An episode from `buildEpisodes`.
+ * @param {?string} from Inclusive lower bound, or null for open.
+ * @param {?string} to Inclusive upper bound, or null for open.
+ * @returns {boolean} True when any of its parade dates falls in the range.
+ */
+export function activeWithin(episode, from, to) {
+  return episode.paradeDates.some((date) => withinRange(date, from, to));
 }
 
 /**

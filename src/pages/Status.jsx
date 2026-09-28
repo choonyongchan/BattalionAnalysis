@@ -3,9 +3,16 @@
  * `statusBuckets.js` folds 403 free-text reasons into. Status is present-but-restricted,
  * never absence — the trend reads it as a rate the same way it reads MC, which is a rate
  * of restriction, not a rate of loss.
+ *
+ * Unlike the other medical pages, the range sections count every Status in force during
+ * the range, not only those begun in it: a status runs for weeks, so a start-date filter
+ * would drop most of the soldiers the trend shows on the same days.
  */
 
+import { useMemo } from 'preact/hooks';
+
 import { DUTY_CLASS } from '../model/classify.js';
+import { activeWithin } from '../model/episodes.js';
 import { bucketsFor } from '../model/statusBuckets.js';
 import {
   CategoryPage,
@@ -29,28 +36,32 @@ const DUTY = DUTY_CLASS.STATUS;
  */
 export function Status() {
   const { data, episodes, index, range } = useCategory();
+  const inForce = useMemo(
+    () => ({ ...range, episodes: episodes.filter((episode) => activeWithin(episode, range.from, range.to)) }),
+    [range, episodes]
+  );
 
   return (
     <CategoryPage title="Status" range={range}>
       <EpisodeTiles
-        range={range}
+        range={inForce}
         dutyClass={DUTY}
         labels={{
-          episodes: 'Number of Status taken',
+          episodes: 'Number of Status in force',
           perSoldier: 'Average number of Status taken per soldier',
         }}
       />
       <DutyTrend title="Status Trend" data={data} dutyClass={DUTY} range={range} />
-      <PlatoonHeatmap cells={episodeCells(range.episodes, DUTY)} />
+      <PlatoonHeatmap cells={episodeCells(inForce.episodes, DUTY)} />
       <ReasonsOverTime
         rows={episodes.filter((e) => e.dutyClass === DUTY)}
         dateOf={(e) => e.startDate}
         labelsOf={(e) => e.reasons.flatMap(bucketsFor)}
         range={range}
       />
-      <EpisodeLeaderboard range={range} dutyClass={DUTY} metric="status" />
+      <EpisodeLeaderboard range={inForce} dutyClass={DUTY} metric="status" />
       <UnitRankings
-        range={range}
+        range={inForce}
         dutyClass={DUTY}
         labels={{ count: 'Number of Status', soldiers: 'Unique Personnel on Status' }}
       />

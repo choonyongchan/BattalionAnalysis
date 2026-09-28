@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { buildEpisodes } from '../../src/model/episodes.js';
+import { activeWithin, buildEpisodes } from '../../src/model/episodes.js';
 import { identityOf } from '../../src/model/identity.js';
 import { DUTY_CLASS } from '../../src/model/classify.js';
 import { toRecords } from '../../src/data/records.js';
@@ -208,5 +208,28 @@ describe('episode detail carried through', () => {
     const episode = episodesFrom(rows)[0];
     expect(episode.platoon).toBe('4');
     expect(episode.company).toBe('Cougar');
+  });
+});
+
+describe('activeWithin', () => {
+  const episode = (paradeDates) => ({ paradeDates });
+
+  test('an episode begun before the range and still listed inside it is active', () => {
+    expect(activeWithin(episode(['2026-09-16', '2026-09-22', '2026-09-28']), '2026-09-28', '2026-09-28')).toBe(true);
+  });
+
+  test('an episode listed only after the range is not active', () => {
+    expect(activeWithin(episode(['2026-09-29', '2026-09-30']), '2026-09-01', '2026-09-28')).toBe(false);
+  });
+
+  test('an episode listed only before the range is not active', () => {
+    expect(activeWithin(episode(['2026-09-14', '2026-09-15']), '2026-09-20', '2026-09-28')).toBe(false);
+  });
+
+  test('an undated perm status counts on the parades that list it', () => {
+    const [perm] = episodesFrom([
+      { date: '2026-09-28', session: 'FPS', name: 'CAI YICHEN', reason_category: DUTY_CLASS.STATUS, reason: 'Perm Excuse FLEGS', start_date: '', end_date: '' },
+    ]);
+    expect(activeWithin(perm, '2026-09-28', '2026-09-28')).toBe(true);
   });
 });
