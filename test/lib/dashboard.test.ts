@@ -73,7 +73,7 @@ describe('rosterRole', () => {
     expect(rosterRole('COS', '1')).toBe('COS');
   });
 
-  test('a PDS carries its sub-unit with no space, as model/orbat.js expects', () => {
+  test('a PDS carries its sub-unit with no space, as model/dutyRoster.js expects', () => {
     expect(rosterRole('PDS', '1')).toBe('PDS1');
     expect(rosterRole('PDS', ' 4 ')).toBe('PDS4');
     expect(rosterRole('PDS', 'SIG')).toBe('PDSSIG');

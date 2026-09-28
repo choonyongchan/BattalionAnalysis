@@ -26,7 +26,7 @@ Carried over from the old root `todo.md` / `todo2.md` (removed 2026-09-21); only
 - [x] `bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql`; verified as `dashboard_read`: `body` and writes are denied (URL saved in `.env.local`).
 - [ ] Set `DASHBOARD_DATABASE_URL` on Vercel; redeploy.
 - [x] Imported `backup/` (2026-09-22): 168 submissions, 2,389 FormSG, 26 holidays; rerun inserted 0. Left out by decision: Scorpion (29 submissions), three submissions with no Strength Data (Braves 07-21, Cougar 09-16, Hercules 09-11), one FormSG row with no Response ID. The three 09-18 submissions already in Neon were kept over the Sheet's copies.
-- [ ] Compare a few dates on the deployed dashboard against the Sheet (strength, MC/MA, report sick, ORBAT, holidays, rotations).
+- [ ] Compare a few dates on the deployed dashboard against the Sheet (strength, MC/MA, report sick, Duty Roster, holidays, rotations).
 - [ ] Retire the Apps Script web app deployment.
 
 ## Cleanup

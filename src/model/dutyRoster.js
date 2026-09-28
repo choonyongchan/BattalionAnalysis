@@ -185,7 +185,7 @@ function companyTree_(rows, isoDate, company, session) {
  *     name the session (defaults to 'FPS').
  * @returns {!Object} The tree.
  */
-export function orbatTree(rows, isoDate, options) {
+export function dutyRosterTree(rows, isoDate, options) {
   const session = (options && options.session) || 'FPS';
   const company = options && options.company;
 
@@ -212,7 +212,7 @@ export function orbatTree(rows, isoDate, options) {
  * @returns {{companies: Array<{company: string, filed: boolean, roles: number}>,
  *     filedCount: number}} Per-company coverage, and how many companies filed anything.
  */
-export function orbatCoverage(rows, isoDate, session) {
+export function dutyRosterCoverage(rows, isoDate, session) {
   const targetSession = session || 'FPS';
   const companies = COMPANIES.map((company) => {
     const roster = rosterOn(rows, isoDate, company, targetSession);

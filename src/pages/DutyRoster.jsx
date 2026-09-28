@@ -1,5 +1,5 @@
 /**
- * ORBAT: who is on duty today, from the CDO down.
+ * Duty Roster: who is on duty today, from the CDO down.
  *
  * A single-date view rather than a range — the question this page answers is "who is in
  * the chair right now", not a trend. The company comes from the page-wide selector, and
@@ -28,25 +28,25 @@ import { PageControls } from '../components/PageControls.jsx';
 import { COMPANIES } from '../model/domain.js';
 import { ALL_COMPANIES } from '../model/scope.js';
 import { datesPresent } from '../model/metrics.js';
-import { orbatCoverage, orbatTree, vacanciesOn } from '../model/orbat.js';
+import { dutyRosterCoverage, dutyRosterTree, vacanciesOn } from '../model/dutyRoster.js';
 import { fmtDate, fmtFraction } from '../format.js';
 import { settingOf } from '../model/settings/active.js';
 
 /**
  * One role and, indented beneath it, the roles that report to it.
- * @param {{node: !Object}} props A role node from `orbatTree`.
+ * @param {{node: !Object}} props A role node from `dutyRosterTree`.
  * @returns {!preact.VNode} The list item.
  */
 function RoleItem({ node }) {
   const children = node.children || [];
   return (
-    <li class="orbat__item">
-      <div class={'orbat__role' + (node.vacant ? ' orbat__role--vacant' : node.filed ? '' : ' orbat__role--unfiled')}>
-        <span class="orbat__tag">{node.role}</span>
-        <span class="orbat__name">{node.name}</span>
+    <li class="duty-roster__item">
+      <div class={'duty-roster__role' + (node.vacant ? ' duty-roster__role--vacant' : node.filed ? '' : ' duty-roster__role--unfiled')}>
+        <span class="duty-roster__tag">{node.role}</span>
+        <span class="duty-roster__name">{node.name}</span>
       </div>
       {children.length > 0 ? (
-        <ul class="orbat__list">
+        <ul class="duty-roster__list">
           {children.map((child) => (
             <RoleItem key={child.role} node={child} />
           ))}
@@ -58,30 +58,30 @@ function RoleItem({ node }) {
 
 /**
  * One company's card: its name in the company's colour, then its chain of command.
- * @param {{node: !Object}} props A company node from `orbatTree`.
+ * @param {{node: !Object}} props A company node from `dutyRosterTree`.
  * @returns {!preact.VNode} The card.
  */
 function CompanyRoster({ node }) {
   const [top] = node.children || [];
   return (
-    <section class={'orbat__company orbat__company--' + node.name.toLowerCase()}>
-      <h3 class="orbat__heading">{node.name}</h3>
+    <section class={'duty-roster__company duty-roster__company--' + node.name.toLowerCase()}>
+      <h3 class="duty-roster__heading">{node.name}</h3>
       {node.filed && top ? (
-        <ul class="orbat__list orbat__list--root">
+        <ul class="duty-roster__list duty-roster__list--root">
           <RoleItem node={top} />
         </ul>
       ) : (
-        <p class="orbat__none">No roster filed</p>
+        <p class="duty-roster__none">No roster filed</p>
       )}
     </section>
   );
 }
 
 /**
- * The ORBAT page.
+ * The Duty Roster page.
  * @returns {!preact.VNode} The page.
  */
-export function Orbat() {
+export function DutyRoster() {
   const data = dataset.value;
   const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);
   const [date, setDate] = useState(paradeDates[paradeDates.length - 1] || null);
@@ -98,9 +98,9 @@ export function Orbat() {
     );
   }
 
-  const tree = orbatTree(data.roster, date, whole ? undefined : { company: company.value });
+  const tree = dutyRosterTree(data.roster, date, whole ? undefined : { company: company.value });
   const companies = whole ? tree.children : [tree];
-  const coverage = orbatCoverage(data.roster, date);
+  const coverage = dutyRosterCoverage(data.roster, date);
   const vacancies = vacanciesOn(data.roster, date).filter((entry) => whole || entry.company === company.value);
 
   return (
@@ -131,7 +131,7 @@ export function Orbat() {
       </PageControls>
 
       <Card title={whole ? settingOf('unit').name : company.value}>
-        <div class="orbat">
+        <div class="duty-roster">
           {companies.map((node) => (
             <CompanyRoster key={node.name} node={node} />
           ))}

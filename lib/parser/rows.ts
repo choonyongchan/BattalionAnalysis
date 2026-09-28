@@ -168,7 +168,7 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
 
   const roster = extraction.command_team.map((member) => {
     // A vacant appointment is written as "CDS: -", and the model faithfully returns the
-    // dash. Storing it as a rank would put "-" on the ORBAT page beside real ranks.
+    // dash. Storing it as a rank would put "-" on the Duty Roster page beside real ranks.
     const rank = blankToNull(member.rank);
     const name = blankToNull(member.name);
     return {

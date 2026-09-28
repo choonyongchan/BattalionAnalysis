@@ -358,7 +358,7 @@ describe('section counts', () => {
 describe('placeholder dashes', () => {
   test('a vacant appointment written as a dash does not become a rank', () => {
     // Hercules files "PDS MED: -". The model returns the dash faithfully; storing it would
-    // put "-" on the ORBAT page beside real ranks.
+    // put "-" on the Duty Roster page beside real ranks.
     const rows = buildRows(
       extraction({
         command_team: [

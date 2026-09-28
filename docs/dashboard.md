@@ -12,7 +12,7 @@ The pages, in the order a commander reads them:
 | **Report sick** · **MC / MA** · **Status** | Is it getting worse? Which company? Which platoon? Who, most often? |
 | **SFT** | How many soldiers have done self-regulated fitness training, and how many today? Which company? Where, doing what, and in how big a group? |
 | **Soldier** | How often has this man been out, and how long was each episode? |
-| **ORBAT** | Who is on duty today, from the CDO down, and which chairs were filed vacant? |
+| **Duty Roster** | Who is on duty today, from the CDO down, and which chairs were filed vacant? |
 | **Settings** | What is the dashboard reading, and how much of the battalion does it cover? |
 
 The three medical pages are one layout asked three times. That is deliberate: the layout

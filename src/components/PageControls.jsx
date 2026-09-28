@@ -32,8 +32,8 @@ const COMPANY_OPTIONS = [
  * @param {{min: string, max: string, showRange?: boolean, children?: *}} props The
  *     selectable date bounds (a page passes its full, unscoped parade-date span so the
  *     range does not shrink when a company is picked); whether to show the date-range
- *     control — ORBAT and Soldier, which have no range, pass `false`; and any page-own
- *     control to sit in the same row, such as ORBAT's single-date picker.
+ *     control — Duty Roster and Soldier, which have no range, pass `false`; and any page-own
+ *     control to sit in the same row, such as Duty Roster's single-date picker.
  * @returns {!preact.VNode} The control bar.
  */
 export function PageControls({ min, max, showRange = true, children }) {

@@ -5,7 +5,7 @@
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { topByCount } from '../../src/model/leaderboards.js';
-import { orbatTree } from '../../src/model/orbat.js';
+import { dutyRosterTree } from '../../src/model/dutyRoster.js';
 import { resetActiveSettings, setActiveSettings } from '../../src/model/settings/active.js';
 import { defaultSettings } from '../../src/model/settings/resolve.js';
 
@@ -46,10 +46,10 @@ describe('leaderboard size', () => {
 
 describe('unit name', () => {
   test('names the battalion root of the duty tree', () => {
-    expect(orbatTree([], '2026-09-01').name).toBe('40 SAR');
+    expect(dutyRosterTree([], '2026-09-01').name).toBe('40 SAR');
     const values = defaultSettings();
     values.unit = { name: '41 SAR', pageTitle: '41 SAR Personnel', logo: '' };
     setActiveSettings(values);
-    expect(orbatTree([], '2026-09-01').name).toBe('41 SAR');
+    expect(dutyRosterTree([], '2026-09-01').name).toBe('41 SAR');
   });
 });

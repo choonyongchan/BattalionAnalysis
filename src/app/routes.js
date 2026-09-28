@@ -16,7 +16,7 @@
 import {
   DepositIcon,
   McMaIcon,
-  OrbatIcon,
+  DutyRosterIcon,
   OverviewIcon,
   ReportSickIcon,
   SettingsIcon,
@@ -30,7 +30,7 @@ import { McMa } from '../pages/McMa.jsx';
 import { Status } from '../pages/Status.jsx';
 import { Sft } from '../pages/Sft.jsx';
 import { Soldier } from '../pages/Soldier.jsx';
-import { Orbat } from '../pages/Orbat.jsx';
+import { DutyRoster } from '../pages/DutyRoster.jsx';
 import { Deposit } from '../pages/Deposit.jsx';
 import { Settings } from '../pages/Settings.jsx';
 
@@ -82,11 +82,11 @@ export const ROUTES = [
     icon: SoldierIcon,
   },
   {
-    path: '/orbat',
-    component: Orbat,
-    label: 'ORBAT',
+    path: '/duty-roster',
+    component: DutyRoster,
+    label: 'Duty Roster',
     group: 'People',
-    icon: OrbatIcon,
+    icon: DutyRosterIcon,
   },
   {
     path: '/deposit',

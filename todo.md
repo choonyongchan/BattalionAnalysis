@@ -12,5 +12,5 @@ General rules:
 2. For the heatmaps, label Plt 1, Plt 2, Plt 3, and so on rather than merely 1, 2, 3 to not be confused with the counts
 3. For Companies, by Rate and Platoon, by Rate, remove the rate calculation and do Companies, by Count and Platoon, by Count.
 
-* Remove PDSHQ from ORBAT
+* Remove PDSHQ from Duty Roster
 

@@ -81,7 +81,7 @@ export const SoldierIcon = () => (
 );
 
 /** @returns {!preact.VNode} A command tree: who is on duty. */
-export const OrbatIcon = () => (
+export const DutyRosterIcon = () => (
   <Glyph>
     <rect x="9" y="2.8" width="6" height="4.4" rx="1.2" />
     <rect x="2.5" y="16.8" width="6" height="4.4" rx="1.2" />

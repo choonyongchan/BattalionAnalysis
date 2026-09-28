@@ -5,7 +5,7 @@
  * from each growing their own copy of "which date range is selected" and drifting apart.
  *
  * The date pair and the single date answer different questions and are deliberately
- * separate. `selectedDate` names one parade — the Overview tiles and the ORBAT tree
+ * separate. `selectedDate` names one parade — the Overview tiles and the Duty Roster tree
  * describe that day and ignore the range. `dateFrom`/`dateTo` bound every aggregate:
  * trends, rates, leaderboards, the Sankey. A reader is never left wondering which slice a
  * "today" figure covers, because a today figure covers today.

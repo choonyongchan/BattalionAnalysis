@@ -43,13 +43,13 @@ export const UNIT_TYPE_COMPANY = 'Company';
 export const REASON_CATEGORIES = ['Att C', 'Status', 'Off/Leave', 'Report Sick', 'MA', 'Others'];
 
 /**
- * The company-level command roles every company files, in ORBAT order.
+ * The company-level command roles every company files, in duty roster order.
  * @type {string[]}
  */
 export const COMMAND_ROLES = ['CDO', 'CDS', 'COS'];
 
 /**
- * Each company's sub-units, in ORBAT order, as they follow `PDS` in a roster role.
+ * Each company's sub-units, in duty roster order, as they follow `PDS` in a roster role.
  *
  * Numbering runs on across the rifle companies (Archer 1-3, Braves 4-6, Cougar 7-9), and
  * the support companies name theirs, so each company's PDS appointments differ.
@@ -85,7 +85,7 @@ export function subunitPosition(company, platoon) {
 }
 
 /**
- * The roster roles one company files, in ORBAT order: the command roles, then a PDS per
+ * The roster roles one company files, in duty roster order: the command roles, then a PDS per
  * sub-unit.
  * @param {string} company Company name.
  * @returns {string[]} Roles such as `CDO`, `PDSHQ`, `PDS7` or `PDSOPR+ASA`.
