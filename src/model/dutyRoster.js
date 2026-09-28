@@ -173,7 +173,7 @@ function companyTree_(rows, isoDate, company, session) {
 }
 
 /**
- * The order-of-battle tree for one date: one company, or the whole battalion.
+ * The duty roster tree for one date: one company, or the whole battalion.
  *
  * Without `options.company`, the root is named after the Unit setting, with all five companies as children in
  * COMPANIES order — including the ones that filed nothing, which collapse to a single

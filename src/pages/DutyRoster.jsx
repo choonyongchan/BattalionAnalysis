@@ -91,7 +91,7 @@ export function DutyRoster() {
     return (
       <div class="page">
         <header class="pagehead">
-          <h1 class="pagehead__title">Order of Battle</h1>
+          <h1 class="pagehead__title">Duty Roster</h1>
         </header>
         <EmptyState>No parade state has been read yet.</EmptyState>
       </div>
@@ -107,7 +107,7 @@ export function DutyRoster() {
     <div class="page">
       <header class="pagehead">
         <div>
-          <h1 class="pagehead__title">Order of Battle</h1>
+          <h1 class="pagehead__title">Duty Roster</h1>
           <p class="pagehead__sub">Who is on duty, from the CDO down.</p>
         </div>
       </header>

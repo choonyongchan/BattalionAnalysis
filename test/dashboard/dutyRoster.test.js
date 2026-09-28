@@ -1,5 +1,5 @@
 /**
- * Tests for the order-of-battle tree.
+ * Tests for the duty roster tree.
  *
  * The case worth having most is the one the real data forces: Braves and Scorpion file no
  * Command Roster rows at all, ever, and the battalion-level tree must show that rather
