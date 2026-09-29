@@ -13,7 +13,7 @@
  *
  * The selected parade also anchors the one forward-looking section: presence by rank tier,
  * then the list of who is due back when, from the dates each absence states
- * (`model/projection.js`).
+ * (`model/projection.js`), and who has just come off MC or Light Duty (`model/recentReturns.js`).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -37,6 +37,7 @@ import { toSubmissions, submissionTrend } from '../model/formsg.js';
 import { filingsOn, toFilings } from '../model/submissions.js';
 import { dutyTrend, presentTrend, tierPresence } from '../model/strength.js';
 import { DEFAULT_PROJECTION_DAYS, returnsToDuty } from '../model/projection.js';
+import { recentlyReturned } from '../model/recentReturns.js';
 import { reportSickFlow } from '../model/sankey.js';
 
 /** @type {string} Session every "today" figure and trend describes. */
@@ -226,6 +227,7 @@ export function Overview() {
       </div>
 
       <ReturnsCard data={data} date={today} />
+      <RecentReturnsCard data={data} date={today} />
 
       <div class="band">
         <h2 class="pagehead__title" style="font-size:21px">
@@ -425,6 +427,45 @@ function ReturnsCard({ data, date }) {
             back: row.backOn ? fmtDate(row.backOn) : 'Not stated',
           }))}
           rowKey={(row) => row.company + row.key}
+        />
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The backward twin of `ReturnsCard`: who came off MC or Light Duty just before this parade.
+ * @param {{data: !Object, date: string}} props The scoped dataset and the parade the list
+ *     is counted back from.
+ * @returns {!preact.VNode} The card.
+ */
+function RecentReturnsCard({ data, date }) {
+  const returns = recentlyReturned(data.personnel, date);
+
+  return (
+    <Card
+      title="Recently Back"
+      note={'Off MC in the last 2 days or Light Duty since yesterday, as of ' + fmtDate(date) + '; watch for relapse'}
+    >
+      {returns.length === 0 ? (
+        <EmptyState>Nobody came off MC or Light Duty just before {fmtDate(date)}.</EmptyState>
+      ) : (
+        <DataTable
+          columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'company', label: 'Company' },
+            { key: 'platoon', label: 'Platoon' },
+            { key: 'kind', label: 'Type' },
+            { key: 'reason', label: 'Reason' },
+            { key: 'ended', label: 'Ended on' },
+            { key: 'daysBack', label: 'Days back' },
+          ]}
+          rows={returns.map((row) => ({
+            ...row,
+            name: (row.rank + ' ' + row.name).trim(),
+            ended: fmtDate(row.endedOn),
+          }))}
+          rowKey={(row) => row.kind + row.key}
         />
       )}
     </Card>
