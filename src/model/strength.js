@@ -14,10 +14,10 @@
  * Every function here is pure.
  */
 
-import { classify, dutyList, isDuty } from './classify.js';
+import { classify, isDuty } from './classify.js';
 import { COMPANIES, UNIT_TYPE_COMPANY } from './domain.js';
 import { identityOf } from './identity.js';
-import { battalionStrength, dutyCountsOn } from './metrics.js';
+import { battalionStrength, distinctDutyOn } from './metrics.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 
 
@@ -284,9 +284,8 @@ export function dutyTrend(personnelRows, strengthRows, dutyClass, dates, options
           if (strength.companiesReporting.length === 0) {
             return asRate ? null : 0;
           }
-          // Several classes sum, as the Overview's MC / MA tile has always summed them.
-          const counts = dutyCountsOn(personnelRows, date, session).counts;
-          const count = dutyList(dutyClass).reduce((sum, name) => sum + (counts[name] || 0), 0);
+          // Several classes count distinct soldiers, so an MC + MA soldier is one.
+          const count = distinctDutyOn(personnelRows, date, session, dutyClass);
           if (!asRate) {
             return count;
           }

@@ -148,6 +148,36 @@ export function dutyCountsOn(personnelRows, isoDate, session) {
 }
 
 /**
+ * Counts distinct soldiers in one or more duty classes on one date.
+ *
+ * Unlike summing `dutyCountsOn` per class, a soldier listed under two of the classes (for
+ * example an MC and an MA on the same day) counts once. Rows that cannot be attributed to
+ * a soldier are skipped, as in `dutyCountsOn`.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {?string} session Session to restrict to, or null for both.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to count, from DUTY_CLASS.
+ * @returns {number} Distinct soldier count.
+ */
+export function distinctDutyOn(personnelRows, isoDate, session, dutyClass) {
+  const keys = new Set();
+  personnelRows
+    .filter(
+      (row) =>
+        toIsoDate(row.date) === isoDate &&
+        (!session || toText(row.session) === session) &&
+        isDuty(dutyClass, classify(row))
+    )
+    .forEach((row) => {
+      const { key } = identityOf(row);
+      if (key !== '') {
+        keys.add(key);
+      }
+    });
+  return keys.size;
+}
+
+/**
  * Counts absence person-days per unit and the pax-days each unit was at risk for.
  *
  * Pax-days is the denominator that makes units of different sizes comparable: a platoon
@@ -526,4 +556,4 @@ export function episodeCounts(episodes, dutyClass) {
   };
 }
 
-
+

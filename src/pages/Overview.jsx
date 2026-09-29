@@ -30,7 +30,7 @@ import { COMPANIES } from '../model/domain.js';
 import { DUTY_CLASS, MC_MA } from '../model/classify.js';
 import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../model/calendarMarks.js';
-import { datesPresent, battalionStrength, dutyCountsOn } from '../model/metrics.js';
+import { datesPresent, battalionStrength, dutyCountsOn, distinctDutyOn } from '../model/metrics.js';
 import { eachDay } from '../model/dateRange.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions, submissionTrend } from '../model/formsg.js';
@@ -211,7 +211,7 @@ export function Overview() {
         <Tile label="Reported sick" value={fmtInt(reportedSickToday)} foot="FormSG" />
         <Tile
           label="MC / MA"
-          value={fmtInt(duty ? MC_MA.reduce((sum, dutyClass) => sum + countOf(duty, dutyClass), 0) : 0)}
+          value={fmtInt(duty ? distinctDutyOn(data.personnel, today, SESSION, MC_MA) : 0)}
         />
         <Tile label="On status" value={fmtInt(duty ? countOf(duty, DUTY_CLASS.STATUS) : 0)} />
       </TileRow>

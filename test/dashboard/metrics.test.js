@@ -17,6 +17,7 @@ import {
   longMcRoster,
   longMcTrend,
   unitRates,
+  distinctDutyOn,
 } from '../../src/model/metrics.js';
 import { DUTY_CLASS, MC_MA } from '../../src/model/classify.js';
 import { UNASSIGNED } from '../../src/model/domain.js';
@@ -63,6 +64,25 @@ describe('duty counts are of soldiers, not rows', () => {
     const result = dutyCountsOn(rows, '2026-06-22');
     expect(result.unattributable).toBe(1);
     expect(result.counts[DUTY_CLASS.ATT_C]).toBe(0);
+  });
+});
+
+describe('distinct MC / MA on a day', () => {
+  const rows = () =>
+    toRecords(
+      personnelValues([
+        { date: '2026-06-22', session: 'FPS', four_d: 'C1110', name: 'A', reason_category: 'Att C', reason: 'MC' },
+        { date: '2026-06-22', session: 'FPS', four_d: 'C1110', name: 'A', reason_category: 'MA', reason: 'MA' },
+        { date: '2026-06-22', session: 'FPS', four_d: 'C1111', name: 'B', reason_category: 'MA', reason: 'MA' },
+        { date: '2026-06-22', session: 'FPS', four_d: 'C1112', name: 'C', reason_category: 'Att C', reason: 'MC' },
+        { date: '2026-06-21', session: 'FPS', four_d: 'C1113', name: 'D', reason_category: 'Att C', reason: 'MC' },
+      ]),
+      PERSONNEL_HEADERS,
+      TABS.PERSONNEL
+    );
+
+  test('a soldier on both MC and MA counts once, and other days are excluded', () => {
+    expect(distinctDutyOn(rows(), '2026-06-22', 'FPS', MC_MA)).toBe(3);
   });
 });
 

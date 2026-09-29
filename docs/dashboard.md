@@ -206,6 +206,10 @@ least one parade in the range, so a status begun weeks earlier still counts on t
 listed, and a single day's range matches that day's trend point. The other medical pages keep
 the episodes whose start date falls in the range.
 
+**The Overview's MC / MA tile and trend count who is out on the day.** Every soldier listed as
+MC (including one whose MC began earlier and is still listed) or MA on that parade date counts,
+once: a soldier with both an MC and an MA that day is one person (`distinctDutyOn`).
+
 **Duration is reported, never derived.** Some messages state a day count that contradicts
 their own date range. The dashboard shows the stated figure, records which source each
 duration came from, and flags the disagreement — it does not quietly pick a winner. See
