@@ -16,7 +16,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          echarts: ['echarts', 'echarts-wordcloud'],
+          echarts: ['echarts'],
         },
       },
     },

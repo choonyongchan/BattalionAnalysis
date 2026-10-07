@@ -10,10 +10,6 @@
  *
  * Adding a chart type is therefore a two-line change in this file plus the component.
  * Forgetting the line shows up as an ECharts console error naming the missing type.
- *
- * `echarts-wordcloud` is a side-effect import: it registers its own series and view
- * against the same core, so it has to come after the core import, and it exports nothing
- * worth naming.
  */
 
 import { use, init } from 'echarts/core';
@@ -34,7 +30,6 @@ import {
   TooltipComponent,
   VisualMapComponent,
 } from 'echarts/components';
-import 'echarts-wordcloud';
 
 use([
   // The renderer. SVG rather than canvas: these charts are mostly text and thin marks,
@@ -42,7 +37,7 @@ use([
   SVGRenderer,
 
   // Series types, one per component under this directory.
-  BarChart, // Bar, Histogram
+  BarChart, // Bar
   CustomChart, // Heatmap's inferred-cell hatch
   HeatmapChart, // Heatmap
   LineChart, // Line (and the empty carrier series that holds its annotations)

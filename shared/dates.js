@@ -35,7 +35,7 @@ export function receivedInSgt(timestamp) {
 }
 
 /** @type {string[]} Short weekday names, Monday first. */
-const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** @type {string[]} Short month names, January first. */
 export const MONTH_NAMES = [

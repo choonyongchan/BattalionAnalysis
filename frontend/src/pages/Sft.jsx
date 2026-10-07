@@ -12,7 +12,8 @@ import { company, dataset, dateFrom, dateTo } from '../app/state.js';
 import { Card } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
-import { Bar, ChartCard } from '../charts/index.js';
+import { Bar, ChartCard, Donut } from '../charts/index.js';
+import { COMPANIES } from '../../../shared/domain.js';
 import { fmtDecimal, fmtInt } from '../format.js';
 import { isoToday, withinRange } from '../model/dateRange.js';
 import { scopeSubmissions } from '../model/scope.js';
@@ -124,14 +125,19 @@ export function Sft() {
           foot={fmtInt(groups.length) + ' groups, IC included'}
         />
       </TileRow>
-      <ChartCard title="Soldiers Did SFT — by Company" empty="No SFT sessions in range.">
-        <Bar
-          categories={perCompany.map((row) => row.company)}
-          values={perCompany.map((row) => row.soldiers)}
-          valueName="soldiers"
-        />
-      </ChartCard>
-      <CompanyBreakdown records={ranged} groups={groups} />
+      <div class="grid-2">
+        <ChartCard
+          title="Soldiers Who Did SFT, by Company"
+          coverage="Each company's share of the distinct soldiers who did SFT in range."
+          empty="No SFT sessions in range."
+        >
+          <Donut
+            slices={perCompany.map((row) => ({ name: row.company, value: row.soldiers, slot: COMPANIES.indexOf(row.company) }))}
+            valueName="soldiers"
+          />
+        </ChartCard>
+        <CompanyBreakdown records={ranged} groups={groups} />
+      </div>
       <ChartCard
         title="Group Size"
         coverage="A group is everyone naming the same Group IC on one day; IC names are fuzzy-matched, and the IC is counted in the group."
@@ -144,6 +150,7 @@ export function Sft() {
           horizontal={false}
         />
       </ChartCard>
+      <div class="grid-2">
       <Ranking
         title="Common SFT Locations"
         empty="No locations recorded in range."
@@ -156,6 +163,7 @@ export function Sft() {
         rows={topExercises(ranged, TOP_N)}
         valueName="sessions"
       />
+      </div>
     </CategoryPage>
   );
 }

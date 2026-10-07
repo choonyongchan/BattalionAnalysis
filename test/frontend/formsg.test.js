@@ -8,7 +8,9 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
+  hourByWeekday,
   reportSickTypeOf,
+  typeShares,
   submissionCounts,
   submissionPlatoonOf,
   submissionTrend,
@@ -179,5 +181,33 @@ describe('reportSickTypeOf', () => {
   test('an unrecorded or pending type matches no filter option', () => {
     expect(reportSickTypeOf({ reportSickType: '' })).toBe('');
     expect(reportSickTypeOf({ reportSickType: 'PENDING' })).toBe('');
+  });
+});
+
+describe('typeShares', () => {
+  test('counts each type in the form order, with unknown answers as Not stated', () => {
+    const shares = typeShares([{ reportSickType: 'RSO' }, { reportSickType: 'RSO' }, { reportSickType: 'MR' }, { reportSickType: 'odd' }]);
+    expect(shares).toEqual([
+      { name: 'RSO', value: 2 },
+      { name: 'RSI', value: 0 },
+      { name: 'FFI', value: 0 },
+      { name: 'Medical Review', value: 1 },
+      { name: 'Not stated', value: 1 },
+    ]);
+  });
+});
+
+describe('hourByWeekday', () => {
+  test('places each submission on its weekday and hour, skipping untimed ones', () => {
+    const cells = hourByWeekday([
+      { date: '2026-09-21', timestamp: '2026-09-21 08:15:00' },
+      { date: '2026-09-21', timestamp: '2026-09-21 08:40:00' },
+      { date: '2026-09-26', timestamp: '2026-09-26 22:05:00' },
+      { date: '2026-09-26', timestamp: '' },
+    ]);
+    expect(cells).toEqual([
+      { row: 'Mon', column: '08', value: 2 },
+      { row: 'Sat', column: '22', value: 1 },
+    ]);
   });
 });

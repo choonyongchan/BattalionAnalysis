@@ -2,9 +2,9 @@
  * Report sick: the parade-state and FormSG picture of who is reporting sick.
  *
  * The sections shared with MC/MA and Status come from `shared/category.jsx`; this file
- * adds what is unique to report sick — the FormSG side of every panel, the free-text
- * word cloud, and the hour-of-day histogram, none of which the other two categories have
- * a source for.
+ * adds what is unique to report sick: the FormSG side of every panel, the type split, the
+ * free-text reasons, and when soldiers file, none of which the other two categories have a
+ * source for.
  */
 
 import { useState } from 'preact/hooks';
@@ -12,21 +12,22 @@ import { Card } from '../components/Card.jsx';
 import { Segmented } from '../components/Segmented.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
-import { ChartCard, Histogram, WordCloud } from '../charts/index.js';
+import { Bar, ChartCard, Donut, Heatmap } from '../charts/index.js';
 import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import {
   REPORT_SICK_TYPES,
+  hourByWeekday,
   reportSickTypeOf,
+  typeShares,
   submissionCounts,
   submissionTrend,
   topSubmitters,
 } from '../model/formsg.js';
 import { episodeCounts } from '../model/metrics.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
-import { isWeekend } from '../../../shared/dates.js';
+import { WEEKDAY_NAMES } from '../../../shared/dates.js';
 import { withinRange } from '../model/dateRange.js';
-import { toTimeOfDay } from '../../../shared/values.js';
 import {
   CategoryPage,
   DutyTrend,
@@ -66,6 +67,27 @@ function ReportedSickTop({ submissions }) {
   );
 }
 
+/**
+ * The words soldiers use most in the form's free-text reason, as a ranked bar.
+ *
+ * A bar rather than the word cloud it replaces: a cloud's font size cannot be read as a
+ * number, and its layout puts the eye on long words rather than frequent ones.
+ * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
+ * @returns {!preact.VNode} The card.
+ */
+function ReasonWords({ submissions }) {
+  const words = reasonKeywords(submissions, 12);
+  return (
+    <ChartCard
+      title="Words in Self-Reported Reasons"
+      coverage="The 12 commonest words in the free-text reason, after common words are dropped."
+      empty="No free-text reasons recorded in range."
+    >
+      <Bar categories={words.map((w) => w.word)} values={words.map((w) => w.count)} valueName="submissions" />
+    </ChartCard>
+  );
+}
+
 /** @type {string} The type filter's "no filter" option. */
 const ALL_TYPES = 'ALL';
 
@@ -99,35 +121,8 @@ function FormSgTrend({ submissions, strength, range }) {
   );
 }
 
-/** @type {string[]} Hour labels, 00:00 through 23:00. */
-const HOUR_LABELS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0') + ':00');
-
-/**
- * Buckets FormSG submissions into hour-of-day bins, split by weekday/weekend.
- * @param {Array<!Object>} submissions Normalised FormSG submissions, already restricted
- *     to the range being drawn.
- * @returns {Array<{label: string, count: number, weekday: number, weekend: number}>} 24
- *     bins, midnight through 23:00, empty hours included.
- */
-function hourBins(submissions) {
-  const counts = HOUR_LABELS.map(() => ({ weekday: 0, weekend: 0 }));
-  submissions.forEach((submission) => {
-    const at = toTimeOfDay(submission.timestamp);
-    if (!at || !submission.date) return;
-    const bucket = counts[at.hour];
-    if (isWeekend(submission.date)) {
-      bucket.weekend += 1;
-    } else {
-      bucket.weekday += 1;
-    }
-  });
-  return HOUR_LABELS.map((label, hour) => ({
-    label,
-    count: counts[hour].weekday + counts[hour].weekend,
-    weekday: counts[hour].weekday,
-    weekend: counts[hour].weekend,
-  }));
-}
+/** @type {string[]} The punch card's columns, midnight to 23:00. */
+const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
 
 /**
  * The Report Sick page.
@@ -176,11 +171,22 @@ export function ReportSick() {
         labelsOf={(s) => [clinicalBucketOf(s.symptomAnswer)]}
         range={range}
       />
-      <ChartCard title="Top Self-Reported Report Sick Reasons" empty="No free-text reasons recorded in range.">
-        <WordCloud words={reasonKeywords(ranged, 60)} />
-      </ChartCard>
-      <ChartCard title="Time of Day" empty="No timestamped submissions in range.">
-        <Histogram bins={hourBins(ranged)} />
+      <div class="grid-2">
+        <ChartCard
+          title="Report Sick Type (FormSG)"
+          coverage="Share of FormSG submissions in range by the type the soldier picked."
+          empty="No FormSG submissions in range."
+        >
+          <Donut slices={typeShares(ranged)} valueName="submissions" />
+        </ChartCard>
+        <ReasonWords submissions={ranged} />
+      </div>
+      <ChartCard
+        title="When Soldiers Report Sick"
+        coverage="FormSG submissions by weekday and hour of submission, Singapore time."
+        empty="No timestamped submissions in range."
+      >
+        <Heatmap rows={WEEKDAY_NAMES} columns={HOURS} cells={hourByWeekday(ranged)} valueName="submissions" showValues height={320} />
       </ChartCard>
       <ReportedSickTop submissions={ranged} />
       <UnitRankings

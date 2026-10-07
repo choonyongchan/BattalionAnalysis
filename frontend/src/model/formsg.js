@@ -15,7 +15,8 @@
 
 import { extractSymptoms, keywords } from './classify.js';
 import { identityKey, normaliseFourD } from '../../../shared/identity.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.js';
+import { weekdayOf } from '../../../shared/dates.js';
 import { COMPANIES, UNASSIGNED } from '../../../shared/domain.js';
 import { platoonOf } from './platoon.js';
 import { battalionStrength } from './metrics.js';
@@ -262,3 +263,44 @@ export function topSubmitters(submissions, limit) {
     .slice(0, limit || settingOf('thresholds').leaderboardSize);
 }
 
+
+/**
+ * How the submissions split across the form's report-sick types: the parts of one whole.
+ * @param {Array<!Object>} submissions Normalised submissions, already restricted to the range.
+ * @returns {Array<{name: string, value: number}>} One part per type in the form's order, then
+ *     "Not stated" for an answer that maps to no type.
+ */
+export function typeShares(submissions) {
+  const counts = new Map();
+  submissions.forEach((submission) => {
+    const type = reportSickTypeOf(submission);
+    counts.set(type, (counts.get(type) || 0) + 1);
+  });
+  return [
+    ...REPORT_SICK_TYPES.map((type) => ({ name: type.label, value: counts.get(type.name) || 0 })),
+    { name: 'Not stated', value: counts.get('') || 0 },
+  ];
+}
+
+/**
+ * When soldiers file: submissions counted by weekday and hour, for a punch-card grid.
+ *
+ * A weekday-by-hour grid rather than two histograms, so weekday and weekend sit on the same
+ * scale per day instead of a five-day total against a two-day one.
+ * @param {Array<!Object>} submissions Normalised submissions, already restricted to the range.
+ * @returns {Array<{row: string, column: string, value: number}>} Non-empty cells; `row` a
+ *     weekday name, `column` the two-digit hour.
+ */
+export function hourByWeekday(submissions) {
+  const counts = new Map();
+  submissions.forEach((submission) => {
+    const at = toTimeOfDay(submission.timestamp);
+    if (!at || !submission.date) return;
+    const key = weekdayOf(submission.date).name + '|' + String(at.hour).padStart(2, '0');
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return Array.from(counts, ([key, value]) => {
+    const [row, column] = key.split('|');
+    return { row, column, value };
+  });
+}

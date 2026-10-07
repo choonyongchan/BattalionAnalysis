@@ -16,10 +16,8 @@ export { ChartCard } from './ChartCard.jsx';
 export { Bar } from './Bar.jsx';
 export { Donut } from './Donut.jsx';
 export { Heatmap } from './Heatmap.jsx';
-export { Histogram } from './Histogram.jsx';
 export { Line } from './Line.jsx';
 export { Sankey } from './Sankey.jsx';
-export { WordCloud } from './WordCloud.jsx';
 
 // The table twin on its own, for the handful of card-shaped things that are a table and
 // never a chart — a data-quality issue list, say. It is the same component the charts
