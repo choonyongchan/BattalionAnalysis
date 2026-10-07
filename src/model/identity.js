@@ -80,3 +80,56 @@ export function identityOf(row) {
   }
   return { key, source: key.startsWith('4D:') ? 'four_d' : 'name' };
 }
+
+/** Rank tokens that may survive into a name field and must not drive a match. */
+const RANKS = new Set([
+  'REC', 'PTE', 'LCP', 'LCPL', 'CPL', '1PTE', '2PTE', '3SG', '2SG', '1SG', 'SSG', 'MSG',
+  '1WO', '2WO', '3WO', 'MWO', 'CWO', 'SWO', 'OCT', 'OFC', '2LT', 'LTA', 'CPT', 'MAJ',
+  'LTC', 'SLTC', 'COL', 'BG', 'ME1', 'ME2', 'ME3', 'ME4', 'ME5', 'DR',
+]);
+
+/** Name connectors that carry no identifying weight on their own. */
+const CONNECTORS = new Set(['BIN', 'BINTE', 'BTE']);
+
+/**
+ * Splits a name into comparable tokens.
+ *
+ * Drops one-letter tokens (initials, and the `s o` / `d o` left by `s/o` and `d/o`),
+ * rank tokens, and name connectors, so what remains is the identifying words.
+ * @param {*} name Raw name.
+ * @returns {Array<string>} Upper-case tokens, in their original order.
+ */
+export function nameTokens(name) {
+  return normaliseName(name)
+    .split(' ')
+    .filter((token) => token.length > 1 && !RANKS.has(token) && !CONNECTORS.has(token));
+}
+
+/**
+ * Whether two names plausibly belong to the same soldier.
+ *
+ * True when every token of the shorter name (at least two of them) also appears in the
+ * longer name — which covers a nickname on one side only and any token order — or when
+ * the two token sets overlap by at least 60%.
+ * @param {*} a One name.
+ * @param {*} b The other name.
+ * @returns {boolean} Whether they match.
+ */
+export function namesMatch(a, b) {
+  const setA = new Set(nameTokens(a));
+  const setB = new Set(nameTokens(b));
+  if (setA.size === 0 || setB.size === 0) {
+    return false;
+  }
+  let inter = 0;
+  setA.forEach((token) => {
+    if (setB.has(token)) {
+      inter += 1;
+    }
+  });
+  const smaller = Math.min(setA.size, setB.size);
+  if (smaller >= 2 && inter === smaller) {
+    return true;
+  }
+  return inter / (setA.size + setB.size - inter) >= 0.6;
+}

@@ -20,7 +20,7 @@ import { COMPANIES } from './domain.js';
 import { toIsoDate, toText, toTimeOfDay } from './values.js';
 
 /** @type {string} Session used when a caller does not name one. */
-export const DEFAULT_SESSION = 'FPS';
+const DEFAULT_SESSION = 'FPS';
 
 /** @type {!RegExp} Shape of `parade_response_id`: `Company_yyyy-MM-dd_SESSION`. */
 const ID_PATTERN = /^([A-Za-z]+)_(\d{4}-\d{2}-\d{2})_([A-Za-z0-9]+)$/;

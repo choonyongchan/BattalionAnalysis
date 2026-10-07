@@ -12,7 +12,6 @@ import { describe, expect, test } from 'bun:test';
 import {
   rotationIssues,
   rotationOf,
-  rotationSpan,
   toRotations,
 } from '../../src/model/rotations.js';
 
@@ -131,27 +130,5 @@ describe('rotationIssues', () => {
   test('an open-ended rotation raises no gap after it', () => {
     const rotations = toRotations([{ name: 'Rot 2', start_date: '2026-07-01', end_date: '' }]);
     expect(rotationIssues(rotations)).toEqual([]);
-  });
-});
-
-describe('rotationSpan', () => {
-  test('returns null for an empty schedule', () => {
-    expect(rotationSpan([])).toBe(null);
-  });
-
-  test('spans from the earliest start to the latest end', () => {
-    const rotations = toRotations([
-      { name: 'TRADES', start_date: '2026-01-01', end_date: '2026-03-31' },
-      { name: 'Rot 1', start_date: '2026-04-01', end_date: '2026-06-30' },
-    ]);
-    expect(rotationSpan(rotations)).toEqual({ start: '2026-01-01', end: '2026-06-30' });
-  });
-
-  test('is open-ended when any rotation is open-ended', () => {
-    const rotations = toRotations([
-      { name: 'TRADES', start_date: '2026-01-01', end_date: '2026-03-31' },
-      { name: 'Rot 4', start_date: '2026-10-01', end_date: '' },
-    ]);
-    expect(rotationSpan(rotations)).toEqual({ start: '2026-01-01', end: null });
   });
 });

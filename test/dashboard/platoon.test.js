@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { platoonCoverage, platoonOf, positionKey, toPositionCells } from '../../src/model/platoon.js';
+import { platoonCoverage, platoonOf, toPositionCells } from '../../src/model/platoon.js';
 import { UNASSIGNED } from '../../src/model/domain.js';
 
 describe('platoonOf', () => {
@@ -151,20 +151,5 @@ describe('toPositionCells', () => {
     ]);
     expect(unplaced).toBe(3);
     expect(cells.every((cell) => cell.value === 0)).toBe(true);
-  });
-});
-
-describe('positionKey', () => {
-  test('spells out what each position column means for every company', () => {
-    const key = positionKey();
-    expect(key.map((entry) => entry.column)).toEqual(['Coy HQ', '1st Pl', '2nd Pl', '3rd Pl', '4th Pl']);
-    expect(key[1].units).toEqual([
-      { company: 'Archer', platoon: '1' },
-      { company: 'Braves', platoon: '4' },
-      { company: 'Cougar', platoon: '7' },
-      { company: 'Stallion', platoon: 'PNR' },
-      { company: 'Hercules', platoon: 'SIG' },
-    ]);
-    expect(key[4].units).toEqual([{ company: 'Stallion', platoon: 'SIG' }]);
   });
 });

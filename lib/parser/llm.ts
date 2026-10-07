@@ -33,7 +33,7 @@ export class LlmParseError extends Error {
 }
 
 /** What `OpenAiParser` needs. */
-export interface OpenAiParserOptions {
+interface OpenAiParserOptions {
   /** The OpenAI API key. */
   apiKey: string;
   /** The model; defaults to `DEFAULT_MODEL`. */

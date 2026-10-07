@@ -137,17 +137,3 @@ export function toPositionCells(cells) {
   );
   return { cells: placed, unplaced };
 }
-
-/**
- * What each position column means, company by company, for a heatmap's key.
- * @returns {Array<{column: string, units: Array<{company: string, platoon: string}>}>} One
- *     entry per `SUBUNIT_POSITIONS` column, listing the companies that have a sub-unit there.
- */
-export function positionKey() {
-  return SUBUNIT_POSITIONS.map((column, position) => ({
-    column,
-    units: COMPANIES.filter((company) => (COMPANY_SUBUNITS[company] || [])[position]).map(
-      (company) => ({ company, platoon: COMPANY_SUBUNITS[company][position] })
-    ),
-  }));
-}

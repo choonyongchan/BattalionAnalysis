@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { identityKey, identityOf, normaliseName } from '../../src/model/identity.js';
+import { identityKey, identityOf, namesMatch, nameTokens, normaliseName } from '../../src/model/identity.js';
 
 describe('normaliseName', () => {
   test('makes one soldier out of two spellings', () => {
@@ -70,5 +70,40 @@ describe('identityKey', () => {
 
   test('a placeholder 4D with no name yields no key, not a key shared by everyone', () => {
     expect(identityKey('NIL', '')).toBe('');
+  });
+});
+
+describe('name tokens', () => {
+  test('drops the rank, punctuation and one-letter tokens', () => {
+    expect(nameTokens('CPL TAN AH KOW, ALPHA')).toEqual(['TAN', 'AH', 'KOW', 'ALPHA']);
+    expect(nameTokens('BRAVO ALI BIN CHARLIE')).toEqual(['BRAVO', 'ALI', 'CHARLIE']);
+    expect(nameTokens('')).toEqual([]);
+  });
+});
+
+describe('name matching', () => {
+  test('identical names match', () => {
+    expect(namesMatch('TAN AH KOW', 'TAN AH KOW')).toBe(true);
+  });
+
+  test('a nickname on one side only still matches', () => {
+    expect(namesMatch('TAN AH KOW, ALPHA', 'TAN AH KOW')).toBe(true);
+  });
+
+  test('token order does not matter', () => {
+    expect(namesMatch('TAN JOHN', 'JOHN TAN')).toBe(true);
+  });
+
+  test('a leftover rank token does not block the match', () => {
+    expect(namesMatch('CPL TAN WEI', 'TAN WEI')).toBe(true);
+  });
+
+  test('same surname but different given names do not match', () => {
+    expect(namesMatch('TAN WEI MING', 'TAN WEI LONG')).toBe(false);
+  });
+
+  test('a blank name never matches', () => {
+    expect(namesMatch('', 'TAN WEI')).toBe(false);
+    expect(namesMatch('TAN WEI', '')).toBe(false);
   });
 });

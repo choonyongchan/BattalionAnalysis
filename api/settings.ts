@@ -24,7 +24,7 @@ import { isSection } from '../src/model/settings/defaults.js';
 import { validateSection } from '../src/model/settings/validate.js';
 
 /** The settings writes, injected so tests need no database. */
-export interface SettingsStore {
+interface SettingsStore {
   save(section: string, value: unknown, version: number): Promise<SaveOutcome>;
   reset(section: string, version: number): Promise<SaveOutcome>;
 }

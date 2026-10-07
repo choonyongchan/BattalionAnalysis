@@ -34,7 +34,7 @@ const NEEDS_REVIEW = 'Needs review: ';
 type Db = any;
 
 /** What happened to a message handed to `recordMessage`. */
-export type RecordOutcome =
+type RecordOutcome =
   | { status: 'stored'; id: number }
   | { status: 'duplicate'; id: number }
   | { status: 'already_processed'; id: number; paradeResponseId: string | null; error: string | null };
@@ -69,7 +69,7 @@ export type IngestOutcome =
   | { status: 'not_found'; id: number };
 
 /** One stored message as the dashboard lists it. Carries no body. */
-export interface MessageSummary {
+interface MessageSummary {
   id: number;
   waMessageId: string;
   receivedAt: Date;
@@ -88,7 +88,7 @@ export interface MessageSummary {
  * @param message The relayed message.
  * @returns What became of it, and the row id either way.
  */
-export async function recordMessage(
+async function recordMessage(
   db: Db,
   message: { waMessageId: string; body: string },
 ): Promise<RecordOutcome> {

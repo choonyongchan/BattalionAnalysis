@@ -71,20 +71,6 @@ function extractHeader(text) {
 }
 
 /**
- * Reports whether a message's header labels it a first parade state.
- *
- * A header that names a last parade is never a first parade, even if it also
- * carries a first-parade marker.
- *
- * @param {string} text Raw message text.
- * @returns {boolean} True when the header names a first parade and not a last one.
- */
-export function isFirstParade(text) {
-  const header = extractHeader(text);
-  return FIRST_PARADE_PATTERN.test(header) && !LAST_PARADE_PATTERN.test(header);
-}
-
-/**
  * Classifies a WhatsApp message as a first parade state or not.
  *
  * @param {string} text Raw message text. Non-string or empty input is rejected.

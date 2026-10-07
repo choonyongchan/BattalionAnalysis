@@ -6,7 +6,7 @@ import { COMPANIES, REPORT_SICK_TYPES, cleanText } from '../domain.ts';
 import type { ExtractedCommandMember, ExtractedPerson, ExtractedUnit, Extraction } from './extraction.ts';
 
 /** What the parser made of a message, and why it is unsure of it (empty when it is sure). */
-export interface DeterministicResult {
+interface DeterministicResult {
   extraction: Extraction;
   problems: string[];
 }

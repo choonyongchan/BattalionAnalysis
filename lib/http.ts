@@ -35,7 +35,7 @@ export function methodNotAllowed(allowed: string[]): Response {
 }
 
 /** A parsed body, or the response explaining why it could not be parsed. */
-export type ParsedBody<T> = { ok: true; body: T } | { ok: false; response: Response };
+type ParsedBody<T> = { ok: true; body: T } | { ok: false; response: Response };
 
 /**
  * Parses a JSON request body.

@@ -31,7 +31,7 @@ export const DEFAULT_PROJECTION_DAYS = 7;
  * The duty classes that keep a soldier off parade for dated days. See the module header.
  * @type {string[]}
  */
-export const PROJECTED_CLASSES = [DUTY_CLASS.ATT_C, DUTY_CLASS.OFF_LEAVE];
+const PROJECTED_CLASSES = [DUTY_CLASS.ATT_C, DUTY_CLASS.OFF_LEAVE];
 
 /**
  * Each soldier on MC or leave on one parade, per company, with every interval stated for him.

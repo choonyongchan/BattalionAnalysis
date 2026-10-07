@@ -10,8 +10,7 @@
  *   - statements are split on the `--> statement-breakpoint` marker drizzle-kit writes;
  *   - applied migrations are recorded in `drizzle.__drizzle_migrations`, keyed by the
  *     SHA-256 of the migration file (with LF line endings), which is how drizzle-kit decides
- *     what is pending. A migration whose CRLF form's hash is recorded also counts as applied
- *     (see `isApplied`).
+ *     what is pending.
  *
  * Re-runnable: a migration already recorded is skipped.
  *
@@ -46,22 +45,6 @@ export interface Migration extends JournalEntry {
  */
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
-}
-
-/**
- * Whether a migration is already recorded as applied.
- *
- * A migration counts as applied when the recorded hashes contain either its LF hash (what
- * this script records) or the hash of the same text with CRLF line endings. Files applied
- * from a CRLF checkout, before hashing normalised line endings, were recorded by their CRLF
- * bytes; without this they would look pending and run a second time.
- *
- * @param migration The migration, as `readMigrations` returns it.
- * @param recorded The hashes in `drizzle.__drizzle_migrations`.
- * @returns True when either hash is recorded.
- */
-export function isApplied(migration: Pick<Migration, 'text' | 'hash'>, recorded: ReadonlySet<string>): boolean {
-  return recorded.has(migration.hash) || recorded.has(sha256(migration.text.replace(/\n/g, '\r\n')));
 }
 
 /**
@@ -118,7 +101,7 @@ export async function applyMigrations(
 
   for (const entry of migrations) {
     const { text, hash } = entry;
-    if (isApplied(entry, seen)) {
+    if (seen.has(hash)) {
       log(`skip  ${entry.tag} (already applied)`);
       continue;
     }

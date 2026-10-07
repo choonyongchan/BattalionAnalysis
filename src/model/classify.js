@@ -47,15 +47,6 @@ export const DUTY_CLASS = {
 export const MC_MA = [DUTY_CLASS.ATT_C, DUTY_CLASS.MA];
 
 /**
- * Reads a duty-class argument as a list, so every view can be about one class or several.
- * @param {string|!Array<string>} wanted One duty class, or several.
- * @returns {!Array<string>} The classes, as a list.
- */
-export function dutyList(wanted) {
-  return Array.isArray(wanted) ? wanted : [wanted];
-}
-
-/**
  * Whether a duty class is one a view is about.
  * @param {string|!Array<string>} wanted One duty class, or several.
  * @param {string} dutyClass The class a row or episode carries.
@@ -68,7 +59,7 @@ export function isDuty(wanted, dutyClass) {
 /**
  * Maps a Personnel Data `reason_category` to a duty class.
  *
- * Mirrors `REASON_CATEGORIES` in `src/parser/ParserSchema.js`. A category outside this
+ * Mirrors `reasonCategoryEnum` in `db/schema.ts`. A category outside this
  * map is surfaced as UNKNOWN rather than dropped, so an upstream enum change shows up
  * as a visible bucket instead of quietly shrinking every total.
  * @type {!Object<string, string>}

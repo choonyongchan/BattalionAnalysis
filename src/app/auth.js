@@ -24,6 +24,8 @@ import { dataset, loadError, status } from './state.js';
  *
  * That build is gone, but a browser that ran it is still holding the password until
  * something removes it, and that something has to be this page.
+ * ponytail: one-off purge kept on purpose; delete once every clerk browser has loaded a
+ * build since 2026-09-21 (safe after 2026-12-31).
  * @returns {void}
  */
 function forgetStoredPassword_() {

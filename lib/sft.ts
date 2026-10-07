@@ -65,7 +65,7 @@ export async function listSftRecords(db: Db): Promise<unknown[]> {
  * @param company The corrected company, or null.
  * @returns The `unit_coy` to store.
  */
-export function unitCoyFor(current: string | null, company: Company | null): string | null {
+function unitCoyFor(current: string | null, company: Company | null): string | null {
   if (companyFromUnitCoy(current) === company) return current;
   return company;
 }

@@ -15,15 +15,8 @@
 
 import { extractSymptoms, keywords } from './classify.js';
 import { identityKey, normaliseFourD } from './identity.js';
-import { toIsoDate, toNumber, toText } from './values.js';
-import {
-  COMPANIES,
-  COMPANY_SUBUNITS,
-  PLATOONS,
-  UNASSIGNED,
-  UNIT_TYPE_COMPANY,
-  subunitPosition,
-} from './domain.js';
+import { toIsoDate, toText } from './values.js';
+import { COMPANIES, UNASSIGNED } from './domain.js';
 import { platoonOf } from './platoon.js';
 import { battalionStrength } from './metrics.js';
 import { settingOf } from './settings/active.js';
@@ -53,23 +46,6 @@ function companyFrom_(text) {
 export function submissionPlatoonOf(submission) {
   const { platoon } = platoonOf({ platoon: '', four_d: submission.fourD });
   return platoon === UNASSIGNED ? 'HQ' : platoon;
-}
-
-/**
- * The sub-unit a FormSG submission belongs to, for the position heatmap.
- *
- * Wider than `submissionPlatoonOf`: the 4D's leading digit is read across 1-9, since
- * Braves numbers 4-6 and Cougar 7-9, and kept only when it is one of the submitter's own
- * company's sub-units (`COMPANY_SUBUNITS`). Anything else — no 4D, or a digit the company
- * has no platoon for, as for Stallion's and Hercules' named sub-units — goes under `HQ`,
- * the same fallback `submissionPlatoonOf` uses.
- * @param {!Object} submission A normalised submission from `toSubmissions`.
- * @returns {string} A sub-unit of the submission's company, or `'HQ'`.
- */
-export function submissionSubunitOf(submission) {
-  const match = /^[A-Z]?([1-9])/.exec(toText(submission.fourD).toUpperCase());
-  const digit = match ? match[1] : '';
-  return subunitPosition(submission.company, digit) > 0 ? digit : 'HQ';
 }
 
 /**
@@ -130,140 +106,6 @@ export function submissionCounts(submissions) {
       perSoldier: soldiers > 0 ? submissions.length / soldiers : null,
     },
   };
-}
-
-/**
- * Counts FormSG submissions by company.
- * @param {Array<!Object>} submissions Normalised submissions.
- * @returns {Array<{company: string, count: number}>} Companies, highest count first.
- */
-export function submissionCountByCompany(submissions) {
-  const counts = new Map();
-  submissions.forEach((submission) => {
-    if (COMPANIES.includes(submission.company)) {
-      counts.set(submission.company, (counts.get(submission.company) || 0) + 1);
-    }
-  });
-  return COMPANIES.map((company) => ({ company, count: counts.get(company) || 0 }))
-    .filter((row) => row.count > 0)
-    .sort((a, b) => b.count - a.count || a.company.localeCompare(b.company));
-}
-
-/**
- * Counts FormSG submissions by company and inferred platoon.
- * @param {Array<!Object>} submissions Normalised submissions.
- * @returns {Array<{company: string, platoon: string, count: number}>} Counts, highest first.
- */
-export function submissionCountByPlatoon(submissions) {
-  const counts = new Map();
-  submissions.forEach((submission) => {
-    if (!COMPANIES.includes(submission.company)) return;
-    const key = submission.company + '\u0000' + submissionPlatoonOf(submission);
-    counts.set(key, (counts.get(key) || 0) + 1);
-  });
-  return Array.from(counts, ([key, count]) => {
-    const [company, platoon] = key.split('\u0000');
-    return { company, platoon, count };
-  }).sort((a, b) => b.count - a.count || a.company.localeCompare(b.company) || a.platoon.localeCompare(b.platoon));
-}
-
-/**
- * FormSG submission counts per company x platoon, for the Report Sick heatmap.
- *
- * Company comes from the matched "Unit & Coy" answer; a submission naming no known company
- * is dropped, exactly as `submissionRateByCompany` drops it, rather than guessed at.
- * Platoon comes from `submissionSubunitOf`. Empty cells are omitted, matching the contract
- * the parade-state `PlatoonHeatmap` already expects.
- * @param {Array<!Object>} submissions Normalised submissions, already restricted to the
- *     range being drawn.
- * @returns {Array<{row: string, column: string, value: number}>} One entry per non-empty
- *     company x sub-unit pair.
- */
-export function submissionHeatmapCells(submissions) {
-  const counts = new Map();
-  submissions.forEach((submission) => {
-    if (!COMPANIES.includes(submission.company)) return;
-    const key = submission.company + '\u0000' + submissionSubunitOf(submission);
-    counts.set(key, (counts.get(key) || 0) + 1);
-  });
-
-  const cells = [];
-  COMPANIES.forEach((company) => {
-    (COMPANY_SUBUNITS[company] || []).forEach((platoon) => {
-      const value = counts.get(company + '\u0000' + platoon) || 0;
-      if (value > 0) {
-        cells.push({ row: company, column: platoon, value });
-      }
-    });
-  });
-  return cells;
-}
-
-/**
- * FormSG submission rate by company x platoon, the platoon counterpart to
- * `submissionRateByCompany`.
- *
- * Made possible only by the 4D-inferred platoon (`submissionPlatoonOf`); the page carrying
- * this ranking says the platoon is inferred. The denominator is the same platoon roll
- * `metrics.rateRows_` uses — Strength Data rows that are not a whole-company total — summed
- * by company and normalised platoon over every strength row passed in.
- * @param {Array<!Object>} submissions Normalised submissions, already restricted to the
- *     range being ranked.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records, restricted to the
- *     same range.
- * @returns {Array<{company: string, platoon: string, count: number, per100: ?number}>}
- *     Company x platoon pairs ranked by rate, highest first; `per100` is null when the
- *     pair has no strength on record.
- */
-export function submissionRateByPlatoon(submissions, strengthRows) {
-  const counts = new Map();
-  submissions.forEach((submission) => {
-    if (!COMPANIES.includes(submission.company)) return;
-    const key = submission.company + '\u0000' + submissionPlatoonOf(submission);
-    counts.set(key, (counts.get(key) || 0) + 1);
-  });
-
-  const paxDays = new Map();
-  strengthRows
-    .filter((strengthRow) => toText(strengthRow.unit_type) !== UNIT_TYPE_COMPANY)
-    .forEach((strengthRow) => {
-      const company = toText(strengthRow.company);
-      if (!COMPANIES.includes(company)) return;
-      const platoon = normalisePlatoonCell_(strengthRow.platoon);
-      if (platoon === '') return;
-      const key = company + '\u0000' + platoon;
-      paxDays.set(key, (paxDays.get(key) || 0) + (toNumber(strengthRow.total_strength) || 0));
-    });
-
-  const rows = [];
-  COMPANIES.forEach((company) => {
-    PLATOONS.forEach((platoon) => {
-      const key = company + '\u0000' + platoon;
-      const count = counts.get(key) || 0;
-      const days = paxDays.get(key) || 0;
-      if (count === 0 && days === 0) return;
-      rows.push({
-        company,
-        platoon,
-        count,
-        per100: days > 0 ? (count / days) * 100 : null,
-      });
-    });
-  });
-  return rows.sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
-}
-
-/**
- * Reads a Strength Data `platoon` cell only when it names a member of the `PLATOONS` roll.
- *
- * Matches `metrics.unitRates`' `onRoll` test exactly — a raw compare, no case-folding — so
- * the FormSG platoon rate divides by the same pax-days the parade-state one does.
- * @param {*} cell The raw platoon cell.
- * @returns {string} A member of `PLATOONS`, or `''` when the cell names none.
- */
-function normalisePlatoonCell_(cell) {
-  const text = toText(cell);
-  return PLATOONS.indexOf(text) >= 0 ? text : '';
 }
 
 /**
@@ -420,44 +262,3 @@ export function topSubmitters(submissions, limit) {
     .slice(0, limit || settingOf('thresholds').leaderboardSize);
 }
 
-/**
- * FormSG submission rate by company, over the whole span the submissions and strength
- * rows both cover.
- *
- * There is no platoon-level counterpart: FormSG's "Unit & Coy" answer names a company,
- * never a platoon, so ranking platoons on "reported sick" is data this dashboard does not
- * have — the page showing this ranking says so rather than showing an empty column.
- * @param {Array<!Object>} submissions Normalised submissions, already restricted to the
- *     range being ranked.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records, restricted to
- *     the same range.
- * @returns {Array<{company: string, count: number, per100: ?number}>} Companies ranked by
- *     rate, highest first; `per100` is null when the range has no strength on record.
- */
-export function submissionRateByCompany(submissions, strengthRows) {
-  const counts = new Map(COMPANIES.map((company) => [company, 0]));
-  submissions.forEach((submission) => {
-    if (counts.has(submission.company)) {
-      counts.set(submission.company, counts.get(submission.company) + 1);
-    }
-  });
-
-  const paxDays = new Map(COMPANIES.map((company) => [company, 0]));
-  strengthRows
-    .filter((row) => toText(row.unit_type) === UNIT_TYPE_COMPANY)
-    .forEach((row) => {
-      const company = toText(row.company);
-      if (paxDays.has(company)) {
-        paxDays.set(company, paxDays.get(company) + (toNumber(row.total_strength) || 0));
-      }
-    });
-
-  return COMPANIES.map((company) => {
-    const days = paxDays.get(company);
-    return {
-      company,
-      count: counts.get(company),
-      per100: days > 0 ? (counts.get(company) / days) * 100 : null,
-    };
-  }).sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
-}

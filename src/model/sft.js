@@ -11,8 +11,7 @@
 
 import Fuse from 'fuse.js';
 import { COMPANIES } from './domain.js';
-import { normaliseName } from './identity.js';
-import { nameTokens, namesMatch } from './reconcile.js';
+import { nameTokens, namesMatch, normaliseName } from './identity.js';
 import { toIsoDate, toText } from './values.js';
 
 /** @type {string} How the form joins a checkbox answer's selections. */
@@ -152,7 +151,7 @@ function tokensMatch_(a, b) {
 /**
  * Whether two typed names plausibly name the same person, tolerating typos.
  *
- * `namesMatch` from `reconcile.js` with its token equality relaxed to `tokensMatch_`: every
+ * `namesMatch` from `identity.js` with its token equality relaxed to `tokensMatch_`: every
  * word of the shorter name (at least two) matching, or a 60% overlap.
  * @param {string} a One name.
  * @param {string} b The other name.

@@ -47,11 +47,11 @@ const TABS = SHEET_TABS as Record<
   string
 >;
 
-/** `parade_submissions.model` on a submission `scripts/import-sheet.ts` brought in from the Sheet. */
-export const IMPORTED_MODEL = 'sheet';
-
-/** The same, for one the Sheet had no filing Timestamp for: it is left out of filing times. */
-export const UNTIMED_MODEL = 'sheet:untimed';
+/**
+ * `parade_submissions.model` on a submission imported from the retired Sheet with no filing
+ * Timestamp: it is left out of filing times.
+ */
+const UNTIMED_MODEL = 'sheet:untimed';
 
 /** Singapore is UTC+8 all year. */
 const SGT_OFFSET_MS = 8 * 60 * 60 * 1000;

@@ -146,7 +146,7 @@ describe.skipIf(!hasTestDb)('submissions that are stored', () => {
 
   test('a multi-respondent (v3) submission is stored too', async () => {
     expect((await handle(sftWebhookRequest(SPEC, { v3: true }), deps({ db }))).status).toBe(200);
-    // v3 carries no question titles, so columns map only once SFT_FIELD_IDS is harvested.
+    // v3 carries no question titles, so no column maps (title matching only).
     expect(await countRows(db, 'sft_formsg')).toBe(1);
   }, DB_TIMEOUT_MS);
 });

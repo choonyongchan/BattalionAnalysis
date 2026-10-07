@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { isFirstParade, isParadeState } from '../../whatsapp/src/signature.js';
+import { isParadeState } from '../../whatsapp/src/signature.js';
 
 describe('isParadeState - chatter', () => {
   /** @type {Array<[string, string]>} Label and text of each rejected message. */
@@ -144,20 +144,5 @@ describe('isParadeState - first parade gate', () => {
   test('does not read a DD/MM/YY date as a strength line', () => {
     const text = withoutStrengthLines(withHeader('ARCHER COY FIRST PARADE STATE\nDATE: 22/06/26'));
     expect(isParadeState(text).rejectReason).toContain('present/strength');
-  });
-});
-
-describe('first parade marker', () => {
-  test('ignores an FP token that appears only below the header block', () => {
-    expect(isFirstParade(['PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'FP 0700'].join('\n'))).toBe(false);
-  });
-
-  test('ignores an LP token that appears only below the header block', () => {
-    expect(isFirstParade(['FIRST PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'LP: 2LT LEE'].join('\n'))).toBe(true);
-  });
-
-  test('does not read FP or LP inside a longer word', () => {
-    expect(isFirstParade('HELP DESK FPSX\nl2')).toBe(false);
-    expect(isFirstParade('ALPHA COY FPS\nl2')).toBe(true);
   });
 });

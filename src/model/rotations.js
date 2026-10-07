@@ -163,23 +163,4 @@ export function rotationIssues(rotations) {
 
   return issues;
 }
-
-/**
- * The outer bounds of a rotation schedule.
- * @param {Array<{name: string, start: string, end: ?string}>} rotations Rotations, as
- *     from `toRotations`.
- * @returns {?{start: string, end: ?string}} The earliest start and latest end, `end`
- *     null when any rotation is open-ended, or null for an empty schedule.
- */
-export function rotationSpan(rotations) {
-  const list = rotations || [];
-  if (list.length === 0) {
-    return null;
-  }
-  const start = list.reduce((earliest, rotation) => (rotation.start < earliest ? rotation.start : earliest), list[0].start);
-  const openEnded = list.some((rotation) => rotation.end === null);
-  const end = openEnded
-    ? null
-    : list.reduce((latest, rotation) => (rotation.end > latest ? rotation.end : latest), list[0].end);
-  return { start, end };
-}
+

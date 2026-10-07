@@ -13,7 +13,7 @@
 import { join } from 'node:path';
 
 /** @type {string} Scheduled task name. */
-export const TASK_NAME = 'WhatsAppBridge';
+const TASK_NAME = 'WhatsAppBridge';
 
 /** @type {string} Repo root: the task's working directory, where `.env.whatsapp` lives. */
 const REPO_ROOT = join(import.meta.dir, '..', '..');

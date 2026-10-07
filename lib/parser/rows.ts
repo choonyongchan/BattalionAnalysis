@@ -12,7 +12,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HH_MM = /^\d{2}:\d{2}$/;
 
 /** The rows one message produces, ready for a single `db.batch`. */
-export interface BuiltRows {
+interface BuiltRows {
   submission: {
     paradeResponseId: string;
     company: string;
@@ -29,7 +29,7 @@ export interface BuiltRows {
 }
 
 /** Context the row builder needs beyond the extraction itself. */
-export interface BuildContext {
+interface BuildContext {
   paradeResponseId: string;
   sourceMessageId: number | null;
   model: string | null;

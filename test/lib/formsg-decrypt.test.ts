@@ -121,7 +121,7 @@ describe('v3 answer shaping', () => {
       fieldType: 'textfield',
       answer: 'CPL',
     });
-    // No question, so title matching cannot work: a v3 form needs FIELD_IDS harvested.
+    // No question, so title matching cannot work: a v3 form maps no columns.
     expect(result.responses[0]!.question).toBeUndefined();
   });
 

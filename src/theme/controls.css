@@ -100,11 +100,6 @@
   font-size: 14px;
 }
 
-.field--pill {
-  border-radius: var(--radius-pill);
-  padding: 0 var(--space-lg);
-}
-
 /* Pasted parade states: multi-line, and the same shape as every other field. */
 .field--area {
   display: block;

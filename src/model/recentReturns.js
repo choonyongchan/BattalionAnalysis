@@ -26,7 +26,7 @@ import { toIsoDate, toText } from './values.js';
  * The kinds the list covers, each with the most days after its end date it stays listed.
  * @type {!Object<string, number>}
  */
-export const RECENT_WINDOW_DAYS = {
+const RECENT_WINDOW_DAYS = {
   MC: 2,
   'Light Duty': 1,
 };

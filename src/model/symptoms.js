@@ -35,10 +35,10 @@ export const CLINICAL_BUCKETS = [
 ];
 
 /** @type {string} The bucket for a soldier who picked "Others". */
-export const OTHER_BUCKET = 'Other';
+const OTHER_BUCKET = 'Other';
 
 /** @type {string} The bucket for a submission that answered the question with nothing. */
-export const UNSTATED_BUCKET = 'Unstated';
+const UNSTATED_BUCKET = 'Unstated';
 
 
 

@@ -3,7 +3,7 @@
  *
  * The bundled crest is the default — a raster asset, not `currentColor`, since it carries
  * its own heraldic colours (gold, red, the fist-and-rifles device) that would be lost if
- * flattened to one theme-ink colour. The source file (`40SARlogo.webp`, repo root) shipped
+ * flattened to one theme-ink colour. The source crest shipped
  * on a solid black square; it was flood-filled to transparency and cropped to the crest's
  * bounding box, so the same asset sits cleanly on both the light and dark sidebar
  * background. The Unit settings may replace it with a different logo; `title` defaults to

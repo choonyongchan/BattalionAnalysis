@@ -1,8 +1,8 @@
 /**
  * Turns a decrypted Self-Regulated Fitness Training submission into one `sft_formsg` row.
  *
- * Answers are matched by field `_id` (v3 payloads carry no question text), else by question
- * title. The two long acknowledgement questions match on a prefix, so a small wording edit to
+ * Answers are matched by question title (v3 payloads carry none, so map nothing). The two
+ * long acknowledgement questions match on a prefix, so a small wording edit to
  * their tail does not unmap them.
  */
 import { companyFromUnitCoy, normaliseName } from '../domain.ts';
@@ -10,7 +10,7 @@ import { normaliseTitle, toSgtDate } from './fields.ts';
 import { answerText, type DecryptedSubmission, type MappedSubmission } from './map.ts';
 
 /** Columns filled straight from an answer; `discard` marks titles dropped on purpose. */
-export type SftColumn =
+type SftColumn =
   | 'rank'
   | 'name'
   | 'unitCoy'
@@ -49,24 +49,16 @@ const TITLE_PREFIXES: Array<[string, SftColumn]> = [
   [normaliseTitle('My training is between 0700h and 2200h'), 'windowConfirmed'],
 ];
 
-/**
- * Field ids harvested from a real submission, as `'<24-char id>': 'location'`.
- *
- * Required for v3 (multi-respondent) payloads, which carry no question text.
- */
-export const SFT_FIELD_IDS: Record<string, SftColumn> = {};
-
 /** Columns stored as a ticked/unticked boolean rather than text. */
 const ACKNOWLEDGEMENTS = new Set<SftColumn>(['informedCommander', 'windowConfirmed']);
 
 /**
  * Identifies which column an answer belongs to.
  *
- * @param answer The `_id` and `question` from a webhook response entry.
+ * @param answer The `question` from a webhook response entry.
  * @returns The column, or null when the answer is not recognised.
  */
-export function resolveSftField(answer: { _id?: string; question?: string }): SftColumn | null {
-  if (answer._id && SFT_FIELD_IDS[answer._id]) return SFT_FIELD_IDS[answer._id]!;
+export function resolveSftField(answer: { question?: string }): SftColumn | null {
   if (!answer.question) return null;
   const title = normaliseTitle(answer.question);
   return TITLE_MAP[title] ?? TITLE_PREFIXES.find(([prefix]) => title.startsWith(prefix))?.[1] ?? null;

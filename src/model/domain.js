@@ -1,5 +1,5 @@
 /**
- * The battalion's own vocabulary, mirrored from `src/parser/ParserSchema.js`.
+ * The battalion's own vocabulary, mirrored from the enums in `db/schema.ts`.
  *
  * The parser remains the single source of truth for what these values may be; the
  * dashboard keeps its own copy because it has to answer questions the data alone cannot
@@ -102,7 +102,7 @@ export function commandRolesOf(company) {
 /**
  * `num_days` sentinel a permanent status carries: "no expiry", not a duration.
  *
- * Mirrors `PERM_STATUS_NUM_DAYS` in `src/parser/ParserSchema.js`. Note that no row in the
+ * The parser writes it (`lib/parser/rows.ts`). Note that no row in the
  * observed data actually carries it — see `model/statusBuckets.js` for the fallback the
  * dashboard uses to recognise a permanent status.
  * @type {number}

@@ -45,7 +45,7 @@ function companyRowsOn_(strengthRows, isoDate, session) {
  * `key` is the column prefix in Strength Data (`officer_strength`, `officer_present`, ...).
  * @type {Array<{key: string, label: string}>}
  */
-export const RANK_TIERS = [
+const RANK_TIERS = [
   { key: 'officer', label: 'Officers' },
   { key: 'wospec', label: 'WOSpecs' },
   { key: 'enlistee', label: 'Enlistees' },

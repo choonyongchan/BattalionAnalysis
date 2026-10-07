@@ -1,4 +1,0 @@
-# Migration files are hashed into drizzle.__drizzle_migrations (scripts/apply-migrations.ts).
-# The migrator hashes LF-normalised text and also accepts a recorded CRLF hash; -text keeps
-# checkouts on the committed bytes anyway.
-db/migrations/*.sql -text

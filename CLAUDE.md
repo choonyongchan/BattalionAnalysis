@@ -1,4 +1,4 @@
-# Codex Project Instructions
+# Project Instructions
 
 ## Workflow
 

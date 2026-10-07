@@ -1,4 +1,4 @@
-/** Maps FormSG answers (by field `_id`, else question title) onto `report_sick_formsg` columns. */
+/** Maps FormSG answers (by question title) onto `report_sick_formsg` columns. */
 
 /** Columns filled straight from an answer; `discard` marks titles dropped on purpose. */
 export type Column =
@@ -54,24 +54,16 @@ const TITLE_MAP: Record<string, Column | 'status' | 'statusDays'> = Object.fromE
   ).map(([title, column]) => [normaliseTitle(title), column]),
 );
 
-/**
- * Field ids harvested from a real submission, as `'<24-char id>': 'rank'`.
- *
- * Required for v3 (multi-respondent) payloads, which carry no question text.
- */
-export const FIELD_IDS: Record<string, Column> = {};
-
 /** The `#3` in `Status Given #3`. */
 const REPEAT_SUFFIX = /\s*#(\d+)\s*$/;
 
 /**
  * Identifies which column an answer belongs to.
  *
- * @param answer The `_id` and `question` from a webhook response entry.
+ * @param answer The `question` from a webhook response entry.
  * @returns The column, or null when the answer is not recognised.
  */
-export function resolveField(answer: { _id?: string; question?: string }): Column | null {
-  if (answer._id && FIELD_IDS[answer._id]) return FIELD_IDS[answer._id]!;
+export function resolveField(answer: { question?: string }): Column | null {
   if (!answer.question) return null;
 
   const repeat = REPEAT_SUFFIX.exec(answer.question);

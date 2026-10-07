@@ -10,9 +10,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   reportSickTypeOf,
   submissionCounts,
-  submissionHeatmapCells,
   submissionPlatoonOf,
-  submissionRateByPlatoon,
   submissionTrend,
   toSubmissions,
 } from '../../src/model/formsg.js';
@@ -166,65 +164,6 @@ describe('submissionCounts', () => {
 
   test('no submissions reads as a null mean, not a division error', () => {
     expect(submissionCounts([]).total).toEqual({ submissions: 0, soldiers: 0, perSoldier: null });
-  });
-});
-
-describe('submissionHeatmapCells', () => {
-  test('counts submissions per company x inferred platoon, dropping unknown companies', () => {
-    const cells = submissionHeatmapCells([
-      { company: 'Cougar', fourD: '8203' },
-      { company: 'Cougar', fourD: 'C8299' },
-      { company: 'Archer', fourD: '' },
-      { company: '', fourD: '1234' },
-    ]);
-    expect(cells).toContainEqual({ row: 'Cougar', column: '8', value: 2 });
-    expect(cells).toContainEqual({ row: 'Archer', column: 'HQ', value: 1 });
-    expect(cells.length).toBe(2);
-  });
-
-  test("a 4D digit that is not one of the company's platoons falls back to HQ", () => {
-    const cells = submissionHeatmapCells([
-      { company: 'Cougar', fourD: '3203' },
-      { company: 'Stallion', fourD: '1234' },
-    ]);
-    expect(cells).toEqual([
-      { row: 'Cougar', column: 'HQ', value: 1 },
-      { row: 'Stallion', column: 'HQ', value: 1 },
-    ]);
-  });
-});
-
-describe('submissionRateByPlatoon', () => {
-  test('rate divides submissions by the platoon-row strength, ignoring the company total', () => {
-    const submissions = [
-      { company: 'Cougar', fourD: '3203' },
-      { company: 'Cougar', fourD: '3299' },
-    ];
-    const strength = strengthRows([
-      { company: 'Cougar', platoon: '3', unit_type: 'Platoon', total_strength: 100 },
-      { company: 'Cougar', platoon: '3', unit_type: 'Company', total_strength: 999 },
-    ]);
-    const rows = submissionRateByPlatoon(submissions, strength);
-    expect(rows).toContainEqual({ company: 'Cougar', platoon: '3', count: 2, per100: 2 });
-  });
-
-  test('a platoon with submissions but no strength on record reads per100 null', () => {
-    const rows = submissionRateByPlatoon([{ company: 'Archer', fourD: '' }], []);
-    expect(rows).toContainEqual({ company: 'Archer', platoon: 'HQ', count: 1, per100: null });
-  });
-
-  test('ranks by rate, highest first', () => {
-    const submissions = [
-      { company: 'Cougar', fourD: '1203' },
-      { company: 'Archer', fourD: '2203' },
-      { company: 'Archer', fourD: '2299' },
-    ];
-    const strength = strengthRows([
-      { company: 'Cougar', platoon: '1', unit_type: 'Platoon', total_strength: 100 },
-      { company: 'Archer', platoon: '2', unit_type: 'Platoon', total_strength: 100 },
-    ]);
-    const rows = submissionRateByPlatoon(submissions, strength);
-    expect(rows.map((r) => r.company + r.platoon)).toEqual(['Archer2', 'Cougar1']);
   });
 });
 

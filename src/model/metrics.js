@@ -6,10 +6,8 @@
  * **Counts are of soldiers, not rows.** A company that files both FPS and LPS lists the
  * same absentee twice, so every headcount deduplicates on identity within a date.
  *
- * **Comparisons are rates, not counts.** In the real data Braves shows 40 MC
- * rows against Hercules' 7, which says nothing until divided by strength — Braves is the
- * larger company. Anything compared across units is expressed as a percentage of the
- * days that unit was observed.
+ * **Comparisons are counts, not rates.** Commanders read whole soldiers; a per-100 rate
+ * is never shown, so every cross-unit comparison is a count of distinct soldiers.
  *
  * **A missing company is stated, never absorbed.** If five of six companies have filed,
  * the battalion total is a total of five companies and the dashboard says so. A headline
@@ -24,9 +22,6 @@ import { COMPANIES, PLATOONS, UNASSIGNED, UNIT_TYPE_COMPANY } from './domain.js'
 import { inclusiveDaySpan } from './dates.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 import { eachDay, withinRange } from './dateRange.js';
-
-/** @type {number} Absolute z-score at or above which a unit is flagged as an outlier. */
-export const OUTLIER_Z = 2;
 
 /**
  * Sums a list of numbers, ignoring nulls.
@@ -175,180 +170,6 @@ export function distinctDutyOn(personnelRows, isoDate, session, dutyClass) {
       }
     });
   return keys.size;
-}
-
-/**
- * Counts absence person-days per unit and the pax-days each unit was at risk for.
- *
- * Pax-days is the denominator that makes units of different sizes comparable: a platoon
- * of 55 observed over 4 days contributes 220 pax-days, and its absence person-days
- * divide into that.
- *
- * **The caller picks the denominator rows, because the grain decides them.** Both sides
- * of the fraction have to describe the same population: whatever `keyOf` groups the
- * personnel rows into, `strengthRows` must carry the strength of. Filtering here instead
- * once cost `companyRates` a company — the rows were narrowed to the platoon breakdown
- * while the absences were counted off every row, so a company filing one company-total
- * line put its absences in the battalion numerator with no pax-days under them, doubling
- * the baseline and scoring an average company at z = -2.5.
- *
- * `keyOf` decides the grain, which is the only difference between the company and
- * platoon views — both need the same arithmetic and the same z-score against the
- * battalion rate.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows The Strength Data records holding this grain's
- *     denominator, already narrowed by the caller.
- * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
- * @param {function(!Object): string} keyOf Groups a row into a unit.
- * @returns {Array<!Object>} One entry per unit, with rate and z-score.
- * @private
- */
-function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
-  const paxDays = new Map();
-  strengthRows.forEach((row) => {
-    const key = keyOf(row);
-    paxDays.set(key, (paxDays.get(key) || 0) + (toNumber(row.total_strength) || 0));
-  });
-
-  const personDays = new Map();
-  // Distinct soldiers per unit, deduped on identity alone: the same soldier out on
-  // ten parades is ten person-days but one person. This is the headcount the platoon
-  // grid colours by, where `days` is the load a rate divides.
-  const persons = new Map();
-  const unattributable = new Map();
-  personnelRows
-    .filter((row) => isDuty(dutyClass, classify(row)))
-    .forEach((row) => {
-      const key = keyOf(row);
-      const identity = identityOf(row);
-      // A row naming neither a 4D nor a soldier cannot be a person-day. Keying it anyway
-      // folds every such row in the unit into the single identity '', which reports one
-      // person-day for a soldier who does not exist and loses the real ones. Counted
-      // aside instead, exactly as `dutyCountsOn` counts it.
-      if (identity.key === '') {
-        unattributable.set(key, (unattributable.get(key) || 0) + 1);
-        return;
-      }
-      const date = toIsoDate(row.date);
-      const bucket = personDays.get(key) || new Set();
-      bucket.add(identity.key + '@' + date);
-      personDays.set(key, bucket);
-      const heads = persons.get(key) || new Set();
-      heads.add(identity.key);
-      persons.set(key, heads);
-    });
-
-  const keys = new Set([...paxDays.keys(), ...personDays.keys(), ...unattributable.keys()]);
-  const rows = Array.from(keys).map((key) => ({
-    key,
-    unattributable: unattributable.get(key) || 0,
-    days: (personDays.get(key) || new Set()).size,
-    people: (persons.get(key) || new Set()).size,
-    paxDays: paxDays.get(key) || 0,
-  }));
-
-  const totalPaxDays = sum_(rows.map((row) => row.paxDays));
-  const battalionRate = totalPaxDays > 0 ? sum_(rows.map((row) => row.days)) / totalPaxDays : 0;
-
-  return rows.map((row) => {
-    // Bound to a local rather than read back as `row.z` inside the same object literal:
-    // there, `row` is still the input row and `row.z` is undefined, which makes
-    // `>= OUTLIER_Z` false for every unit however extreme. Silent, and caught only
-    // because a test pins a known outlier.
-    const z = zScore_(row.days, row.paxDays, battalionRate);
-    return {
-      ...row,
-      per100: row.paxDays > 0 ? (row.days / row.paxDays) * 100 : null,
-      z,
-      // Elevated only, not two-tailed. "Is it localised here?" is a question about units
-      // losing more days than the battalion, and flagging a unit for losing unusually
-      // *few* would put it in a list captioned "worth asking about". The signed z-score
-      // stays on every row, so a low outlier is still visible in the table.
-      isOutlier: z !== null && z >= OUTLIER_Z,
-    };
-  });
-}
-
-/**
- * Absence rate per company and platoon, with elevated units flagged.
- *
- * Restricted to the `PLATOONS` roll on both sides of the fraction. Filtering the inputs
- * rather than the output is what keeps the z-score honest: the battalion rate this
- * scores against has to be the rate among the platoons being compared, and leaving a
- * command element's pax-days or a company's unattributed absences in the baseline would
- * measure each platoon against a battalion it is not part of.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
- * @returns {Array<!Object>} One entry per company/platoon on the roll.
- */
-export function unitRates(personnelRows, strengthRows, dutyClass) {
-  const onRoll = (row) => PLATOONS.indexOf(toText(row.platoon)) >= 0;
-  const keyOf = (row) => toText(row.company) + '|' + toText(row.platoon);
-  return rateRows_(
-    personnelRows.filter(onRoll),
-    // The breakdown rows, never the company total: at platoon grain the total would land
-    // on whichever key its own `platoon` cell happens to name and count that company's
-    // strength twice. `onRoll` already drops it in the observed data, where the cell reads
-    // 'Company'; excluding it by `unit_type` does not rely on that.
-    strengthRows.filter((row) => onRoll(row) && toText(row.unit_type) !== UNIT_TYPE_COMPANY),
-    dutyClass,
-    keyOf
-  )
-    .map((row) => {
-      const [company, platoon] = row.key.split('|');
-      return { ...row, company, platoon };
-    })
-    .sort((a, b) => a.company.localeCompare(b.company) || a.platoon.localeCompare(b.platoon));
-}
-
-/**
- * Absence rate per company, with elevated companies flagged.
- *
- * A separate roll-up rather than a sum of `unitRates`, because the z-score has to be
- * recomputed at this level: a company's denominator is its own accountable strength, and
- * a z-score computed per platoon says nothing about the company that contains them.
- *
- * The denominator is the company-total row, which is the only row that covers everyone
- * the numerator counts. The platoon breakdown does not: a company files it or it does
- * not — Hercules files one line in the samples — and its command element sits outside the
- * platoon roll either way, so a company's absences would be read against a fraction of
- * its strength, or against none at all.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string|!Array<string>} dutyClass Duty class(es) to measure, from DUTY_CLASS.
- * @returns {Array<!Object>} One entry per company, highest rate first.
- */
-export function companyRates(personnelRows, strengthRows, dutyClass) {
-  return rateRows_(
-    personnelRows,
-    strengthRows.filter((row) => toText(row.unit_type) === UNIT_TYPE_COMPANY),
-    dutyClass,
-    (row) => toText(row.company)
-  )
-    .filter((row) => row.key !== '')
-    .map((row) => ({ ...row, company: row.key }))
-    .sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
-}
-
-/**
- * Scores how far a unit's absence count sits from the battalion rate.
- *
- * A normal approximation to the binomial: with n pax-days at battalion rate p, a unit is
- * expected to lose n*p days with standard deviation sqrt(n*p*(1-p)). This is what
- * separates "a small platoon had three MCs" from "this platoon is an outlier" — the
- * former is noise in a small denominator and the z-score says so.
- * @param {number} days Observed absence person-days.
- * @param {number} paxDays The unit's pax-days.
- * @param {number} rate Battalion-wide rate, as a proportion.
- * @returns {?number} The z-score, or null when there is too little to compare.
- */
-function zScore_(days, paxDays, rate) {
-  if (paxDays <= 0 || rate <= 0 || rate >= 1) {
-    return null;
-  }
-  const sd = Math.sqrt(paxDays * rate * (1 - rate));
-  return sd > 0 ? (days - paxDays * rate) / sd : null;
 }
 
 /**
@@ -520,8 +341,7 @@ function countGroups_(episodes, keyOf) {
  * thirty soldiers filing one each.
  *
  * This is a raw volume, not a size-fair rate: a bigger unit sits higher on both counts
- * for being bigger. `companyRates` / `unitRates` are the comparison; this sits beside
- * them. The battalion and per-platoon soldier counts are taken from the episode list
+ * for being bigger. The battalion and per-platoon soldier counts are taken from the episode list
  * whole, never summed from `byCompany`: a soldier who files under two companies across
  * the range is one soldier to the battalion but a member of two company groups.
  * @param {Array<!Object>} episodes Episodes to count, any duty class.
