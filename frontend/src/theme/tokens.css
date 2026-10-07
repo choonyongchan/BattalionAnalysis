@@ -118,7 +118,7 @@
   /*
    * The only shadow in the system. DESIGN.md reserves it for product photography; the
    * nearest thing here is a panel that genuinely floats above the page, so it is used
-   * on the slide-over sidebar and on a popover, and on nothing else.
+   * on the slide-over sidebar, the soldier-search dropdown and a popover, and on nothing else.
    */
   --shadow-float: rgba(0, 0, 0, 0.22) 0 5px 30px;
 }

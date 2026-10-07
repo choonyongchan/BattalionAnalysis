@@ -323,7 +323,7 @@ tbody tr:last-child td {
  */
 .soldiersearch {
   --soldiersearch-height: 48px;
-  --soldiersearch-lift: 0 1px 6px rgba(32, 33, 36, 0.18);
+  --soldiersearch-lift: var(--shadow-float);
   position: relative;
   width: 100%;
   max-width: 40rem;
@@ -414,7 +414,7 @@ tbody tr:last-child td {
   background: var(--surface-raised);
   border-top: 1px solid var(--hairline-soft);
   border-radius: 0 0 calc(var(--soldiersearch-height) / 2) calc(var(--soldiersearch-height) / 2);
-  box-shadow: 0 4px 6px rgba(32, 33, 36, 0.18);
+  box-shadow: var(--shadow-float);
   max-height: 22rem;
   overflow-y: auto;
 }
