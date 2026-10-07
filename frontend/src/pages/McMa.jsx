@@ -52,7 +52,7 @@ export function McMa() {
         labelsOf={(e) => (e.symptoms.length > 0 ? e.symptoms : extractSymptoms(e.reasons.join(' ')))}
         range={range}
       />
-      <LocationsCard personnel={data.personnel} />
+      <LocationsCard personnel={data.personnel} range={range} />
       <LongMcCard episodes={episodes} range={range} />
       <EpisodeLeaderboard range={range} dutyClass={DUTY} metric="days" />
       <UnitRankings

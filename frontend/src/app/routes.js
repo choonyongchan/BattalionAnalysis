@@ -24,7 +24,7 @@ import {
   SoldierIcon,
   StatusIcon,
 } from './icons.jsx';
-import { Overview } from '../pages/Overview.jsx';
+import { Overview } from '../pages/overview/Overview.jsx';
 import { ReportSick } from '../pages/ReportSick.jsx';
 import { McMa } from '../pages/McMa.jsx';
 import { Status } from '../pages/Status.jsx';

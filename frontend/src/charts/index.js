@@ -14,7 +14,7 @@
 export { ChartCard } from './ChartCard.jsx';
 
 export { Bar } from './Bar.jsx';
-export { GroupedBar } from './GroupedBar.jsx';
+export { Donut } from './Donut.jsx';
 export { Heatmap } from './Heatmap.jsx';
 export { Histogram } from './Histogram.jsx';
 export { Line } from './Line.jsx';

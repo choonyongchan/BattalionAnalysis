@@ -9,6 +9,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
+  absenceParts,
   battalionStrength,
   dutyCountsOn,
   episodeCounts,
@@ -369,5 +370,17 @@ describe('longMcRoster', () => {
     const roster = longMcRoster(episodes, DUTY_CLASS.ATT_C);
     expect(roster).toHaveLength(2);
     expect(roster.map((row) => row.days)).toEqual([10, 8]);
+  });
+});
+
+describe('absenceParts', () => {
+  test('splits the absent classes only, in a fixed order', () => {
+    const duty = { counts: { 'Att C': 3, MA: 1, 'Off/Leave': 4, Others: 0, Status: 9, 'Report Sick': 2 } };
+    expect(absenceParts(duty)).toEqual([
+      { name: 'MC', value: 3 },
+      { name: 'MA', value: 1 },
+      { name: 'Off / leave', value: 4 },
+      { name: 'Other duties', value: 0 },
+    ]);
   });
 });

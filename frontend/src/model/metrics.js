@@ -377,3 +377,20 @@ export function episodeCounts(episodes, dutyClass) {
 }
 
 
+
+/**
+ * The soldiers out of camp on one parade, split by why: the parts of one whole that the
+ * Overview draws as a ring. Only the absent classes (`isAbsent`); a soldier on Status or
+ * reporting sick is still in camp and belongs to a different question.
+ * @param {!Object} duty A `dutyCountsOn` result.
+ * @returns {Array<{name: string, value: number}>} One part per absent class, in a fixed
+ *     order so the ring does not reshuffle from one day to the next.
+ */
+export function absenceParts(duty) {
+  return [
+    ['MC', DUTY_CLASS.ATT_C],
+    ['MA', DUTY_CLASS.MA],
+    ['Off / leave', DUTY_CLASS.OFF_LEAVE],
+    ['Other duties', DUTY_CLASS.OTHERS],
+  ].map(([name, dutyClass]) => ({ name, value: duty.counts[dutyClass] || 0 }));
+}

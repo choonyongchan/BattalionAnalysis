@@ -23,7 +23,7 @@ import { PageControls } from '../../components/PageControls.jsx';
 import { SoldierSearch } from '../../components/SoldierSearch.jsx';
 import { Leaderboard } from '../../components/Leaderboard.jsx';
 import { fmtDate, fmtFraction, fmtInt } from '../../format.js';
-import { Bar, ChartCard, GroupedBar, Heatmap, Line } from '../../charts/index.js';
+import { Bar, ChartCard, Heatmap, Line } from '../../charts/index.js';
 import { COMPANIES, SUBUNIT_POSITIONS, UNASSIGNED } from '../../../../shared/domain.js';
 import { toPositionCells } from '../../model/platoon.js';
 import { ALL_COMPANIES, scopeDataset, scopeSubmissions } from '../../model/scope.js';
@@ -39,7 +39,7 @@ import { dutyTrend } from '../../model/strength.js';
 import { topByCount, topByDays, topByStatusCount, rankUnits } from '../../model/leaderboards.js';
 import { topLabelsOverTime } from '../../model/reasonTrend.js';
 import { locationCounts, locationCoverage } from '../../model/locations.js';
-import { toText } from '../../../../shared/values.js';
+import { toIsoDate, toText } from '../../../../shared/values.js';
 import { isDuty } from '../../model/classify.js';
 import { settingOf } from '../../model/activeSettings.js';
 
@@ -152,50 +152,48 @@ export function EpisodeTiles({ range, dutyClass, labels = {} }) {
  * bar the toggle has nothing to switch between, so it is hidden and the chart draws that
  * company's one line in its own colour slot.
  * @param {{title: string, coverage: string, trendFn: function(string, string[]): !Object,
- *     range: !Object, controls?: *}} props The card's title and coverage line;
- *     `trendFn(scope, dates)` returns `{dates, series}`; the range supplies the dates and
- *     annotations; `controls` is any card-own filter, drawn in the same row as the scope
- *     toggle.
+ *     range: !Object, controls?: *, valueName?: string}} props The card's title and
+ *     coverage line; `trendFn(scope, dates)` returns `{dates, series}`; the range supplies
+ *     the dates and annotations; `controls` is any card-own filter, drawn beside the scope
+ *     toggle; `valueName` names the axis unit.
  * @returns {!preact.VNode} The card.
  */
-export function TrendSection({ title, coverage, trendFn, range, controls }) {
+export function TrendSection({ title, coverage, trendFn, range, controls, valueName = 'soldiers' }) {
   const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
   const [scope, setScope] = useState('battalion');
   const effectiveScope = scopedCompany ? 'battalion' : scope;
   const trend = trendFn(effectiveScope, range.days);
 
   return (
-    <Card title={title}>
-      {scopedCompany && !controls ? null : (
-        <div class="controlrow">
+    <ChartCard
+      title={title}
+      coverage={coverage}
+      controls={
+        <>
           {scopedCompany ? null : (
-            <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
+            <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label={title + ': scope'} />
           )}
           {controls}
-        </div>
-      )}
-      <ChartCard title="" coverage={coverage}>
-        <Line
-          categories={trend.dates}
-          series={trend.series.map((series) => ({
-            ...series,
-            name: scopedCompany || series.name,
-            slot: scopedCompany
-              ? COMPANIES.indexOf(scopedCompany)
-              : effectiveScope === 'companies'
-                ? COMPANIES.indexOf(series.name)
-                : undefined,
-            neutral: !scopedCompany && effectiveScope === 'battalion',
-          }))}
-          weekends={range.weekends}
-          holidays={range.holidays}
-          valueName="soldiers"
-        />
-      </ChartCard>
-      {!scopedCompany && effectiveScope === 'companies' ? (
-        <p class="chart-hint">Tap on the company to hide</p>
-      ) : null}
-    </Card>
+        </>
+      }
+    >
+      <Line
+        categories={trend.dates}
+        series={trend.series.map((series) => ({
+          ...series,
+          name: scopedCompany || series.name,
+          slot: scopedCompany
+            ? COMPANIES.indexOf(scopedCompany)
+            : effectiveScope === 'companies'
+              ? COMPANIES.indexOf(series.name)
+              : undefined,
+          neutral: !scopedCompany && effectiveScope === 'battalion',
+        }))}
+        weekends={range.weekends}
+        holidays={range.holidays}
+        valueName={valueName}
+      />
+    </ChartCard>
   );
 }
 
@@ -284,34 +282,12 @@ export function PlatoonHeatmap({
   );
 }
 
-/** @type {number} Pixels per bar in a reasons-over-time group. */
-const REASON_BAR_PX = 10;
-
-/** @type {number} Pixels of gap between one period's group of bars and the next. */
-const REASON_GROUP_GAP_PX = 16;
-
-/** @type {number} Pixels for the legend and value axis around the bars. */
-const REASON_CHROME_PX = 80;
-
-/** @type {number} The chart's floor height, so a short range is not drawn squat. */
-const REASON_MIN_PX = 360;
-
 /**
- * The height that gives every bar in a reasons-over-time chart room to be read.
+ * The top reasons over time, as a reason by period grid with its own granularity radio.
  *
- * The chart is horizontal, one group of bars per period, so a fixed height squeezes a
- * month of daily groups into slivers. Growing with the number of periods keeps each bar
- * the same thickness whatever the range; the page scrolls instead.
- * @param {{categories: string[], series: Array<!Object>}} trend From `topLabelsOverTime`.
- * @returns {number} The chart height in pixels.
- */
-function reasonsChartHeight_(trend) {
-  const perGroup = trend.series.length * REASON_BAR_PX + REASON_GROUP_GAP_PX;
-  return Math.max(REASON_MIN_PX, trend.categories.length * perGroup + REASON_CHROME_PX);
-}
-
-/**
- * The reasons-over-time grouped bar, with its own granularity radio.
+ * A grid rather than grouped bars: five reasons across a month of days made thirty groups
+ * of five slivers, a chart that grew taller with the range. A heatmap keeps one row per
+ * reason at any range, and a hot cell is where a reason spiked.
  * @param {{rows: Array<!Object>, dateOf: function(!Object): ?string,
  *     labelsOf: function(!Object): string[], range: !Object, title?: string}} props The
  *     rows to chart, how to read each one's date and labels, and the range to keep.
@@ -327,32 +303,40 @@ export function ReasonsOverTime({ rows, dateOf, labelsOf, range, title = 'Top Re
       .map((row) => ({ date: dateOf(row), labels: labelsOf(row) }));
     return topLabelsOverTime(items, granularity, range.rotations, 5);
   }, [rows, range, granularity]);
+  const cells = trend.series.flatMap((series) =>
+    series.values.map((value, index) => ({ row: series.name, column: trend.categories[index], value }))
+  );
 
   return (
-    <Card title={title}>
-      <div class="controlrow">
-        <Segmented
-          options={GRANULARITIES}
-          value={granularity}
-          onChange={setGranularity}
-          label="Group dates by"
-          radio
-        />
-      </div>
-      <ChartCard title="" empty="No reasons recorded in range.">
-        <GroupedBar categories={trend.categories} series={trend.series} height={reasonsChartHeight_(trend)} />
-      </ChartCard>
-    </Card>
+    <ChartCard
+      title={title}
+      coverage="Count of soldiers giving each reason; the five commonest in range, the rest under Other."
+      empty="No reasons recorded in range."
+      controls={
+        <Segmented options={GRANULARITIES} value={granularity} onChange={setGranularity} label="Group dates by" radio />
+      }
+    >
+      <Heatmap
+        rows={trend.series.map((series) => series.name)}
+        columns={trend.categories}
+        cells={cells.filter((cell) => cell.value > 0)}
+        valueName="soldiers"
+        showValues={trend.categories.length <= 14}
+        height={80 + 40 * trend.series.length}
+      />
+    </ChartCard>
   );
 }
 
 /**
  * Clinic-ranking bars for MC and MA, drawn separately since their location coverage
- * differs sharply (88% on MA, 17% on MC in the observed data).
- * @param {{personnel: Array<!Object>}} props Personnel rows.
+ * differs sharply (88% on MA, 17% on MC in the observed data). Only parade states inside
+ * the range count, like every other section on the page.
+ * @param {{personnel: Array<!Object>, range: !Object}} props Personnel rows and the range.
  * @returns {!preact.VNode} The cards.
  */
-export function LocationsCard({ personnel }) {
+export function LocationsCard({ personnel: all, range }) {
+  const personnel = all.filter((row) => withinRange(toIsoDate(row.date), range.from, range.to));
   const mc = locationCoverage(personnel, 'Att C');
   const ma = locationCoverage(personnel, 'MA');
   const mcCounts = locationCounts(personnel, { category: 'Att C' }).slice(0, 10);

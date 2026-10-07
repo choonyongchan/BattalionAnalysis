@@ -29,13 +29,14 @@ import { Segmented, VIEW_OPTIONS } from '../components/Segmented.jsx';
 /**
  * A card holding one chart and its table twin.
  * @param {{title: string, note: (string|undefined), coverage: (string|undefined),
- *     empty: (string|undefined), children: !Object}} props The heading; one line of
- *     context under it; the coverage line under the chart; the sentence shown in place of
- *     the chart when there is nothing to draw; and exactly one chart component as the
- *     child.
+ *     empty: (string|undefined), controls: (*|undefined), children: !Object}} props The
+ *     heading; one line of context under it; the coverage line under the chart; the
+ *     sentence shown in place of the chart when there is nothing to draw; the card's own
+ *     filters (a scope toggle, a granularity), drawn in the head beside the chart/table
+ *     toggle; and exactly one chart component as the child.
  * @returns {!Object} The card.
  */
-export function ChartCard({ title, note, coverage, empty, children }) {
+export function ChartCard({ title, note, coverage, empty, controls, children }) {
   const [view, setView] = useState('chart');
   const chart = Array.isArray(children) ? children[0] : children;
   const blank = isBlank_(chart);
@@ -44,6 +45,7 @@ export function ChartCard({ title, note, coverage, empty, children }) {
     <section class="card">
       <div class="card__head">
         <h3 class="card__title">{title}</h3>
+        {controls ? <div class="card__controls">{controls}</div> : null}
         {blank ? null : (
           <Segmented
             options={VIEW_OPTIONS}

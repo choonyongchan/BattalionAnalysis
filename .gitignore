@@ -29,3 +29,6 @@ parade_state_template_new.md
 
 # bun test --coverage output.
 coverage/
+
+# Local visual-review helper.
+frontend/public/__review.html

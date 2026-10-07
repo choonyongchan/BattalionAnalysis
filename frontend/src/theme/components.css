@@ -36,6 +36,24 @@
   line-height: 1.19;
 }
 
+/* A heading between groups of cards on a page, one step above a card title. */
+.section-title {
+  margin-top: var(--space-md);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.28px;
+  line-height: 1.14;
+}
+
+/* A chart card's own filters, pushed right of the title and ahead of the chart/table toggle. */
+.card__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
 .card__note {
   color: var(--ink-muted);
   font-size: 14px;

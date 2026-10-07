@@ -5,6 +5,7 @@
   "workspaces": ["frontend", "backend", "runner"],
   "scripts": {
     "dev": "bun run --cwd frontend dev",
+    "dev:api": "bun --env-file=.env.test test/support/devServer.ts",
     "build": "bun run --cwd frontend build",
     "test": "bun test ./test/",
     "test:coverage": "bun test ./test/ --coverage",

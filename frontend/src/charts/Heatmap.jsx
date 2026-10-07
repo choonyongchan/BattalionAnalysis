@@ -1,5 +1,6 @@
 /**
- * Company by platoon, on a sequential ramp.
+ * A grid of counts on a sequential ramp: company by platoon, reason by period, weekday by
+ * hour.
  *
  * Magnitude, so one hue light to dark — a rainbow would invent categories the grid does not
  * have. The ramp is `--seq-1..5`, which is declared once per theme and is already the right
@@ -20,7 +21,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtInt } from '../format.js';
+import { fmtDayMonth, fmtInt } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { axisOption, baseOption } from './theme.js';
 
@@ -119,7 +120,8 @@ function inferredOverlay_(palette, inferred) {
  * @returns {!Object} The option.
  */
 function option_(props, palette) {
-  const { rows, columns, cells, valueName, detail } = props;
+  const { rows, columns, cells, valueName, detail, showValues } = props;
+  const named = cells.some((cell) => cell.platoon);
   const max = Math.max(1, ...cells.map((cell) => (Number.isFinite(cell.value) ? cell.value : 0)));
   const placed = cells
     .map((cell) => ({
@@ -147,7 +149,7 @@ function option_(props, palette) {
       formatter: (params) => {
         const entry = params.data.cell;
         return tooltipLines(
-          entry.row + ' · ' + (entry.platoon ? entry.platoon + ' (' + entry.column + ')' : entry.column),
+          entry.row + ', ' + (entry.platoon ? entry.platoon + ' (' + entry.column + ')' : fmtDayMonth(entry.column)),
           [
             (valueName || 'Value') + ': ' + fmtInt(entry.value),
             ...(detail ? detail(entry) : []),
@@ -157,7 +159,16 @@ function option_(props, palette) {
         );
       },
     },
-    xAxis: gridAxis(columns, { axisLabel: { color: palette.inkMuted, fontSize: 11, fontFamily: palette.fontUi, interval: 0 } }),
+    // Every column labelled while they fit; a long date axis thins its labels instead.
+    xAxis: gridAxis(columns, {
+      axisLabel: {
+        color: palette.inkMuted,
+        fontSize: 11,
+        fontFamily: palette.fontUi,
+        interval: columns.length > 12 ? 'auto' : 0,
+        formatter: fmtDayMonth,
+      },
+    }),
     yAxis: gridAxis(rows, { inverse: true }),
     visualMap: {
       min: 0,
@@ -187,9 +198,10 @@ function option_(props, palette) {
         // grid the column alone does not say which platoon a company means by it. The
         // surface halo keeps the name legible on every step of the ramp.
         label: {
-          show: placed.some((entry) => entry.cell.platoon),
+          show: named || Boolean(showValues),
           formatter: (params) => {
             const cell = params.data.cell;
+            if (!named) return cell.value ? fmtInt(cell.value) : '';
             const label =
               cell.platoon && cell.platoon !== 'Coy HQ' && /^[0-9]+$/.test(cell.platoon)
                 ? 'Plt ' + cell.platoon
@@ -218,17 +230,19 @@ function option_(props, palette) {
 }
 
 /**
- * A company by platoon heatmap.
+ * A heatmap of counts. Column values that are ISO dates are labelled as day and month.
  * @param {{rows: string[], columns: string[],
  *     cells: Array<{row: string, column: string, value: ?number,
  *         inferred: (boolean|undefined), platoon: (string|undefined)}>,
  *     valueName: (string|undefined), detail: (function(!Object): string[]|undefined),
- *     height: (number|undefined), view: (string|undefined)}} props
+ *     showValues: (boolean|undefined), height: (number|undefined),
+ *     view: (string|undefined)}} props
  *     `rows` are normally `COMPANIES`; a cell naming a row or column not on the axis is
  *     dropped rather than drawn somewhere wrong; `inferred` marks a cell whose platoon was
  *     worked out from the 4D and draws the hatch; `platoon` is the company's own name for
  *     the cell's column, written in the cell, when the columns are positions rather than
  *     platoons;
+ *     `showValues` writes each non-zero count in its cell, for a grid small enough to read;
  *     `detail` adds tooltip lines for one cell — its text is inserted as text, never as
  *     markup; `view` is set by `ChartCard`.
  * @returns {!Object} The chart, or its table twin.

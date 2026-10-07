@@ -20,7 +20,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtInt } from '../format.js';
+import { fmtDate, fmtDayMonth, fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import { axisOption, baseOption, legendOption, seriesColor, valueAxisOption } from './theme.js';
 
@@ -120,10 +120,13 @@ const ANNOTATION_SERIES = '__annotations';
 function option_(props, palette) {
   const { categories, series, valueName, weekends = [], holidays = [] } = props;
   const base = baseOption(palette);
+  // Several coloured lines are named where they end, so nobody matches colours to a legend.
+  const labelEnds = series.filter((entry) => !entry.neutral).length > 1;
 
   return {
     ...base,
-    grid: { ...base.grid, top: 36 },
+    // Room on the right for the end labels that name each company's line.
+    grid: { ...base.grid, top: 36, right: labelEnds ? 72 : base.grid.right },
     legend: legendOption(
       palette,
       series.map((entry) => entry.name)
@@ -135,7 +138,7 @@ function option_(props, palette) {
       formatter: (params) => {
         const points = params.filter((point) => point.seriesName !== ANNOTATION_SERIES);
         return tooltipNode(
-          points.length ? points[0].axisValue : null,
+          points.length ? fmtDate(points[0].axisValue) : null,
           points.map((point) => ({
             label: point.seriesName,
             value: point.value === null || point.value === undefined ? 'no filing' : fmtInt(point.value),
@@ -161,6 +164,7 @@ function option_(props, palette) {
         fontFamily: palette.fontUi,
         alignMinLabel: 'left',
         alignMaxLabel: 'right',
+        formatter: fmtDayMonth,
       },
     }),
     yAxis: valueAxisOption(palette, valueName, true),
@@ -169,7 +173,9 @@ function option_(props, palette) {
       ...series.map((entry, index) => {
         const color = entry.neutral
           ? palette.inkMuted
-          : seriesColor(palette, entry.slot === undefined ? index : entry.slot);
+          : entry.accent
+            ? palette.accent
+            : seriesColor(palette, entry.slot === undefined ? index : entry.slot);
         return {
           type: 'line',
           name: entry.name,
@@ -185,6 +191,7 @@ function option_(props, palette) {
           lineStyle: { width: 2, color, cap: 'round', join: 'round' },
           // See the file header: a day nobody filed is a gap, not an interpolation.
           connectNulls: false,
+          endLabel: { show: labelEnds, formatter: '{a}', color, fontSize: 11, fontFamily: palette.fontUi },
         };
       }),
     ],
@@ -195,7 +202,7 @@ function option_(props, palette) {
  * A multi-series time series with weekend and holiday annotations.
  * @param {{categories: string[],
  *     series: Array<{name: string, values: Array<?number>, slot: (number|undefined),
- *         neutral: (boolean|undefined)}>,
+ *         neutral: (boolean|undefined), accent: (boolean|undefined)}>,
  *     valueName: (string|undefined),
  *     weekends: (Array<{from: string, to: string}>|undefined),
  *     holidays: (Array<{date: string, name: string}>|undefined),
@@ -205,7 +212,8 @@ function option_(props, palette) {
  *     `null` is a day that company did not file and is drawn as a gap; `slot` fixes the
  *     colour to a company's identity (pass `COMPANIES.indexOf(name)`) so a filter never
  *     repaints the survivors; `neutral` draws the series in muted ink, for a battalion
- *     total or a baseline that is not one of the six; `weekends` and `holidays` take the
+ *     total or a baseline that is not one of the six; `accent` draws a non-company series
+ *     in the accent colour, beside a neutral one; `weekends` and `holidays` take the
  *     shapes `model/calendarMarks.js` returns and are silently dropped where the axis has
  *     no column for them; `view` is set by `ChartCard`.
  * @returns {!Object} The chart, or its table twin.
@@ -220,7 +228,7 @@ export function Line(props) {
           ...series.map((entry) => ({ label: entry.name, numeric: true })),
         ]}
         rows={categories.map((category, index) => [
-          category,
+          fmtDate(category),
           ...series.map((entry) => fmtInt(entry.values[index])),
         ])}
         caption={valueName ? valueName + ' by day' : 'Values by day'}

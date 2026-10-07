@@ -23,6 +23,7 @@ import {
   CustomChart,
   HeatmapChart,
   LineChart,
+  PieChart,
   SankeyChart,
 } from 'echarts/charts';
 import {
@@ -41,10 +42,11 @@ use([
   SVGRenderer,
 
   // Series types, one per component under this directory.
-  BarChart, // Bar, GroupedBar, Histogram
+  BarChart, // Bar, Histogram
   CustomChart, // Heatmap's inferred-cell hatch
   HeatmapChart, // Heatmap
   LineChart, // Line (and the empty carrier series that holds its annotations)
+  PieChart, // Donut
   SankeyChart, // Sankey
 
   // Components.

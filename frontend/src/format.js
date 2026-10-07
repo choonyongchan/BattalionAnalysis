@@ -68,6 +68,20 @@ export function fmtDate(isoDate) {
 }
 
 /**
+ * Formats an ISO date as day and month only, e.g. '22 Jun', for a chart axis where the year
+ * is the same on every tick and would only crowd the labels.
+ * @param {?string} isoDate ISO 'yyyy-MM-dd'.
+ * @returns {string} The formatted date; anything that is not an ISO date comes back as is.
+ */
+export function fmtDayMonth(isoDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(isoDate))) {
+    return String(isoDate);
+  }
+  const [, month, day] = isoDate.split('-');
+  return Number(day) + ' ' + MONTH_NAMES[Number(month) - 1];
+}
+
+/**
  * Formats a fraction as "n of m", the shape every coverage line in the dashboard uses.
  * @param {number} part The numerator.
  * @param {number} whole The denominator.

@@ -87,12 +87,12 @@ export interface RunningApp {
  * `/api/sft` over HTTP on a free local port.
  *
  * @param db The database every route uses.
- * @param options Passed to `paradeDeps`.
+ * @param options Passed to `paradeDeps`; `port` fixes the port (default: any free one).
  * @returns The origin and a stop function.
  */
-export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] = {}): RunningApp {
+export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] & { port?: number } = {}): RunningApp {
   const server = Bun.serve({
-    port: 0,
+    port: options.port ?? 0,
     fetch(request) {
       const path = new URL(request.url).pathname;
       if (path === '/api/parade') return handleParade(request, paradeDeps(db, options));
