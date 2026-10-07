@@ -11,6 +11,7 @@
 ## Project Notes
 
 - Treat `docs/architecture_patterns.md` as the canonical architecture reference for AI agents. Read it before codebase exploration, broad refactors, or architecture-impacting changes, and update it whenever architecture or ownership boundaries change.
+- `docs/DeveloperGuide.md` covers setup, local running (`bun run dev:api` + `bun run dev`), testing, deploys and migrations; `docs/security.md` covers personal data. Keep both current when those change.
 - Use persistent task notes only when they add value:
   - For substantial work, `tasks/todo.md` may track implementation and verification details.
   - After user corrections, capture repeatable lessons in `tasks/lessons.md` when the lesson should carry into future sessions.

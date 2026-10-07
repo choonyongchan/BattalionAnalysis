@@ -1,20 +1,92 @@
-# Battalion Analysis
+# 40 SAR Personnel Dashboard
 
 [![codecov](https://codecov.io/gh/choonyongchan/BattalionDataAnalysis/graph/badge.svg)](https://codecov.io/gh/choonyongchan/BattalionDataAnalysis)
 
-Parade states (WhatsApp, or deposited on the dashboard), report-sick submissions (FormSG,
-webhook `/api/reportsick`) and Self-Regulated Fitness Training submissions (FormSG, webhook
-`/api/sft`) into Neon Postgres, and a dashboard over them, deployed on Vercel.
+The battalion's daily personnel picture in one place: who filed a parade state, how many soldiers
+are present, who is on MC, MA, status or reporting sick, and how that is trending. It reads three
+sources:
 
-```sh
-bun install
-bun run dev          # dashboard
-bun test             # everything, no network
-bun run db:migrate   # apply db/migrations to DATABASE_URL (.env.local)
-```
+- **Parade states** posted in the WhatsApp group, relayed automatically, or pasted on the Deposit
+  page.
+- **Report-sick submissions** from the FormSG form.
+- **Self-Regulated Fitness Training (SFT)** submissions from their own FormSG form.
 
-Environment variables: `.env.example` (app, copy to `.env.local`) and `.env.whatsapp.example` (WhatsApp bridge, copy to `.env.whatsapp`).
+Open it at **https://40sar.vercel.app**.
 
-- Architecture: [docs/architecture_patterns.md](docs/architecture_patterns.md)
-- Dashboard: [docs/dashboard.md](docs/dashboard.md)
-- WhatsApp runner: [whatsapp/README.md](whatsapp/README.md)
+> This guide is for the people who use the dashboard. To maintain or change it, read
+> [docs/DeveloperGuide.md](docs/DeveloperGuide.md).
+
+## Logging in
+
+Enter the dashboard password you were given and press **Enter**. There are two passwords:
+
+- The **read** password shows every page and lets you deposit and correct parade states.
+- The **settings** password also lets you change Settings.
+
+You stay logged in for the working day. Press **Lock** at the bottom of the sidebar when you leave
+a shared computer. The data refreshes by itself every minute while the tab is open.
+
+Never share the passwords over chat, and never paste a screenshot of the dashboard into a group:
+it shows soldiers' names and medical information.
+
+## The bar at the top of every page
+
+- **All / Archer / Braves / Cougar / Stallion / Hercules** narrows every chart on the page to one
+  company.
+- **All dates** opens the date range. Trends, rankings and heatmaps follow it; the Overview's
+  "today" figures always describe the single parade picked there.
+- Every chart has a **Chart / Table** switch. The table holds the exact numbers.
+
+## The pages
+
+| Page | Use it to answer |
+|---|---|
+| **Overview** | Which companies have filed this morning? How many soldiers do I have and how many are present? Who is out of camp and why? Who is back next week, and who just came back? How are the numbers trending? |
+| **Report Sick** | How many are reporting sick, on the parade state and on FormSG? Which company and platoon? Which type (RSO, RSI, FFI, Medical Review)? What do soldiers say is wrong, and at what time of day do they report? |
+| **MC / MA** | Who is on MC or medical appointment, which clinics, and who has been on MC the longest? |
+| **Status** | Who holds an excuse or light duty, and which kinds are most common? |
+| **SFT** | How many soldiers trained, in which companies, in what group sizes, where and doing what? |
+| **Soldier** | One soldier's full history: search by name or 4D. |
+| **Duty Roster** | Who is on duty today, from the CDO down, and which posts were filed vacant? |
+| **Deposit** | Add a parade state WhatsApp missed, fix one the system could not read, or correct an SFT record. |
+| **Settings** | Unit name and crest, public holidays and rotations, thresholds, session length. |
+
+Counts are of soldiers, not lines: a soldier listed twice on one day counts once. A day a company
+did not file shows as zero or a gap, and every chart says how much of the battalion it covers.
+
+## Depositing and fixing a parade state
+
+1. Open **Deposit** and stay on **Parade State**.
+2. Paste the whole parade state, exactly as posted, and press **Deposit**.
+3. The page says **Saved** with the company and date, or lists the lines it could not read.
+4. To fix a stored message, find it in the list (newest first) and press **Edit**. The lines to
+   fix are shown above the text. Correct them and save. Nothing changes until the text reads
+   cleanly.
+5. **Delete** removes a message and everything read from it. It asks once more before it does.
+
+The list shows each message's status:
+
+- **Parsed**: its numbers are in the charts.
+- **Needs review**: some lines could not be read; the count says how many. Open it with **Edit**.
+- **Rejected**: a last parade state, or not a parade state at all.
+- **Pending**: received but not read yet.
+
+## Correcting an SFT record
+
+Records come only from the FormSG form. On **Deposit → SFT**, search the list, press **Edit**,
+correct any answer and save, or **Delete** a duplicate.
+
+## Changing settings
+
+Log in with the settings password, open **Settings** and press **Edit** on a section. Holidays
+and rotations live under **Calendar**; holidays draw as lines on every trend. If someone else
+saved the same section first, the page says so: reload and try again.
+
+## Something looks wrong
+
+| You see | Do this |
+|---|---|
+| A company never lights up under "Today's First Parade State" | Check the WhatsApp group for its parade state; if it is there, deposit it by hand |
+| A parade state shows **Needs review** | Open it with **Edit** and correct the listed lines |
+| The login screen keeps coming back | Your session ended or the password changed; ask for the current one |
+| A number looks wrong | Switch the chart to **Table** and compare with the parade state; report it to the maintainer with the date and company |

@@ -18,13 +18,21 @@ The pages, in the order a commander reads them:
 The three medical pages are one layout asked three times. That is deliberate: the layout
 is learned once and read three times, and the three categories become comparable because
 they are presented identically. They are built from one set of sections
-([`src/pages/shared/category.jsx`](src/pages/shared/category.jsx)) so they cannot
+([`frontend/src/pages/shared/category.jsx`](frontend/src/pages/shared/category.jsx)) so they cannot
 drift apart; each page lists the sections it shows, in order.
 
-**Every comparison is a rate, never a count.** Braves files 40 MC rows against Hercules'
-7 in the labelled data, which says nothing until divided by strength — Braves is the
-larger company. Company and platoon panels therefore show the percentage of the days a
-unit was observed, with a z-score against the battalion rate deciding what gets flagged.
+**Every comparison is a count of soldiers, never a rate.** Commanders read whole soldiers,
+so no chart shows a per-100 rate, and no statistic uses 4D numbers. Company and platoon
+panels show distinct soldiers and episodes; a bigger company sits higher for being bigger,
+and the card says so.
+
+**Each chart type answers one kind of question.** A trend over days is a line, with weekends
+banded, holidays ruled and each company's line named where it ends. A ranking is a sorted
+horizontal bar. A part of one whole with five or six parts (today's absentees by reason,
+the FormSG type split, each company's share of SFT) is a donut with every slice labelled. A
+count across two dimensions (company by platoon, reason by period, weekday by hour) is a
+heatmap on one sequential ramp. Company colours are identities and never reused for anything
+else. Every chart has a Table view.
 
 **Every chart states its coverage.** In the observed data only 5 of 45 parade days carry
 all six companies, and the two sources cover different spans — parade state from
@@ -44,16 +52,16 @@ browser  --POST password-->  /api/session  --Set-Cookie: session (HttpOnly, 12h)
 browser  --GET, session cookie-->  /api/dashboard  --SELECT as dashboard_read-->  Neon
 ```
 
-The password is checked **there**, in [`api/session.ts`](../api/session.ts), against
+The password is checked **there**, in [`backend/api/session.ts`](../backend/api/session.ts), against
 `DASHBOARD_PASSWORD` before any session is issued, and
-[`api/dashboard.ts`](../api/dashboard.ts) checks the session before a single row is read.
+[`backend/api/dashboard.ts`](../backend/api/dashboard.ts) checks the session before a single row is read.
 A wrong password gets a 401, no cookie and no data.
 A password checked in the browser instead would be decoration: the page's JavaScript is
 public, so anyone could read past the check.
 
-The route connects as `dashboard_read` ([`db/grants-dashboard.sql`](../db/grants-dashboard.sql)),
+The route connects as `dashboard_read` ([`backend/db/grants-dashboard.sql`](../backend/db/grants-dashboard.sql)),
 a role that can only `SELECT` the tables the dashboard charts and cannot read
-`raw_messages.body` at all. [`lib/dashboard.ts`](../lib/dashboard.ts) answers with the tabs the
+`raw_messages.body` at all. [`backend/lib/dashboard.ts`](../backend/lib/dashboard.ts) answers with the tabs the
 retired Google Sheet held, under the same names and headers, so everything in `model/`
 reads it unchanged.
 
@@ -81,29 +89,19 @@ for this.
 **2. Create the read-only role.** After `bun run db:migrate`:
 
 ```bash
-bun --env-file=.env.local scripts/apply-grants.ts db/grants-dashboard.sql
+bun --env-file=.env.local backend/scripts/apply-grants.ts backend/db/grants-dashboard.sql
 ```
 
-It prints `dashboard_read`'s connection string. Re-running rotates its password.
+It writes `dashboard_read`'s connection string to `.env.dashboard_read` (gitignored); copy
+it, then delete the file. Re-running rotates its password.
 
 **3. Set both on Vercel** (Project Settings → Environment Variables), then redeploy:
-`DASHBOARD_PASSWORD` (the passphrase) and `DASHBOARD_DATABASE_URL` (the printed string).
+`DASHBOARD_PASSWORD` (the passphrase), `SESSION_SECRET` (random, e.g. `openssl rand -hex 32`)
+and `DASHBOARD_DATABASE_URL` (the written string).
 The route fails closed: until both exist it answers 503 to everyone, including an empty
 password.
 
-**4. Import the Sheet history once.** Download each tab of the old spreadsheet as CSV
-(File → Download → CSV) into one folder outside the repo, then:
-
-```bash
-bun --env-file=.env.local scripts/import-sheet.ts <folder> --dry-run   # counts only
-bun --env-file=.env.local scripts/import-sheet.ts <folder>             # writes
-```
-
-The dry run reports rows read and rejected per tab, by CSV row number; check the rejections
-before writing. Parade states already in Neon win, and re-running inserts nothing new. The
-message-body and NRIC columns are never read.
-
-**5. Holidays and rotations.** Holidays and rotations are edited under Settings → Calendar
+**4. Holidays and rotations.** Holidays and rotations are edited under Settings → Calendar
 by someone holding the settings password (`SETTINGS_PASSWORD`), not by SQL. Until they are
 set, the Settings page says so, no holiday lines are drawn on any chart, and there is no
 rotational grouping. Everything else works without them. The Unit, Thresholds and Session
@@ -124,15 +122,12 @@ background refresh, within a minute, and asks for the new password.
 
 ```
 bun install
-vercel dev                       # serves the page and /api together; needs .env.local
+bun run dev:api                  # API on :3001 over synthetic data on the Neon test branch
+bun run dev                      # the page on :5173, proxying /api to :3001
+bun test                         # from the repo root
 ```
 
-```
-bun test                         # from the repo root: model layer, routes, and importer
-```
-
-`bun run dev` serves only the page, with no `/api`, so it cannot log in; use `vercel dev`
-with `DASHBOARD_PASSWORD` and `DASHBOARD_DATABASE_URL` in `.env.local`, or a preview deploy.
+Log in with the passwords in `test/support/app.ts`. See `docs/DeveloperGuide.md`.
 
 ### Why there is a build step now
 
@@ -146,13 +141,12 @@ pinned by a hash that had to be recomputed on every version bump.
 
 ## Deploying
 
-Vercel builds and serves the app from the repository root. `vercel.json` pins the settings
-the project would otherwise take from its dashboard: the Vite preset, `bun install`,
-`bun run build`, and `dist/` as the output directory. Without it the project fell back to
-the "Other" preset, which serves the root as-is, so a deploy "succeeded" with nothing to
-serve. Pushing a branch gives a preview deployment; merging to `main` deploys production.
+Vercel builds from GitHub with the project's Root Directory set to `backend`.
+`backend/vercel.json` installs from the repo root, runs Vite in `frontend/` with its output in
+`backend/public`, and sets the security headers. Pushing a branch gives a preview deployment;
+merging to `main` deploys production.
 
-`vite.config.js` sets no `base`: Vercel serves from the domain root, so the default
+`frontend/vite.config.js` sets no `base`: Vercel serves from the domain root, so the default
 absolute asset URLs are correct. Routing uses the URL hash, so no SPA rewrites are needed.
 
 ## How it is put together
@@ -182,12 +176,12 @@ number can come from, and the reason a page can be rewritten without re-deriving
 metric. A page that computes something itself instead of asking `model/` for it is the
 defect that layering exists to prevent.
 
-The server half is [`api/dashboard.ts`](../api/dashboard.ts), which reads through
-[`lib/dashboard.ts`](../lib/dashboard.ts).
+The server half is [`backend/api/dashboard.ts`](../backend/api/dashboard.ts), which reads through
+[`backend/lib/dashboard.ts`](../backend/lib/dashboard.ts).
 
-Browser tests are in [`test/dashboard/`](../test/dashboard); the read route's are
-[`test/api/dashboard.test.ts`](../test/api/dashboard.test.ts) and
-[`test/lib/dashboard.test.ts`](../test/lib/dashboard.test.ts).
+Browser tests are in [`test/frontend/`](../test/frontend); the read route's are
+[`test/backend/api/dashboard.test.ts`](../test/backend/api/dashboard.test.ts) and
+[`test/backend/lib/dashboard.test.ts`](../test/backend/lib/dashboard.test.ts).
 
 ## Three things worth knowing before reading the numbers
 
@@ -225,7 +219,7 @@ start, which is later than the parade date for an absence booked ahead. Only MC 
 parade; counting MA and Others put 51 soldiers off parade on 22 Sep 26 against the 28 the
 strength figures reported, while MC and leave gave 23. A soldier listed twice is one row, back
 only when both absences end, and an absence with no end date reads `Not stated` rather than a
-guessed day. The rules are in `src/model/projection.js`.
+guessed day. The rules are in `frontend/src/model/projection.js`.
 
 **Presence by Rank** splits the day's presence into officers, WOSpecs and enlistees from the
 strength block's own split, so a company at 90% missing half its officers shows it.
@@ -242,8 +236,8 @@ strength block's own split, so a company at 90% missing half its officers shows 
   keyboard — and the password itself is never written to `localStorage`, `sessionStorage`
   or a cookie. A refresh therefore does not ask again, while the standing risk is only
   that an unlocked browser can open the dashboard until the session expires. **Lock**
-  ends it at the server, and rotating `DASHBOARD_PASSWORD` ends every open session,
-  because the token is signed with it.
+  ends it at the server, and rotating `DASHBOARD_PASSWORD` or `SESSION_SECRET` ends every
+  open session, because the token is signed with a key derived from both.
 - **No per-viewer identity.** The token names nobody: there are still no accounts, no
   record of who looked, and no way to revoke one viewer.
   While open, the page re-reads `/api/dashboard` every minute the tab is visible and as
@@ -275,8 +269,8 @@ strength block's own split, so a company at 90% missing half its officers shows 
 
 ## Deposit
 
-`src/pages/Deposit.jsx`, at `#/deposit`. A **Parade State / SFT** toggle in the header
-picks the panel (`src/pages/deposit/`); it opens on Parade State.
+`frontend/src/pages/Deposit.jsx`, at `#/deposit`. A **Parade State / SFT** toggle in the header
+picks the panel (`frontend/src/pages/deposit/`); it opens on Parade State.
 
 ### Parade State
 
@@ -284,19 +278,19 @@ picks the panel (`src/pages/deposit/`); it opens on Parade State.
 missed and presses Deposit; below it, every stored message (WhatsApp or manual) is listed
 newest first with its key, status, source and receipt time, and can be edited or deleted.
 
-- **Where it writes.** `/api/parade` on the same Vercel deployment (`src/data/parade.js`), with
+- **Where it writes.** `/api/parade` on the same Vercel deployment (`frontend/src/data/parade.js`), with
   the session cookie from `/api/session`. A cookie-authorised write must be same-origin, so
   a forged cross-site form cannot deposit or delete.
-- **Statuses.** Parsed (rows exist), Needs review (the parser doubted a line; the reasons are
-  shown under the status), Rejected (a last parade state, or not a parade state), Pending
-  (stored, never parsed). Rules in `src/model/paradeMessages.js`.
+- **Statuses.** Parsed (rows exist), Needs review (the parser doubted some lines; the list
+  says how many, and Edit shows which, since the reasons quote personnel lines), Rejected (a last parade state, or not a parade state), Pending
+  (stored, never parsed). Rules in `frontend/src/model/paradeMessages.js`.
 - **Edit** loads the stored text into the form. Saving re-parses it; if it parses, the text
   and every row derived from it are replaced together, and if not, nothing changes and the
   reasons are shown. **Delete** asks once more inline, then removes the message and its rows.
 - **Charts.** They read the same tables, so a deposit reaches them on the next refresh.
 ### SFT
 
-`SftPanel.jsx`, over `/api/sft` (`src/data/sft.js`). FormSG is the only way an SFT record is
+`SftPanel.jsx`, over `/api/sft` (`frontend/src/data/sft.js`). FormSG is the only way an SFT record is
 created, so nothing is deposited here: every stored record is listed (newest first, sortable,
 with a filter on name, company, Group IC or location), and each can be edited or deleted.
 
@@ -305,7 +299,7 @@ with a filter on name, company, Group IC or location), and each can be edited or
   (Singapore), and both acknowledgements. The server re-derives the name key, `unit_coy` (the
   soldier's own answer is kept when it already names the chosen company) and the SFT date,
   as it does when FormSG inserts the record. The page and the server check the correction
-  with the same rules (`src/model/sftEdit.js`): a name is required, the company must be a
+  with the same rules (`shared/sftEdit.js`): a name is required, the company must be a
   known one or blank, and the time may not be in the future. An NRIC-shaped value is refused.
 - **Delete** asks once more inline, then removes the record.
 - **Charts.** The SFT page reads the same table, so a correction reaches it on the refresh
@@ -313,13 +307,13 @@ with a filter on name, company, Group IC or location), and each can be edited or
 
 ### Both panels
 
-- **Local development.** `bun run dev` serves no `/api`, so neither login nor this page can
-  reach the server. Use `vercel dev`, or a deployed preview.
+- **Local development.** Run `bun run dev:api` beside `bun run dev`; both panels then work
+  against synthetic data.
 
 ## SFT
 
-`src/pages/Sft.jsx`, at `#/sft`, over the SFT FormSG form (`sft_formsg`, written by
-`api/sft.ts`). Numbers come from `src/model/sft.js`.
+`frontend/src/pages/Sft.jsx`, at `#/sft`, over the SFT FormSG form (`sft_formsg`, written by
+`backend/api/sft.ts`). Numbers come from `frontend/src/model/sft.js`.
 
 - **Tiles.** Soldiers who did SFT in the range (unique by normalised name — the form has no
   4D), sessions in the range, soldiers who did SFT today (ignores the range), and the average
