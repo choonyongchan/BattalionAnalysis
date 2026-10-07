@@ -2,3 +2,7 @@
 coverageReporter = ["text", "lcov"]
 coverageDir = "coverage"
 coveragePathIgnorePatterns = ["test/**", "node_modules/**"]
+
+[install]
+# Hoisted: the root test suite imports every workspace's dependencies.
+linker = "hoisted"

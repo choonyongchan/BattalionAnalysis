@@ -14,9 +14,9 @@
 import { neon } from '@neondatabase/serverless';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
-import type { Db } from '../../db/index.ts';
-import * as schema from '../../db/schema.ts';
-import { applyMigrations, ensureMigrationsTable, readMigrations } from '../../scripts/apply-migrations.ts';
+import type { Db } from '../../backend/db/index.ts';
+import * as schema from '../../backend/db/schema.ts';
+import { applyMigrations, ensureMigrationsTable, readMigrations } from '../../backend/scripts/apply-migrations.ts';
 
 /** The test branch's connection string, or undefined when DB suites should be skipped. */
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || undefined;

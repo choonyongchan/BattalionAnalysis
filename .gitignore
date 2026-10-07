@@ -1,7 +1,8 @@
 node_modules/
 
 # The Vite build. Vercel rebuilds it; a committed copy only goes stale.
-dist/
+frontend/dist/
+backend/public/
 
 # Secrets. .env.example is the committed template.
 .env
@@ -11,16 +12,17 @@ dist/
 
 # Vercel CLI local state.
 .vercel
-whatsapp/auth/
-whatsapp/data/
+runner/auth/
+runner/data/
 
 # Captured group listings hold real group names and JIDs.
-whatsapp/output.txt
+runner/output.txt
 
 # Real personnel data. None of this may ever enter git history, which is not
 # erasable in practice. The FormSG export holds NRICs and full names; the parade
 # state samples and the format template hold full names, 4D numbers and diagnoses.
 parade-state-example/*
+backup/
 parade-state-example.txt
 parade_state_template_new.md
 *.csv

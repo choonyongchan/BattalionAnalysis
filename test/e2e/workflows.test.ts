@@ -9,21 +9,21 @@
  * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { Db } from '../../db/index.ts';
-import { loadAll } from '../../src/data/feed.js';
-import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../src/data/parade.js';
-import { endSession, startSession } from '../../src/data/session.js';
-import { saveSection } from '../../src/data/settings.js';
-import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../src/data/sft.js';
-import { DUTY_CLASS } from '../../src/model/classify.js';
-import { battalionStrength, dutyCountsOn } from '../../src/model/metrics.js';
-import { MESSAGE_STATUS, toMessageRows } from '../../src/model/paradeMessages.js';
-import { toEditForm } from '../../src/model/sftEdit.js';
-import { toSftRecords } from '../../src/model/sft.js';
-import { loadConfig } from '../../whatsapp/src/config.js';
-import { createMessageHandler } from '../../whatsapp/src/index.js';
-import { createIngestor } from '../../whatsapp/src/ingest.js';
-import { extractText, isWatchedGroupMessage } from '../../whatsapp/src/listener.js';
+import type { Db } from '../../backend/db/index.ts';
+import { loadAll } from '../../frontend/src/data/feed.js';
+import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../frontend/src/data/parade.js';
+import { endSession, startSession } from '../../frontend/src/data/session.js';
+import { saveSection } from '../../frontend/src/data/settings.js';
+import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../frontend/src/data/sft.js';
+import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
+import { battalionStrength, dutyCountsOn } from '../../frontend/src/model/metrics.js';
+import { MESSAGE_STATUS, toMessageRows } from '../../frontend/src/model/paradeMessages.js';
+import { toEditForm } from '../../shared/sftEdit.js';
+import { toSftRecords } from '../../frontend/src/model/sft.js';
+import { loadConfig } from '../../runner/src/config.js';
+import { createMessageHandler } from '../../runner/src/index.js';
+import { createIngestor } from '../../runner/src/ingest.js';
+import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.js';
 import { DASHBOARD_PASSWORD, INGEST_SECRET, SETTINGS_PASSWORD, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
 import { FAKE_NRIC, SFT_SPECS, SICK_SPECS, sftWebhookRequest, webhookRequest } from '../support/formsg.ts';

@@ -18,5 +18,5 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["api/**/*.ts", "db/**/*.ts", "lib/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
+  "include": ["backend/**/*.ts", "test/**/*.ts"]
 }

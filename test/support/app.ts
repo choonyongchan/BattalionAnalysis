@@ -3,16 +3,16 @@
  * production -- the real pipeline, the real dashboard read and the real FormSG SDK (in its test
  * mode) -- and optionally served over HTTP on a local port for the end-to-end suite.
  */
-import { handle as handleDashboard } from '../../api/dashboard.ts';
-import { handle as handleReportSick } from '../../api/reportsick.ts';
-import { handle as handleSft, type Deps as SftDeps } from '../../api/sft.ts';
-import { handle as handleParade, type Deps as ParadeDeps } from '../../api/parade.ts';
-import { handle as handleSession } from '../../api/session.ts';
-import { handle as handleSettings } from '../../api/settings.ts';
-import type { Db } from '../../db/index.ts';
-import { loadTabs } from '../../lib/dashboard.ts';
-import { readSettings, resetSection, saveSection } from '../../lib/settings.ts';
-import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../lib/sft.ts';
+import { handle as handleDashboard } from '../../backend/api/dashboard.ts';
+import { handle as handleReportSick } from '../../backend/api/reportsick.ts';
+import { handle as handleSft, type Deps as SftDeps } from '../../backend/api/sft.ts';
+import { handle as handleParade, type Deps as ParadeDeps } from '../../backend/api/parade.ts';
+import { handle as handleSession } from '../../backend/api/session.ts';
+import { handle as handleSettings } from '../../backend/api/settings.ts';
+import type { Db } from '../../backend/db/index.ts';
+import { loadTabs } from '../../backend/lib/dashboard.ts';
+import { readSettings, resetSection, saveSection } from '../../backend/lib/settings.ts';
+import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../backend/lib/sft.ts';
 import {
   deleteMessage,
   editMessage,
@@ -20,7 +20,7 @@ import {
   ingestMessage,
   listMessages,
   type ModelParser,
-} from '../../lib/pipeline.ts';
+} from '../../backend/lib/pipeline.ts';
 import { FORM_KEYS, POST_URI, SFT_FORM_KEYS, SFT_POST_URI, testSdk } from './formsg.ts';
 
 /** The dashboard password the tests configure. */

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd .. && bun install --frozen-lockfile",
+  "buildCommand": "cd ../frontend && bun x vite build --outDir ../backend/public --emptyOutDir",
+  "outputDirectory": "public",
+  "functions": {
+    "api/parade.ts": { "maxDuration": 300 }
+  }
+}
