@@ -20,10 +20,10 @@ describe('sourceOf', () => {
 
 describe('statusOf', () => {
   test.each([
-    [{ paradeResponseId: 'Archer_2026-09-18_FPS', error: null, processedAt: 't' }, MESSAGE_STATUS.PARSED],
-    [{ paradeResponseId: null, error: 'Needs review: bad line', processedAt: 't' }, MESSAGE_STATUS.NEEDS_REVIEW],
-    [{ paradeResponseId: null, error: 'This is a LAST PARADE STATE.', processedAt: 't' }, MESSAGE_STATUS.REJECTED],
-    [{ paradeResponseId: null, error: null, processedAt: null }, MESSAGE_STATUS.PENDING],
+    [{ paradeResponseId: 'Archer_2026-09-18_FPS', outcome: null }, MESSAGE_STATUS.PARSED],
+    [{ paradeResponseId: null, outcome: 'needs_review' }, MESSAGE_STATUS.NEEDS_REVIEW],
+    [{ paradeResponseId: null, outcome: 'rejected' }, MESSAGE_STATUS.REJECTED],
+    [{ paradeResponseId: null, outcome: null }, MESSAGE_STATUS.PENDING],
   ])('%o is %s', (message, status) => {
     expect(statusOf(message)).toBe(status);
   });
@@ -49,7 +49,8 @@ describe('toMessageRows', () => {
         receivedAt: '2026-09-17T23:31:00Z',
         processedAt: '2026-09-17T23:31:01Z',
         paradeResponseId: 'Archer_2026-09-18_FPS',
-        error: null,
+        outcome: null,
+        problems: 0,
       },
     ]);
     expect(row).toEqual({
@@ -58,7 +59,7 @@ describe('toMessageRows', () => {
       status: MESSAGE_STATUS.PARSED,
       source: 'Manual',
       received: { date: '2026-09-18', time: '07:31' },
-      reasons: [],
+      problems: 0,
     });
   });
 });

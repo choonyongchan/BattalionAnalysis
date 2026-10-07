@@ -2,12 +2,13 @@
  * Applies a `db/grants*.sql` file over the Neon HTTP driver, for machines without psql.
  *
  * Generates a fresh hex password for `:'password'`, runs each `--> statement-breakpoint`
- * chunk, and prints the role's connection string. Re-running rotates the password.
+ * chunk, and writes the role's connection string to `.env.<role>` (gitignored) rather than
+ * the terminal, where it would sit in scrollback. Re-running rotates the password.
  *
- * Usage:  bun --env-file=.env.local scripts/apply-grants.ts db/grants-<name>.sql
+ * Usage:  bun --env-file=.env.local backend/scripts/apply-grants.ts backend/db/grants-<name>.sql
  */
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { neon } from '@neondatabase/serverless';
 
 /**
@@ -37,7 +38,9 @@ async function main(): Promise<void> {
   const target = new URL(url);
   target.username = role;
   target.password = password;
-  console.log(`${role} ready. Connection string:\n${target}`);
+  const out = `.env.${role}`;
+  writeFileSync(out, `DASHBOARD_DATABASE_URL=${target}\n`, { mode: 0o600 });
+  console.log(`${role} ready. Connection string written to ${out}: copy it into .env.local and Vercel, then delete it.`);
 }
 
 await main();

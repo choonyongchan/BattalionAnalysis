@@ -61,34 +61,13 @@ const MAX_VERSION = 2147483647;
  *
  * Rejecting an out-of-range version here, rather than letting it reach the database, matters
  * for more than correctness: an oversized value made Postgres reject the query, and that
- * failure used to reach `serverError` with the query's own params attached (see `redacted`).
+ * failure used to reach the log with the query's own params attached.
  *
  * @param value The candidate.
  * @returns True when usable.
  */
 function isVersion(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_VERSION;
-}
-
-/**
- * Strips an unexpected error down to its name and, when the driver supplied one, its error
- * code -- never its message or stack.
- *
- * `serverError` (`lib/http.ts`) logs `error.stack || error.message`, which is fine for most
- * routes but not this one: Drizzle 0.45 wraps a failed query in `DrizzleQueryError`, whose
- * message is `Failed query: ...\nparams: ...`, and for `saveSection` those params are the
- * section's own value -- exactly what "nothing here logs a value" forbids. This is what a
- * store call throws through on its way to `serverError`, so the log still says *that*
- * something broke and, where the driver says so (e.g. Postgres's `22003`, "out of range"),
- * *what kind* -- without ever repeating what was being saved.
- *
- * @param error Whatever `deps.store.save` or `deps.store.reset` threw.
- * @returns A new `Error` carrying only a name and an optional driver error code.
- */
-function redacted(error: unknown): Error {
-  const name = error instanceof Error ? error.name : 'Error';
-  const code = (error as { cause?: { code?: unknown } } | null | undefined)?.cause?.code;
-  return new Error(typeof code === 'string' ? `${name} (${code})` : name);
 }
 
 /**
@@ -168,7 +147,7 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
   try {
     return request.method === 'PUT' ? await put(request, deps) : await remove(request, deps);
   } catch (error) {
-    return serverError(redacted(error), 'api/settings');
+    return serverError(error, 'api/settings');
   }
 }
 

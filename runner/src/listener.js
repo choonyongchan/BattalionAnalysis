@@ -135,11 +135,32 @@ function createSocket({ version, state, logger }) {
   return makeWASocket({
     version,
     auth: state,
-    // 'warn' rather than 'silent' so connection-level trouble - including
-    // repeated session-decrypt failures - reaches the bridge log.
-    logger: logger.child({ component: 'baileys' }, { level: 'warn' }),
+    logger: baileysLogger(logger),
     browser: ['BattalionDataAnalysis', 'Chrome', '1.0.0'],
   });
+}
+
+/**
+ * The logger Baileys gets: warnings and errors reach the bridge log, payloads do not.
+ *
+ * Baileys logs whole objects with its warnings ("failed to decrypt message", "error in
+ * handling message"): sender JIDs, phone numbers, WhatsApp display names and raw message
+ * nodes. The log is a plain file on the ops laptop, so only the level, Baileys' own message
+ * and the error's message are kept, which still shows connection-level trouble.
+ *
+ * @param {import('pino').Logger} logger The bridge's logger.
+ * @returns {Object} A Baileys-compatible logger.
+ */
+export function baileysLogger(logger) {
+  const out = logger.child({ component: 'baileys' });
+  const keep = (level) => (obj, msg) => {
+    if (typeof obj === 'string') return out[level](obj);
+    const err = obj?.err ?? obj?.error;
+    return out[level](err?.message ? { err: err.message } : {}, msg);
+  };
+  const quiet = () => {};
+  const self = { level: 'warn', child: () => self, trace: quiet, debug: quiet, info: quiet };
+  return Object.assign(self, { warn: keep('warn'), error: keep('error'), fatal: keep('fatal') });
 }
 
 /**

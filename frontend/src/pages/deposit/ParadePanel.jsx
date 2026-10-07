@@ -16,7 +16,7 @@ import { Banner, Card, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../data/parade.js';
 import { fmtDate, fmtInt } from '../../format.js';
-import { MESSAGE_STATUS, describeOutcome, toMessageRows } from '../../model/paradeMessages.js';
+import { MESSAGE_STATUS, describeOutcome, reasonsOf, toMessageRows } from '../../model/paradeMessages.js';
 import { settingOf } from '../../model/activeSettings.js';
 import { Outcome, RowActions, runBusy } from './shared.jsx';
 
@@ -78,15 +78,20 @@ function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, 
 }
 
 /**
- * The status cell: the label, and beneath it what stopped the message parsing.
- * @param {{status: string, reasons: !Array<string>}} props The row's status and reasons.
+ * The status cell: the label, and beneath it how many lines stopped the message parsing.
+ * The lines themselves show only once the message is opened for editing.
+ * @param {{status: string, problems: number}} props The row's status and doubted-line count.
  * @returns {!preact.VNode} The cell content.
  */
-function StatusCell({ status, reasons }) {
+function StatusCell({ status, problems }) {
   return (
     <span class="msgstatus">
       <span class={'msgstatus__label msgstatus__label--' + STATUS_CLASS[status]}>{status}</span>
-      {reasons.length ? <span class="msgstatus__reason">{reasons.join(' · ')}</span> : null}
+      {problems ? (
+        <span class="msgstatus__reason">
+          {problems} line{problems === 1 ? '' : 's'} to fix. Edit to see {problems === 1 ? 'it' : 'them'}.
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -142,7 +147,8 @@ export function ParadePanel() {
       const message = await getMessage(id);
       setEditing(id);
       setText(message.body);
-      setResult(null);
+      const reasons = reasonsOf(message.error);
+      setResult(reasons.length ? { tone: 'error', text: 'Correct these lines and save:', reasons } : null);
       setConfirming(null);
       if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -161,7 +167,7 @@ export function ParadePanel() {
     ...row,
     idLabel: '#' + row.id,
     receivedLabel: row.received ? fmtDate(row.received.date) + ', ' + row.received.time : '—',
-    statusCell: <StatusCell status={row.status} reasons={row.reasons} />,
+    statusCell: <StatusCell status={row.status} problems={row.problems} />,
     actions: (
       <RowActions
         label={'#' + row.id}

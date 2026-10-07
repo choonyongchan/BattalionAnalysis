@@ -61,6 +61,14 @@ describe('OpenAiParser', () => {
     expect(JSON.stringify(bodies[0]!.messages)).toContain('40 SAR ARCHER COMPANY');
   });
 
+  test('sends no NRIC to the provider and asks it not to store the completion', async () => {
+    const { impl, bodies } = fakeFetch(completion(JSON.stringify(EXTRACTION)));
+    await new OpenAiParser({ apiKey: 'sk-test', fetchImpl: impl }).parse('REC TAN AH KOW S0000000Z MC', TODAY);
+    expect(bodies[0]).toMatchObject({ store: false });
+    expect(JSON.stringify(bodies[0]!.messages)).not.toContain('S0000000Z');
+    expect(JSON.stringify(bodies[0]!.messages)).toContain('TAN AH KOW [NRIC] MC');
+  });
+
   test('retries once, so a single bad reply is not fatal', async () => {
     const { impl, bodies } = fakeFetch(new Response('busy', { status: 503 }), completion(JSON.stringify(EXTRACTION)));
     await new OpenAiParser({ apiKey: 'sk-test', fetchImpl: impl }).parse('text', TODAY);

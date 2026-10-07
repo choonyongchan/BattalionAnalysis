@@ -1,6 +1,7 @@
 /** The shared route helpers. */
 import { describe, expect, spyOn, test } from 'bun:test';
 import { json, methodNotAllowed, readJson, serverError } from '../../../backend/lib/http.ts';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 
 describe('json', () => {
   test('sets the status and a JSON content type', async () => {
@@ -57,24 +58,47 @@ describe('readJson', () => {
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.response.status).toBe(400);
   });
+
+  test('answers 413 for a body past the cap, before parsing it', async () => {
+    const parsed = await readJson(withBody(JSON.stringify({ body: 'x'.repeat(300 * 1024) })));
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.response.status).toBe(413);
+  });
 });
 
 describe('serverError', () => {
-  test('logs the cause chain, where a wrapped database error keeps its real reason', async () => {
-    /*
-     * Drizzle wraps every failure as "Failed query: <sql>" and puts the driver's error --
-     * the one that says why -- in `cause`. Logging only the wrapper hid a production outage.
-     */
+  const MARKER = 'TAN AH KOW 3203 S0000000Z';
+
+  /**
+   * Runs `serverError` and returns the line it logged.
+   *
+   * @param error What the route threw.
+   * @returns The log line and the response.
+   */
+  function logged(error: unknown): { line: string; response: Response } {
     const log = spyOn(console, 'error').mockImplementation(() => {});
     try {
-      const driver = new Error('password authentication failed for user "dashboard_read"');
-      const response = serverError(new Error('Failed query: select 1', { cause: driver }), 'api/test');
-      const line = String(log.mock.calls[0]?.[0]);
-      expect(line).toContain('Failed query: select 1');
-      expect(line).toContain('password authentication failed');
-      expect(await response.json()).not.toHaveProperty('error', expect.stringContaining('password'));
+      const response = serverError(error, 'api/test');
+      return { line: String(log.mock.calls[0]?.[0]), response };
     } finally {
       log.mockRestore();
     }
+  }
+
+  test('never logs a failed query’s params, but keeps the driver’s error code', async () => {
+    // Drizzle's message is "Failed query: <sql>\nparams: <params>": the params are personnel data.
+    const driver = Object.assign(new Error(`password authentication failed: ${MARKER}`), { code: '28P01' });
+    const error = new DrizzleQueryError('insert into raw_messages (body) values ($1)', [MARKER], driver);
+    expect(error.message).toContain(MARKER);
+
+    const { line, response } = logged(error);
+    expect(line).not.toContain(MARKER);
+    expect(line).toContain('(28P01)');
+    expect(JSON.stringify(await response.json())).not.toContain(MARKER);
+  });
+
+  test('keeps the stack of a programming error, which names code rather than input', () => {
+    const { line } = logged(new TypeError('cannot read properties of undefined'));
+    expect(line).toContain('TypeError: cannot read properties of undefined');
   });
 });

@@ -24,6 +24,7 @@ import {
   editSecret,
   issueSession,
   sessionCookie,
+  sessionsConfigured,
 } from '../lib/session.ts';
 
 /** What `handle` needs. */
@@ -78,7 +79,7 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
     return response;
   }
   if (request.method !== 'POST') return methodNotAllowed(['POST', 'DELETE']);
-  if (!deps.dashboardPassword) {
+  if (!deps.dashboardPassword || !sessionsConfigured()) {
     return json(503, { ok: false, error: 'not_configured' }, NO_STORE);
   }
 

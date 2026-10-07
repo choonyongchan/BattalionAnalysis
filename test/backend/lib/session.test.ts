@@ -6,6 +6,7 @@
  * has since been rotated. Each of those is someone keeping access they should have lost.
  */
 import { describe, expect, test } from 'bun:test';
+import { createHmac } from 'node:crypto';
 import {
   SESSION_COOKIE,
   SESSION_TTL_MS,
@@ -25,6 +26,23 @@ const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
 const HOUR = 60 * 60 * 1000;
 
 describe('issueSession and verifySession', () => {
+  test('a token signed with the password alone is refused, so a cookie is no password oracle', () => {
+    const payload = `v1.${NOW + HOUR}`;
+    const passwordOnly = `${payload}.${createHmac('sha256', SECRET).update(payload).digest('base64url')}`;
+    expect(verifySession(SECRET, passwordOnly, NOW)).toBe(false);
+  });
+
+  test('with SESSION_SECRET unset, nothing verifies', () => {
+    const token = issueSession(SECRET, HOUR, NOW);
+    const saved = process.env.SESSION_SECRET;
+    delete process.env.SESSION_SECRET;
+    try {
+      expect(verifySession(SECRET, token, NOW)).toBe(false);
+    } finally {
+      process.env.SESSION_SECRET = saved;
+    }
+  });
+
   test('a token it just issued is accepted', () => {
     const token = issueSession(SECRET, 12 * HOUR, NOW);
     expect(verifySession(SECRET, token, NOW)).toBe(true);

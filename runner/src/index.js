@@ -7,7 +7,6 @@
 
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
-import { describeError } from './errors.js';
 import { createIngestor } from './ingest.js';
 import { isParadeState } from './signature.js';
 import { startListener } from './listener.js';
@@ -62,7 +61,7 @@ export function createMessageHandler({ config, logger, ingestor }) {
       const level = outcome.status === 'parsed' || outcome.status === 'already_parsed' ? 'info' : 'warn';
       logger[level]({ ...summary, status: outcome.status, id: outcome.id, paradeResponseId: outcome.paradeResponseId }, message);
     } catch (err) {
-      logger.error({ ...summary, err: describeError(err) }, 'relay failed; deposit this parade state on the dashboard');
+      logger.error({ ...summary, err: { name: err?.name, message: err?.message } }, 'relay failed; deposit this parade state on the dashboard');
     }
   };
 }

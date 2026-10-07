@@ -9,7 +9,7 @@ import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.js
 import { createMessageHandler } from '../../runner/src/index.js';
 
 /** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
-const MARKER = 'NRIC S1234568B BODY';
+const MARKER = 'NRIC S0000000Z BODY';
 
 /** @type {string} JID used as the watched group in the envelope tests. */
 const GROUP_JID = '120363000000000000@g.us';

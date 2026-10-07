@@ -10,10 +10,12 @@
  *
  * The token carries nothing but its own expiry — there are no accounts to name, and the
  * dashboard deliberately has no per-person identity (`docs/dashboard.md`). It is signed
- * with `DASHBOARD_PASSWORD` itself, which is what makes a rotation end every open session:
- * change the password and every token signed with the old one stops verifying. There is
- * no server-side session store, because `neon-http` gives the routes no place to keep one
- * and a signature needs none.
+ * with a key derived from the password, which is what makes a rotation end every open
+ * session: change the password and every token signed with the old one stops verifying.
+ * The derivation is keyed by `SESSION_SECRET`, a random server-only value, so a stolen
+ * cookie cannot be used to guess the password offline. There is no server-side session
+ * store, because `neon-http` gives the routes no place to keep one and a signature needs
+ * none.
  */
 import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
 import { bearerToken, sameSecret } from './http.ts';
@@ -31,14 +33,31 @@ export const SETTINGS_COOKIE = 'settings_session';
 const VERSION = 'v1';
 
 /**
- * Signs the payload with the dashboard password.
+ * Whether sessions can be issued at all: `SESSION_SECRET` is set.
  *
- * @param secret The `DASHBOARD_PASSWORD` in force.
+ * @returns True when configured.
+ */
+export function sessionsConfigured(): boolean {
+  return Boolean(process.env.SESSION_SECRET);
+}
+
+/**
+ * Signs the payload with a key derived from the password and `SESSION_SECRET`.
+ *
+ * Signing with the password alone made every cookie an offline password-guessing oracle:
+ * the payload is in the clear, so a guess could be checked against the signature at full
+ * speed. Keying the derivation with a server-only secret closes that.
+ *
+ * @param secret The password in force.
  * @param payload The token's signed part, `v1.<expiry>`.
  * @returns The signature, base64url.
+ * @throws {Error} When `SESSION_SECRET` is unset; callers check `sessionsConfigured` first.
  */
 function sign(secret: string, payload: string): string {
-  return createHmac('sha256', secret).update(payload).digest('base64url');
+  const pepper = process.env.SESSION_SECRET;
+  if (!pepper) throw new Error('SESSION_SECRET is not configured.');
+  const key = createHmac('sha256', pepper).update(secret).digest();
+  return createHmac('sha256', key).update(payload).digest('base64url');
 }
 
 /**
@@ -67,7 +86,7 @@ export function issueSession(secret: string, ttlMs: number, now: number): string
  * @returns Whether the token is valid right now.
  */
 export function verifySession(secret: string, token: string | null, now: number): boolean {
-  if (!secret || !token) return false;
+  if (!secret || !token || !sessionsConfigured()) return false;
   const parts = token.split('.');
   if (parts.length !== 3) return false;
   // Read with a default rather than destructured: under `noUncheckedIndexedAccess` an

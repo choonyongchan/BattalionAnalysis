@@ -112,7 +112,11 @@ export async function handleWebhook(request: Request, deps: Deps, form: FormSpec
 
   // Form edits show up here first: a new question, or a renamed option that now maps to null.
   if (mapped.unmapped.length) console.warn(`[${form.tag}] unmapped questions: ${mapped.unmapped.join(' | ')}`);
-  if (mapped.unrecognised.length) console.warn(`[${form.tag}] unrecognised answers: ${mapped.unrecognised.join(' | ')}`);
+  // Column names only: an answer such as the doctor's outcome is free text about a soldier.
+  if (mapped.unrecognised.length) {
+    const columns = mapped.unrecognised.map((entry) => entry.split('=')[0]);
+    console.warn(`[${form.tag}] unrecognised answers in: ${columns.join(' | ')}`);
+  }
 
   const column = nricColumn(mapped.row);
   if (column) {

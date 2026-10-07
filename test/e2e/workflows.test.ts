@@ -187,8 +187,12 @@ describe.skipIf(!hasTestDb)('end to end', () => {
       const rows = toMessageRows(await page.list());
       expect(rows.map((row: any) => row.status)).toEqual([MESSAGE_STATUS.NEEDS_REVIEW, MESSAGE_STATUS.PARSED]);
       expect(rows.every((row: any) => row.source === 'Manual')).toBe(true);
-      expect(rows[0]!.reasons.join(' ')).toContain('SOMETHING UNHEARD OF');
-      expect((await page.get(review.id)).body).toBe(doubtful);
+      // The list says how many lines to fix but never quotes them; opening the message does.
+      expect(rows[0]!.problems).toBeGreaterThan(0);
+      expect(JSON.stringify(await page.list())).not.toContain('SOMETHING UNHEARD OF');
+      const opened = await page.get(review.id);
+      expect(opened.body).toBe(doubtful);
+      expect(opened.error).toContain('SOMETHING UNHEARD OF');
 
       // The clerk fixes the doubtful line.
       expect((await page.edit(review.id, renderParadeState(first))).status).toBe('parsed');

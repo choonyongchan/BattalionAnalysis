@@ -75,7 +75,10 @@ interface MessageSummary {
   receivedAt: Date;
   processedAt: Date | null;
   paradeResponseId: string | null;
-  error: string | null;
+  /** Why no rows were written, without the reasons: those can quote a personnel line. */
+  outcome: 'needs_review' | 'rejected' | null;
+  /** How many lines the parser doubted; 0 unless `outcome` is `needs_review`. */
+  problems: number;
 }
 
 /**
@@ -263,13 +266,16 @@ export async function deleteMessage(db: Db, id: number): Promise<boolean> {
 }
 
 /**
- * Lists every stored message, newest first, without its text.
+ * Lists every stored message, newest first, without its text or its reasons.
+ *
+ * The stored reasons quote the lines the parser doubted, so they leave the database only with
+ * the message itself (`getMessage`); the list says what happened and how many lines to fix.
  *
  * @param db A database handle.
  * @returns One summary per message.
  */
 export async function listMessages(db: Db): Promise<MessageSummary[]> {
-  return db
+  const rows = await db
     .select({
       id: rawMessages.id,
       waMessageId: rawMessages.waMessageId,
@@ -280,18 +286,37 @@ export async function listMessages(db: Db): Promise<MessageSummary[]> {
     })
     .from(rawMessages)
     .orderBy(desc(rawMessages.id));
+  return rows.map(({ error, ...row }: { error: string | null } & Omit<MessageSummary, 'outcome' | 'problems'>) => ({
+    ...row,
+    ...outcomeOf(error),
+  }));
 }
 
 /**
- * Reads one stored message's text, for editing.
+ * Reads what a stored error says happened, without keeping its text.
+ *
+ * @param error `raw_messages.error`.
+ * @returns The outcome and the number of doubted lines.
+ */
+function outcomeOf(error: string | null): Pick<MessageSummary, 'outcome' | 'problems'> {
+  if (!error) return { outcome: null, problems: 0 };
+  if (!error.startsWith(NEEDS_REVIEW)) return { outcome: 'rejected', problems: 0 };
+  return { outcome: 'needs_review', problems: error.slice(NEEDS_REVIEW.length).split(' | ').length };
+}
+
+/**
+ * Reads one stored message's text and why it produced no rows, for editing.
  *
  * @param db A database handle.
  * @param id The `raw_messages` id.
- * @returns The id and text, or null when there is no such message.
+ * @returns The id, text and stored error, or null when there is no such message.
  */
-export async function getMessage(db: Db, id: number): Promise<{ id: number; body: string } | null> {
+export async function getMessage(
+  db: Db,
+  id: number,
+): Promise<{ id: number; body: string; error: string | null } | null> {
   const [row] = await db
-    .select({ id: rawMessages.id, body: rawMessages.body })
+    .select({ id: rawMessages.id, body: rawMessages.body, error: rawMessages.error })
     .from(rawMessages)
     .where(eq(rawMessages.id, id));
   return row ?? null;

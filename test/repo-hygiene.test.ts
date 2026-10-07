@@ -62,14 +62,18 @@ describe('source files are text', () => {
 describe('personnel data stays out of git', () => {
   test('the files holding real NRICs and names are ignored', () => {
     /*
-     * formsg.csv holds 2,376 SingPass-validated NRICs; the parade-state samples and the
-     * format template hold full names, 4D numbers and diagnoses. All were untracked and
+     * formsg.csv holds 2,376 SingPass-validated NRICs; the parade-state samples, the format
+     * template and the Sheet backups hold full names, 4D numbers and diagnoses; the runner's
+     * log and WhatsApp session hold phone numbers and keys. All were untracked and
      * unignored at one point, one `git add .` away from being permanent.
      */
     const mustBeIgnored = [
       'formsg.csv',
       'parade-state-example.txt',
       'parade_state_template_new.md',
+      'backup/Personnel Data.xlsx',
+      'runner/data/bridge.log',
+      'runner/auth/creds.json',
     ];
 
     const notIgnored = mustBeIgnored.filter((path) => {
@@ -83,17 +87,13 @@ describe('personnel data stays out of git', () => {
   test('no tracked file contains something shaped like a real NRIC', () => {
     /*
      * Test fixtures deliberately use NRIC-shaped placeholders, so this allows the two that
-     * exist by name rather than by pattern. Anything else matching is a leak.
+     * exist by name rather than by pattern. Anything else matching is a leak. Each proves an
+     * NRIC does NOT reach somewhere (a log, the model provider, a stored row), and each has
+     * an invalid check letter, so neither can be anyone's real NRIC:
+     *   S0000000Z  a parade-state body or log marker
+     *   T0000001A  a FormSG "SingPass Validated NRIC" answer
      */
-    /*
-     * Each of these exists so a test can prove an NRIC does NOT reach somewhere:
-     *   S1234568B  a FormSG webhook fixture in the Apps Script harness
-     *   T0573638I  asserted absent from the dashboard feed reply
-     *   T0000001A  asserted absent from a mapped FormSG row
-     * They have to be NRIC-shaped to be worth anything, so they are allowed by exact value
-     * rather than by loosening the pattern.
-     */
-    const ALLOWED = new Set(['S1234568B', 'T0573638I', 'T0000001A']);
+    const ALLOWED = new Set(['S0000000Z', 'T0000001A']);
     const NRIC = /\b[STFGM]\d{7}[A-Z]\b/g;
 
     const found: string[] = [];

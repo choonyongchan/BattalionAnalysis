@@ -290,15 +290,21 @@ describe.skipIf(!hasTestDb)('against the test database', () => {
   });
 
   describe('listMessages and getMessage', () => {
-    test('list newest first, without any text; get returns the text', async () => {
+    test('list newest first, without any text or reasons; get returns both', async () => {
       const first = await ingestMessage(db, { waMessageId: 'wa-1', body: GOOD }, arrival(FULL));
       const second = await ingestMessage(db, { waMessageId: 'wa-2', body: DOUBTFUL }, arrival(FULL));
 
       const listed = await listMessages(db);
       expect(listed.map((row) => row.id)).toEqual([second.id, first.id]);
-      for (const row of listed) expect(row).not.toHaveProperty('body');
-      expect(listed[0]!.error).toStartWith('Needs review: ');
-      expect(await getMessage(db, first.id)).toEqual({ id: first.id, body: GOOD });
+      for (const row of listed) {
+        expect(row).not.toHaveProperty('body');
+        expect(row).not.toHaveProperty('error');
+      }
+      expect(listed[0]).toMatchObject({ outcome: 'needs_review' });
+      expect(listed[0]!.problems).toBeGreaterThan(0);
+      expect(listed[1]).toMatchObject({ outcome: null, problems: 0 });
+      expect(await getMessage(db, first.id)).toEqual({ id: first.id, body: GOOD, error: null });
+      expect((await getMessage(db, second.id))!.error).toStartWith('Needs review: ');
     }, DB_TIMEOUT_MS);
 
     test('personnel rows keep the stated names', async () => {

@@ -15,6 +15,19 @@ const CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
 /** The model, overridable by env; whichever is used is recorded on `parade_submissions.model`. */
 export const DEFAULT_MODEL = 'gpt-6-luna';
 
+/** Anything shaped like an NRIC or FIN, as `lib/formsg/webhook.ts` refuses to store. */
+const NRIC_SHAPES = /\b[STFGM]\d{7}[A-Z]\b/gi;
+
+/**
+ * Replaces every NRIC-shaped token before text is sent to the model provider.
+ *
+ * @param text The message text.
+ * @returns The same text with each NRIC shape replaced by `[NRIC]`.
+ */
+export function maskNrics(text: string): string {
+  return text.replace(NRIC_SHAPES, '[NRIC]');
+}
+
 /** How many times to call before giving up. A truncated or empty reply may not recur. */
 const MAX_ATTEMPTS = 2;
 
@@ -81,9 +94,12 @@ export class OpenAiParser {
    * @throws {LlmParseError} When every attempt fails.
    */
   async parse(text: string, today: string): Promise<Extraction> {
+    // No column stores an NRIC, so the model never needs one; `store: false` keeps the
+    // completion out of OpenAI's stored-completions log.
     const body = JSON.stringify({
       model: this.model,
-      messages: [{ role: 'user', content: buildPrompt(text, today) }],
+      store: false,
+      messages: [{ role: 'user', content: buildPrompt(maskNrics(text), today) }],
       response_format: { type: 'json_schema', json_schema: buildResponseSchema() },
     });
 

@@ -37,20 +37,20 @@ export function sourceOf(waMessageId) {
 
 /**
  * What became of a message.
- * @param {{paradeResponseId: ?string, error: ?string, processedAt: ?string}} message A summary
- *     from `GET /api/parade`.
+ * @param {{paradeResponseId: ?string, outcome: ?string}} message A summary from
+ *     `GET /api/parade`.
  * @returns {string} One of MESSAGE_STATUS.
  */
 export function statusOf(message) {
   if (message.paradeResponseId) return MESSAGE_STATUS.PARSED;
-  if (message.error) {
-    return message.error.startsWith(NEEDS_REVIEW_PREFIX) ? MESSAGE_STATUS.NEEDS_REVIEW : MESSAGE_STATUS.REJECTED;
-  }
+  if (message.outcome === 'needs_review') return MESSAGE_STATUS.NEEDS_REVIEW;
+  if (message.outcome === 'rejected') return MESSAGE_STATUS.REJECTED;
   return MESSAGE_STATUS.PENDING;
 }
 
 /**
- * The reasons a message produced no rows, one per line the parser doubted.
+ * The reasons a message produced no rows, one per line the parser doubted. Only the opened
+ * message carries them (`GET /api/parade?id=`): they can quote a personnel line.
  * @param {?string} error The stored error.
  * @returns {!Array<string>} The reasons; empty for a parsed message.
  */
@@ -63,8 +63,7 @@ export function reasonsOf(error) {
  * Shapes the stored messages for the table, newest first as the API returns them.
  * @param {!Array<!Object>} messages Summaries from `GET /api/parade`.
  * @returns {!Array<{id: number, parade: string, status: string, source: string,
- *     received: ?{date: string, time: string}, reasons: !Array<string>}>} One row per
- *     message.
+ *     received: ?{date: string, time: string}, problems: number}>} One row per message.
  */
 export function toMessageRows(messages) {
   return messages.map((message) => ({
@@ -73,7 +72,7 @@ export function toMessageRows(messages) {
     status: statusOf(message),
     source: sourceOf(message.waMessageId),
     received: receivedInSgt(message.receivedAt),
-    reasons: reasonsOf(message.error),
+    problems: message.problems || 0,
   }));
 }
 

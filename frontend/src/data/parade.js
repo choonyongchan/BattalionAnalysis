@@ -39,9 +39,9 @@ export async function listMessages() {
 }
 
 /**
- * Reads one message's text.
+ * Reads one message's text, and the stored reasons it produced no rows.
  * @param {number} id The message id.
- * @returns {!Promise<{id: number, body: string}>} The message.
+ * @returns {!Promise<{id: number, body: string, error: ?string}>} The message.
  */
 export function getMessage(id) {
   return call('GET', '?id=' + id);

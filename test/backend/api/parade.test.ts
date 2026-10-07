@@ -196,7 +196,7 @@ describe.skipIf(!hasTestDb)('requests that reach the pipeline', () => {
     expect(list.headers.get('Cache-Control')).toBe('no-store');
     expect(list.body.messages[0]).not.toHaveProperty('body');
     expect(JSON.stringify(list.body)).not.toContain(SPEC.units[0]!.entries[0]!.name);
-    expect((await send(request('GET', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}` }))).body).toEqual({ id: posted.id, body: GOOD });
+    expect((await send(request('GET', { token: DASHBOARD_PASSWORD, query: `?id=${posted.id}` }))).body).toEqual({ id: posted.id, body: GOOD, error: null });
     expect((await send(request('GET', { token: DASHBOARD_PASSWORD, query: '?id=999' }))).status).toBe(404);
   }, DB_TIMEOUT_MS);
 

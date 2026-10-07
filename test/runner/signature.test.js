@@ -84,8 +84,8 @@ describe('isParadeState - first parade gate', () => {
       'PLATOON 2: 49/56',
       'COMMANDERS: 20/25',
       '[OFFICER]: 05/07',
-      'CDO: 2LT TERENCE LEE',
-      'CDS: 3SG KWOH KAI JIE',
+      'CDO: 2LT ALPHA TAN',
+      'CDS: 3SG BRAVO LIM',
       'Padding line to clear the character gate comfortably for this test case.',
     ].join('\n');
   }

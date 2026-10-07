@@ -8,7 +8,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { DisconnectReason } from '@whiskeysockets/baileys';
-import { classifyDisconnect, reconnectDelayMs } from '../../runner/src/listener.js';
+import pino from 'pino';
+import { baileysLogger, classifyDisconnect, reconnectDelayMs } from '../../runner/src/listener.js';
 
 describe('classifyDisconnect', () => {
   test('treats a logged-out session as fatal', () => {
@@ -50,5 +51,24 @@ describe('reconnectDelayMs', () => {
     expect(reconnectDelayMs(6)).toBe(96000);
     expect(reconnectDelayMs(7)).toBe(120000);
     expect(reconnectDelayMs(99)).toBe(120000);
+  });
+});
+
+describe('baileysLogger', () => {
+  test('keeps the message and error text, never the payload Baileys attaches', () => {
+    const lines = [];
+    const sink = { write: (line) => lines.push(line) };
+    const logger = baileysLogger(pino({ level: 'info' }, sink));
+    logger.warn({ key: { participant: '6591234567@s.whatsapp.net' }, notify: 'Tan Ah Kow', err: new Error('bad mac') }, 'failed to decrypt message');
+    logger.child({}).error('plain text');
+    logger.info({ participant: '6591234567@s.whatsapp.net' }, 'chatter');
+
+    const text = lines.join('');
+    expect(text).toContain('failed to decrypt message');
+    expect(text).toContain('bad mac');
+    expect(text).toContain('plain text');
+    expect(text).not.toContain('6591234567');
+    expect(text).not.toContain('Tan Ah Kow');
+    expect(text).not.toContain('chatter');
   });
 });

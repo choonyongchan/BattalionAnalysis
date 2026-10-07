@@ -34,6 +34,13 @@ export function methodNotAllowed(allowed: string[]): Response {
   });
 }
 
+/**
+ * The largest JSON body any route reads. A parade state is capped at 50,000 characters and
+ * a FormSG webhook is a few kilobytes; this leaves room for both and refuses anything that
+ * could only be an attempt to make a function chew memory.
+ */
+const MAX_BODY_CHARS = 256 * 1024;
+
 /** A parsed body, or the response explaining why it could not be parsed. */
 type ParsedBody<T> = { ok: true; body: T } | { ok: false; response: Response };
 
@@ -53,6 +60,9 @@ export async function readJson<T = unknown>(request: Request): Promise<ParsedBod
     text = await request.text();
   } catch {
     return { ok: false, response: json(400, { error: 'Could not read the request body.' }) };
+  }
+  if (text.length > MAX_BODY_CHARS) {
+    return { ok: false, response: json(413, { error: 'The request body is too large.' }) };
   }
   if (text.trim() === '') {
     return { ok: false, response: json(400, { error: 'The request body is empty.' }) };
@@ -81,24 +91,46 @@ export function serverError(error: unknown, context: string): Response {
   return json(500, { error: 'Internal error.', reference });
 }
 
+/** Programming errors: their stack names code, never input, so it is safe to log whole. */
+const CODE_ERRORS = new Set(['TypeError', 'ReferenceError', 'RangeError', 'SyntaxError']);
+
+/**
+ * Renders one thrown value without any text that could quote personnel data.
+ *
+ * Drizzle's `DrizzleQueryError` message is `Failed query: <sql>\nparams: <params>`, and the
+ * params are the bodies, names, 4D numbers and diagnoses being written. Postgres and parser
+ * messages can quote input too ("invalid input syntax: \"...\""). So only a programming
+ * error keeps its stack; anything else is logged as its name, plus the driver's error code
+ * when it has one (e.g. Postgres `23505`), which is enough to say what kind of thing broke.
+ *
+ * @param error One link of the cause chain.
+ * @returns A log-safe rendering.
+ */
+function describeOne(error: unknown): string {
+  if (!(error instanceof Error)) return typeof error;
+  if (CODE_ERRORS.has(error.name)) return error.stack || error.name;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? `${error.name} (${code})` : error.name;
+}
+
 /**
  * Renders a thrown value for the log, followed by its `cause` chain.
  *
- * Drizzle wraps a failed query as "Failed query: <sql>" and keeps the driver's error, the one
- * that says why it failed, in `cause`; without the chain the log names the query and not the
- * reason. The chain is cut at a few links in case a cause refers back to itself.
+ * Drizzle keeps the driver's error, the one that says why a query failed, in `cause`, so the
+ * chain is what carries the useful code. It is cut at a few links in case a cause refers
+ * back to itself.
  *
  * @param error Whatever was thrown.
- * @returns The stack (or message) of the error and of each cause, one per paragraph.
+ * @returns Each link of the chain, rendered by `describeOne`.
  */
 function describeError(error: unknown): string {
   const parts: string[] = [];
   let current: unknown = error;
   for (let depth = 0; depth < 5 && current !== undefined; depth++) {
-    parts.push(current instanceof Error ? current.stack || current.message : String(current));
+    parts.push(describeOne(current));
     current = current instanceof Error ? current.cause : undefined;
   }
-  return parts.join('\nCaused by: ');
+  return parts.join(' <- ');
 }
 
 /**

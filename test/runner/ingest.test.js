@@ -99,6 +99,6 @@ describe('createIngestor.ingest', () => {
   test('never puts the message text in the error', async () => {
     const { relay } = relayOver([new TypeError('fetch failed')]);
 
-    await expect(relay.ingest('NRIC S1234568B BODY', 'MSG6')).rejects.not.toThrow(/S1234568B/);
+    await expect(relay.ingest('NRIC S0000000Z BODY', 'MSG6')).rejects.not.toThrow(/S0000000Z/);
   });
 });
