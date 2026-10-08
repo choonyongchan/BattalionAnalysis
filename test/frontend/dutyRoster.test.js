@@ -9,7 +9,7 @@
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
 import { ROSTER_HEADERS } from '../../shared/tabs.js';
-import { dutyRosterCoverage, dutyRosterTree, rosterOn, vacanciesOn } from '../../frontend/src/model/dutyRoster.js';
+import { dutyRosterCoverage, dutyRosterTree, rosterOn, vacanciesOn, rosterClashes, rosterLoad } from '../../frontend/src/model/dutyRoster.js';
 
 /**
  * Builds Command Roster records from column-keyed row specs.
@@ -170,5 +170,33 @@ describe('vacant appointments', () => {
     ]);
     expect(vacanciesOn(rows, '2026-09-22')).toEqual([{ company: 'Hercules', role: 'PDSMED' }]);
     expect(vacanciesOn(rows, '2026-09-23')).toEqual([]);
+  });
+});
+
+describe('rosterLoad and rosterClashes', () => {
+  const duty = (date, company, role, name) => ({ date, session: 'FPS', company, role, rank: 'CPT', name, vacant: false, parade_response_id: date + company });
+  const roster = [
+    duty('2026-10-03', 'Archer', 'CDO', 'ALPHA TAN'), // Saturday
+    duty('2026-10-03', 'Braves', 'CDO', 'ALPHA TAN'), // same battalion CDO, one duty
+    duty('2026-10-05', 'Archer', 'PDS1', 'BRAVO LIM'),
+    duty('2026-10-06', 'Archer', 'COS', 'ALPHA TAN'),
+  ];
+
+  test('counts each person once per date and appointment, weekends apart', () => {
+    expect(rosterLoad(roster)).toEqual([
+      { name: 'ALPHA TAN', rank: 'CPT', duties: 2, weekend: 1 },
+      { name: 'BRAVO LIM', rank: 'CPT', duties: 1, weekend: 0 },
+    ]);
+  });
+
+  test('lists a duty filed for someone the same parade lists on MC or leave', () => {
+    const personnel = [
+      { date: '2026-10-05', session: 'FPS', company: 'Archer', name: 'LIM BRAVO', reason_category: 'Att C', reason: 'MC (Fever)' },
+      { date: '2026-10-06', session: 'FPS', company: 'Archer', name: 'ALPHA TAN', reason_category: 'Status', reason: 'LD' },
+      { date: '2026-10-03', session: 'FPS', company: 'Archer', rank: 'LCP', name: 'ALPHA TAN', reason_category: 'Att C', reason: 'MC' },
+    ];
+    expect(rosterClashes(roster, personnel)).toEqual([
+      { date: '2026-10-05', appointment: 'PDS', rank: 'CPT', name: 'BRAVO LIM', company: 'Archer', away: 'MC (Fever)' },
+    ]);
   });
 });

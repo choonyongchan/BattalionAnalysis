@@ -17,8 +17,11 @@
  */
 
 import { COMMAND_ROLES, COMPANIES, commandRolesOf } from '../../../shared/domain.js';
+import { isWeekend } from '../../../shared/dates.js';
+import { namesMatch, normaliseName } from '../../../shared/identity.js';
 import { toIsoDate, toText } from '../../../shared/values.js';
 import { settingOf } from './activeSettings.js';
+import { classify, DUTY_CLASS } from './classify.js';
 
 /** @type {string} What an unfilled role's node reads. */
 const NOT_FILED = 'Not filed';
@@ -220,4 +223,82 @@ export function dutyRosterCoverage(rows, isoDate, session) {
     return { company, filed: roles > 0, roles };
   });
   return { companies, filedCount: companies.filter((entry) => entry.filed).length };
+}
+
+/**
+ * The appointment a roster role is: `CDO`, `CDS`, `COS` or `PDS` (any sub-unit).
+ * @param {*} role Raw role cell.
+ * @returns {string} The appointment.
+ */
+function appointmentOf_(role) {
+  const text = canonicalRole_(role);
+  return COMMAND_ROLES.includes(text) ? text : 'PDS';
+}
+
+/**
+ * Every filled duty, once: a battalion CDO listed on all five companies' rosters is one
+ * duty, not five.
+ * @param {Array<!Object>} rows Normalised Command Roster records.
+ * @param {string=} session Parade session; defaults to 'FPS'.
+ * @returns {Array<{date: string, appointment: string, rank: string, name: string,
+ *     company: string}>} One entry per date, appointment and person.
+ */
+function duties_(rows, session) {
+  const seen = new Map();
+  rows
+    .filter((row) => toText(row.session) === (session || 'FPS') && toText(row.name) !== '' && !isVacant_(row))
+    .forEach((row) => {
+      const date = toIsoDate(row.date);
+      const appointment = appointmentOf_(row.role);
+      const key = date + '|' + appointment + '|' + normaliseName(row.name);
+      if (date && !seen.has(key)) {
+        seen.set(key, { date, appointment, rank: toText(row.rank), name: toText(row.name), company: toText(row.company) });
+      }
+    });
+  return Array.from(seen.values());
+}
+
+/**
+ * How many duties each person has done, and how many of those fell on a weekend.
+ * @param {Array<!Object>} rows Normalised Command Roster records.
+ * @param {string=} session Parade session; defaults to 'FPS'.
+ * @returns {Array<{name: string, rank: string, duties: number, weekend: number}>} Most
+ *     duties first.
+ */
+export function rosterLoad(rows, session) {
+  const byPerson = new Map();
+  duties_(rows, session).forEach((duty) => {
+    const key = normaliseName(duty.name);
+    const entry = byPerson.get(key) || { name: duty.name, rank: duty.rank, duties: 0, weekend: 0 };
+    entry.duties += 1;
+    if (isWeekend(duty.date)) entry.weekend += 1;
+    byPerson.set(key, entry);
+  });
+  return Array.from(byPerson.values()).sort((a, b) => b.duties - a.duties || a.name.localeCompare(b.name));
+}
+
+/**
+ * Duties filed for someone the same day's parade state lists on MC or leave: either the
+ * roster was not updated or the soldier was on duty while away. Names match loosely
+ * (`namesMatch`), so a stated rank must agree too: `1WO BRAVO LIM` is not `LCP BRAVO LIM`.
+ * @param {Array<!Object>} rows Normalised Command Roster records.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string=} session Parade session; defaults to 'FPS'.
+ * @returns {Array<{date: string, appointment: string, rank: string, name: string,
+ *     company: string, away: string}>} One line per clash, newest first.
+ */
+export function rosterClashes(rows, personnelRows, session) {
+  const away = personnelRows.filter(
+    (row) => toText(row.session) === (session || 'FPS') && [DUTY_CLASS.ATT_C, DUTY_CLASS.OFF_LEAVE].includes(classify(row))
+  );
+  return duties_(rows, session)
+    .map((duty) => {
+      const sameRank = (row) => !toText(row.rank) || !duty.rank || toText(row.rank).toUpperCase() === duty.rank.toUpperCase();
+      const match = away.find(
+        (row) => toIsoDate(row.date) === duty.date && namesMatch(row.name, duty.name) && sameRank(row)
+      );
+      return match ? { ...duty, away: toText(match.reason) || toText(match.reason_category) } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 }

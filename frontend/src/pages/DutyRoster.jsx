@@ -28,8 +28,10 @@ import { PageControls } from '../components/PageControls.jsx';
 import { COMPANIES } from '../../../shared/domain.js';
 import { ALL_COMPANIES } from '../model/scope.js';
 import { datesPresent } from '../model/metrics.js';
-import { dutyRosterCoverage, dutyRosterTree, vacanciesOn } from '../model/dutyRoster.js';
-import { fmtDate, fmtFraction } from '../format.js';
+import { dutyRosterCoverage, dutyRosterTree, rosterClashes, rosterLoad, vacanciesOn } from '../model/dutyRoster.js';
+import { DataTable } from '../components/Table.jsx';
+import { scopeDataset } from '../model/scope.js';
+import { fmtDate, fmtFraction, fmtInt } from '../format.js';
 import { settingOf } from '../model/activeSettings.js';
 
 /**
@@ -77,6 +79,56 @@ function CompanyRoster({ node }) {
   );
 }
 
+/** @type {number} People the duty-load table lists. */
+const LOAD_ROWS = 15;
+
+/**
+ * Who has done the most duties since the roster began, weekends counted apart, and every
+ * duty filed for someone the same parade lists on MC or leave.
+ * @param {{roster: Array<!Object>, personnel: Array<!Object>, since: ?string}} props The
+ *     scoped roster and personnel rows, and the first parade date.
+ * @returns {!preact.VNode} The two cards.
+ */
+function DutyFairness({ roster, personnel, since }) {
+  const load = useMemo(() => rosterLoad(roster).slice(0, LOAD_ROWS), [roster]);
+  const clashes = useMemo(() => rosterClashes(roster, personnel), [roster, personnel]);
+  return (
+    <div class="grid-2">
+      <Card title="Duty Load" note={'CDO, CDS, COS and PDS duties per person' + (since ? ' since ' + fmtDate(since) : '')}>
+        {load.length === 0 ? (
+          <EmptyState>No duty filed yet.</EmptyState>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'who', label: 'Name' },
+              { key: 'all', label: 'Duties', numeric: true },
+              { key: 'wknd', label: 'On a weekend', numeric: true },
+            ]}
+            rows={load.map((row) => ({ who: (row.rank + ' ' + row.name).trim(), all: fmtInt(row.duties), wknd: fmtInt(row.weekend) }))}
+            rowKey={(row) => row.who}
+          />
+        )}
+      </Card>
+      <Card title="On Duty While Away" note="Duties filed for someone the same parade state lists on MC or leave">
+        {clashes.length === 0 ? (
+          <EmptyState>No duty clashes with an MC or leave.</EmptyState>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'day', label: 'Date' },
+              { key: 'appointment', label: 'Duty' },
+              { key: 'who', label: 'Name' },
+              { key: 'away', label: 'Listed as' },
+            ]}
+            rows={clashes.map((row) => ({ ...row, day: fmtDate(row.date), who: (row.rank + ' ' + row.name).trim() }))}
+            rowKey={(row) => row.date + row.appointment + row.name}
+          />
+        )}
+      </Card>
+    </div>
+  );
+}
+
 /**
  * The Duty Roster page.
  * @returns {!preact.VNode} The page.
@@ -86,6 +138,7 @@ export function DutyRoster() {
   const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);
   const [date, setDate] = useState(paradeDates[paradeDates.length - 1] || null);
   const whole = company.value === ALL_COMPANIES;
+  const scoped = useMemo(() => scopeDataset(data, company.value), [data, company.value]);
 
   if (!date) {
     return (
@@ -143,6 +196,8 @@ export function DutyRoster() {
             : ' No appointment filed vacant.'}
         </Coverage>
       </Card>
+
+      <DutyFairness roster={scoped.roster} personnel={scoped.personnel} since={paradeDates[0] || null} />
     </div>
   );
 }
