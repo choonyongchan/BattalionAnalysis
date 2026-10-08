@@ -422,7 +422,12 @@ export async function loadTabs(db: Db): Promise<Tabs> {
     formSgTab(db),
     submissionsTab(db),
     sftTab(db),
-    sectionCountsTab(db),
+    // Optional: before migration 0008 grants it, dashboard_read cannot read section_counts,
+    // and that must cost one empty tab, not the whole dashboard. Logs the driver code only.
+    sectionCountsTab(db).catch((error: { code?: string }) => {
+      console.warn(`[dashboard] section_counts unreadable (${error?.code ?? 'no code'})`);
+      return [];
+    }),
   ]);
   return {
     [TABS.STRENGTH]: toTab(STRENGTH_HEADERS, strength),
