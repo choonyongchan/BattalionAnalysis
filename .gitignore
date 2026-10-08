@@ -32,3 +32,4 @@ coverage/
 
 # Local visual-review helper.
 frontend/public/__review.html
+frontend/public/__soldier.html

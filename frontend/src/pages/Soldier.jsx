@@ -19,6 +19,7 @@ import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { SoldierSearch } from '../components/SoldierSearch.jsx';
 import { fmtDate, fmtInt } from '../format.js';
+import { ChartCard, Timeline } from '../charts/index.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions } from '../model/formsg.js';
 import { soldierIndex, soldierReport } from '../model/soldier.js';
@@ -89,6 +90,25 @@ export function Soldier() {
               merge here.
             </Coverage>
           ) : null}
+
+          <ChartCard
+            title="MC and Leave Over Time"
+            coverage="Each bar runs from the first to the last day stated on the parade state; an episode with no end date is left off."
+            empty="No MC or Off/Leave with both dates recorded."
+          >
+            <Timeline
+              lanes={['MC', 'Off/Leave']}
+              spans={report.absences
+                .filter((absence) => absence.startDate && absence.endDate)
+                .map((absence) => ({
+                  lane: absence.dutyClass === 'Att C' ? 'MC' : 'Off/Leave',
+                  start: absence.startDate,
+                  end: absence.endDate,
+                  days: absence.days,
+                  label: absence.reason,
+                }))}
+            />
+          </ChartCard>
 
           <Card title="MC and Off/Leave History" note="Most recent first">
             {report.absences.length === 0 ? (

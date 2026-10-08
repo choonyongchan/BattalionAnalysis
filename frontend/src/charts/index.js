@@ -18,6 +18,7 @@ export { Donut } from './Donut.jsx';
 export { Heatmap } from './Heatmap.jsx';
 export { Line } from './Line.jsx';
 export { Sankey } from './Sankey.jsx';
+export { Timeline } from './Timeline.jsx';
 
 // The table twin on its own, for the handful of card-shaped things that are a table and
 // never a chart — a data-quality issue list, say. It is the same component the charts
