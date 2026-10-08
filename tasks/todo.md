@@ -1,16 +1,13 @@
 # Open work
 
 Done items are deleted, not ticked; git history keeps them. The Vercel + Neon cut-over and the
-Settings rollout are finished (2026-10-07: every env var is set on Vercel, migrations 0000–0006
-are applied, `WHATSAPP_INGEST_TOKEN` and `CRON_SECRET` are gone, stale branches are deleted).
+Settings rollout are finished. On 2026-10-08 the folder split and security fixes shipped: Vercel's
+Root Directory is `backend`, `SESSION_SECRET` is set, migration 0007 is applied, and a firewall rule
+rate-limits `/api/session` and `/api/parade` to 10 requests a minute per IP.
 
-## Folder split and security rollout (branch `refactor/structure`), in this order
-- [ ] Set `SESSION_SECRET` on Vercel (Production and Preview): random, e.g. `openssl rand -hex 32`. Without it nobody can log in.
-- [ ] `bun run db:migrate` against production (0007 drops `auth_failures` and the `parade_ingest` role).
-- [ ] Push the branch; set the Vercel project's Root Directory to `backend`; check the preview: login, every page, a deposit, response headers (CSP, HSTS).
-- [ ] Merge to `main` straight away (a `main` redeploy between the setting change and the merge fails).
-- [ ] Add a Vercel Firewall rate-limit rule on `/api/session` and `/api/parade`.
-- [ ] Truncate `runner/data/bridge.log` (entries before 2026-10-07 hold phone numbers).
+## After the 2026-10-08 rollout
+- [ ] Log in on https://40sar.vercel.app with each password; open every page; deposit, edit and delete a test parade state.
+- [ ] Watch the runner relay tomorrow's first parade states (`bun run runner:service status`).
 
 ## Dashboard
 - [ ] Present, Reporting Sick (parade state), MC/MA and Status trends: a day with no parade state reads 0, not a gap. Verify on the deployed dashboard.

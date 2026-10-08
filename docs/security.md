@@ -56,8 +56,9 @@ refused before it is written.
 
 ## Open, by decision
 
-- **Rate limiting.** No route counts failed logins. Add a Vercel Firewall rate-limit rule on
-  `/api/session` and `/api/parade`; until then the passwords must be long.
+- **Rate limiting is coarse.** A Vercel Firewall rule allows 10 requests a minute per IP on
+  `/api/session` and `/api/parade` (added 2026-10-08), but nothing locks an account after failed
+  logins, so the passwords must still be long.
 - **Whole history to every viewer.** `/api/dashboard` returns every record since the import to
   anyone with `DASHBOARD_PASSWORD`. Narrowing it means a date window or per-column grants.
 - **Writes run as the owner role.** The intake and webhooks use `DATABASE_URL` (`neondb_owner`).
