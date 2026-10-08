@@ -34,7 +34,7 @@ export function Status() {
   );
 
   return (
-    <CategoryPage title="Status" range={range}>
+    <CategoryPage title="Status & Restrictions" range={range}>
       <EpisodeTiles
         range={inForce}
         dutyClass={DUTY}

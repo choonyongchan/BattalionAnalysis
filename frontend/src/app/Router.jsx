@@ -12,7 +12,7 @@
 import { Redirect, Route, Router as WouterRouter, Switch } from 'wouter-preact';
 import { useHashLocation } from 'wouter-preact/use-hash-location';
 import { Shell } from './Shell.jsx';
-import { DEFAULT_ROUTE, ROUTES } from './routes.js';
+import { DEFAULT_ROUTE, ROUTES, ROUTE_ALIASES } from './routes.js';
 import { isReady } from './state.js';
 import { Login } from '../pages/Login.jsx';
 
@@ -31,6 +31,11 @@ export function Router() {
         <Switch>
           {ROUTES.map((route) => (
             <Route key={route.path} path={route.path} component={route.component} />
+          ))}
+          {Object.entries(ROUTE_ALIASES).map(([from, to]) => (
+            <Route key={from} path={from}>
+              <Redirect to={to} replace />
+            </Route>
           ))}
           <Route>
             <Redirect to={DEFAULT_ROUTE} replace />

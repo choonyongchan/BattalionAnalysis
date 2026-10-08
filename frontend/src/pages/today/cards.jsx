@@ -1,48 +1,16 @@
 /**
- * The Overview's tables and the Sankey: presence by rank, who is due back, who is just back,
- * and how report-sick flows from the parade state through FormSG.
+ * The Today page's tables: presence by rank, who is due back, and who is just back.
  */
 
-import { useMemo } from 'preact/hooks';
 import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { fmtDate, fmtInt, fmtPercent } from '../../format.js';
-import { ChartCard, Sankey } from '../../charts/index.js';
 import { tierPresence } from '../../model/strength.js';
 import { returnsToDuty } from '../../model/projection.js';
 import { recentlyReturned } from '../../model/recentReturns.js';
-import { reportSickFlow } from '../../model/sankey.js';
 
 /** @type {string} Session every "today" figure describes. */
 const SESSION = 'FPS';
-
-/**
- * The report-sick Sankey, with its coverage findings printed under it.
- * @param {{episodes: Array<!Object>, submissions: Array<!Object>, from: ?string, to:
- *     ?string}} props Inputs to `reportSickFlow`.
- * @returns {!preact.VNode} The card.
- */
-export function SankeyCard({ episodes, submissions, from, to }) {
-  const flow = useMemo(
-    () => reportSickFlow({ episodes, submissions, from, to }),
-    [episodes, submissions, from, to]
-  );
-  const c = flow.coverage;
-
-  return (
-    <ChartCard
-      title="Report-Sick Flow"
-      note="Parade state to FormSG is counts only, not matched by name; type, outcome and Status follow each FormSG submission."
-      coverage={
-        fmtInt(c.reportingSick) + ' reporting sick on the parade state, ' + fmtInt(c.reportedSick) +
-        ' reported sick on FormSG. Of those, the form records ' + fmtInt(c.mc) + ' MC, ' + fmtInt(c.status) +
-        ' Status, ' + fmtInt(c.both) + ' both and ' + fmtInt(c.none) + ' no outcome.'
-      }
-    >
-      <Sankey nodes={flow.nodes} links={flow.links} />
-    </ChartCard>
-  );
-}
 
 /**
  * Formats one tier cell: the percentage present, then present over strength.

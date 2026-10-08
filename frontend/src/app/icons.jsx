@@ -1,7 +1,7 @@
 /**
  * The shell's icon set.
  *
- * Hand-drawn rather than pulled from a library: seven nav icons and a handful of controls is not
+ * Hand-drawn rather than pulled from a library: eleven nav icons and a handful of controls is not
  * worth a dependency, and drawing them here keeps every one on the same 24-unit grid at
  * the same 1.6 stroke, which is what makes an icon rail look deliberate rather than
  * assembled. All inherit `currentColor`, so the active-link and theme colours reach them
@@ -38,6 +38,21 @@ function Glyph({ children, size = 18 }) {
 export const OverviewIcon = () => (
   <Glyph>
     <path d="M4 20V13M10 20V7M16 20V10M22 20H2" />
+  </Glyph>
+);
+
+/** @returns {!preact.VNode} A line rising across an axis: the battalion over time. */
+export const TrendsIcon = () => (
+  <Glyph>
+    <path d="M3 20h18M4 16l5-5 4 3 7-8" />
+  </Glyph>
+);
+
+/** @returns {!preact.VNode} A clipboard with a tick: parade states filed and checked. */
+export const FilingIcon = () => (
+  <Glyph>
+    <rect x="5" y="4.5" width="14" height="16" rx="2" />
+    <path d="M9 4.5V3h6v1.5M9 13l2 2 4-4" />
   </Glyph>
 );
 

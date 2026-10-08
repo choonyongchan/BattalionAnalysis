@@ -1,13 +1,10 @@
 /**
- * Battalion overview: who has filed this morning, today's numbers, and how the battalion
- * is trending.
+ * Today: who has filed this morning and today's numbers. Trends over a range live on the
+ * Trends page.
  *
- * Two clocks run on this page and they answer different questions. `selectedDate` names
- * one parade — the filing chips, the tile row and the absence ring describe that single day
- * and ignore the range entirely, because "today's strength" should never sit under a span a
- * reader has to remember is active. `dateFrom`/`dateTo` bound every trend and the Sankey;
- * null on both means "all data". `company` narrows every panel on the page to one company,
- * or `ALL` for the whole battalion — applied once, upstream, by `scopeDataset`.
+ * `selectedDate` names one parade — the filing chips, the tile row and the absence ring
+ * describe that single day. `company` narrows every panel on the page to one company, or
+ * `ALL` for the whole battalion — applied once, upstream, by `scopeDataset`.
  *
  * The selected parade also anchors the one forward-looking section: presence by rank tier,
  * then the list of who is due back when, from the dates each absence states
@@ -15,80 +12,41 @@
  */
 
 import { useEffect, useMemo, useRef } from 'preact/hooks';
-import { company, dataset, dateFrom, dateTo, selectedDate } from '../../app/state.js';
+import { company, dataset, selectedDate } from '../../app/state.js';
 import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { Tile, TileRow } from '../../components/Tile.jsx';
 import { PageControls } from '../../components/PageControls.jsx';
 import { FilingChips } from '../../components/FilingChips.jsx';
 import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../../format.js';
-import { ChartCard, Donut, Line } from '../../charts/index.js';
+import { ChartCard, Donut } from '../../charts/index.js';
 import { COMPANIES } from '../../../../shared/domain.js';
 import { DUTY_CLASS, MC_MA } from '../../model/classify.js';
 import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../../model/scope.js';
-import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
 import { absenceParts, datesPresent, battalionStrength, dutyCountsOn, distinctDutyOn } from '../../model/metrics.js';
-import { eachDay } from '../../model/dateRange.js';
-import { buildEpisodes } from '../../model/episodes.js';
-import { toSubmissions, submissionTrend } from '../../model/formsg.js';
+import { toSubmissions } from '../../model/formsg.js';
 import { filingsOn, toFilings } from '../../model/submissions.js';
-import { dutyTrend, presentTrend } from '../../model/strength.js';
 import { DEFAULT_PROJECTION_DAYS } from '../../model/projection.js';
-import { TrendSection } from '../shared/trends.jsx';
-import { RecentReturnsCard, ReturnsCard, SankeyCard, TierCard } from './cards.jsx';
+import { RecentReturnsCard, ReturnsCard, TierCard } from './cards.jsx';
 
 /** @type {string} Session every "today" figure and trend describes. */
 const SESSION = 'FPS';
 
-/**
- * Report sick from both sources on one chart: the parade state's count and FormSG's.
- *
- * They measure the same event recorded by different people, so the useful reading is the
- * gap between them, which two separate cards hid. Always the battalion (or the one company
- * picked in the page bar); the per-company view lives on the Report Sick page.
- * @param {{data: !Object, submissions: Array<!Object>, range: !Object}} props The scoped
- *     dataset, its FormSG submissions, and the trend range.
- * @returns {!preact.VNode} The card.
- */
-function SickSourcesCard({ data, submissions, range }) {
-  const options = { scope: 'battalion', session: SESSION, asRate: false };
-  const parade = dutyTrend(data.personnel, data.strength, DUTY_CLASS.REPORT_SICK, range.days, options);
-  const formsg = submissionTrend(submissions, data.strength, range.days, options);
-  return (
-    <ChartCard
-      title="Reporting Sick: Parade State and FormSG"
-      coverage="Parade state counts soldiers listed as reporting sick; FormSG counts submissions. A day with no filing reads zero."
-    >
-      <Line
-        categories={range.days}
-        series={[
-          { name: 'Parade state', values: parade.series[0]?.values || [], neutral: true },
-          { name: 'FormSG', values: formsg.series[0]?.values || [], accent: true },
-        ]}
-        weekends={range.weekends}
-        holidays={range.holidays}
-        valueName="soldiers"
-      />
-    </ChartCard>
-  );
-}
 
 /**
- * The Overview page.
+ * The Today page.
  * @returns {!preact.VNode} The page.
  */
-export function Overview() {
+export function Today() {
   const full = dataset.value;
   const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
   const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
 
-  const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
   const submissions = useMemo(
     () => scopeSubmissions(toSubmissions(data.formSg), company.value),
     [data.formSg, company.value]
   );
   const filings = useMemo(() => toFilings(data.submissions), [data.submissions]);
-  const holidays = useMemo(() => toHolidays(data.holidays), [data.holidays]);
-  // The selectable dates and the trend axis come from the full, unscoped strength so they
+  // The selectable dates come from the full, unscoped strength so they
   // do not shrink when a company that filed on fewer days is picked.
   const paradeDates = useMemo(() => datesPresent(full.strength), [full.strength]);
 
@@ -104,18 +62,12 @@ export function Overview() {
   }, [paradeDates]);
 
   const today = selectedDate.value || paradeDates[paradeDates.length - 1] || null;
-  const from = dateFrom.value || paradeDates[0] || today;
-  const to = dateTo.value || paradeDates[paradeDates.length - 1] || today;
-  const range = useMemo(
-    () => ({ days: eachDay(from, to), weekends: weekendBands(from, to), holidays: holidaysIn(holidays, from, to) }),
-    [from, to, holidays]
-  );
 
   if (!today) {
     return (
       <div class="page">
         <header class="pagehead">
-          <h1 class="pagehead__title">Battalion Overview</h1>
+          <h1 class="pagehead__title">Today</h1>
         </header>
         <EmptyState>No parade state has been read yet.</EmptyState>
       </div>
@@ -135,15 +87,12 @@ export function Overview() {
       ', ' +
       fmtFraction(strength.companiesReporting.length, COMPANIES.length) +
       ' companies.';
-  const trendCoverage = 'Count of soldiers on each parade; a day with no parade state reads zero.';
-  const dutyTrendFn = (dutyClass) => (scope, days) =>
-    dutyTrend(data.personnel, data.strength, dutyClass, days, { scope, session: SESSION, asRate: false });
 
   return (
     <div class="page">
       <header class="pagehead">
         <div>
-          <h1 class="pagehead__title">Battalion Overview</h1>
+          <h1 class="pagehead__title">Today</h1>
           <p class="pagehead__sub">{fmtDate(today)}</p>
         </div>
       </header>
@@ -183,20 +132,6 @@ export function Overview() {
       <ReturnsCard data={data} date={today} />
       <RecentReturnsCard data={data} date={today} />
 
-      <h2 class="section-title">Trends</h2>
-      <div class="grid-2">
-        <TrendSection
-          title="Soldiers Present"
-          coverage="Present strength on each parade; a day with no parade state reads zero."
-          range={range}
-          trendFn={(scope, days) => presentTrend(data.strength, days, { scope, session: SESSION })}
-        />
-        <SickSourcesCard data={data} submissions={submissions} range={range} />
-        <TrendSection title="MC / MA" coverage={trendCoverage} range={range} trendFn={dutyTrendFn(MC_MA)} />
-        <TrendSection title="Status" coverage={trendCoverage} range={range} trendFn={dutyTrendFn(DUTY_CLASS.STATUS)} />
-      </div>
-
-      <SankeyCard episodes={episodes} submissions={submissions} from={dateFrom.value} to={dateTo.value} />
     </div>
   );
 }
