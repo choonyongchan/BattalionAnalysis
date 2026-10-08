@@ -9,7 +9,7 @@
  * separately by the page.
  *
  * A cell may be `{text, inferred: true}` to mark a value the dashboard worked out rather
- * than read; it takes the `.inferred` hatch from `theme/components.css`, the same texture
+ * than read; it takes the `.inferred` hatch from `theme/components/table.css`, the same texture
  * the Heatmap draws over an inferred cell.
  */
 

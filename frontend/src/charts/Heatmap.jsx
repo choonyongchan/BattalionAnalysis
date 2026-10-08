@@ -15,7 +15,7 @@
  * cannot carry that: the cell already spends its fill on magnitude, and a second hue would
  * be read as a value. So an inferred cell takes a 45° hatch in `--inferred` — a texture,
  * which survives a colour-blind reader and a greyscale printout alike, and which is the
- * same 45° rhythm `theme/components.css`'s `.inferred` uses on the table twin's cells, so
+ * same 45° rhythm `theme/components/table.css`'s `.inferred` uses on the table twin's cells, so
  * the two views mark it the same way.
  */
 

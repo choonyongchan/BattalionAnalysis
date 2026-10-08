@@ -1,0 +1,70 @@
+/* ------------------------------------------------------------------ table */
+
+/* Wide tables scroll inside their own box; the page never scrolls sideways. */
+.tablewrap {
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: 0 var(--space-lg);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-caption);
+  letter-spacing: -0.224px;
+}
+
+th,
+td {
+  padding: 9px var(--space-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--hairline-soft);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--ink-muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+td.num,
+th.num {
+  text-align: right;
+}
+
+/* A sortable header: click to reorder, arrow shows the active column and direction. */
+th.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.th-sortable:hover {
+  color: var(--ink);
+}
+
+.th-sort-indicator {
+  color: var(--ink-faint);
+  font-size: var(--text-fine);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+
+/*
+ * A value the dashboard worked out rather than read. An inferred platoon is drawn with
+ * this hatch so a commander can see at a glance which cells the message actually stated
+ * and which the 4D implied.
+ */
+.inferred {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 3px,
+    var(--inferred) 3px 4px
+  );
+}
+
