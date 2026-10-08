@@ -183,3 +183,21 @@ export function rankUnits(episodes, dutyClass, level) {
       (a.platoon || '').localeCompare(b.platoon || '')
   );
 }
+
+/**
+ * Every soldier's episode count and days lost, and how much of the total the top few hold.
+ *
+ * Two counts per soldier separate two different conversations: many short episodes
+ * (welfare, motivation) and a few long ones (an injury to rehabilitate).
+ * @param {Array<!Object>} episodes Episodes, already narrowed to the range.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to count, from DUTY_CLASS.
+ * @param {number} top How many soldiers the concentration figure names.
+ * @returns {{entries: Array<{name: string, rank: string, company: string, episodes: number,
+ *     daysLost: number}>, totalDays: number, topDays: number}} One entry per soldier; all
+ *     days lost; days lost by the `top` soldiers who lost most.
+ */
+export function soldierLoad(episodes, dutyClass, top) {
+  const entries = leaderboard(episodes, dutyClass).sort((a, b) => b.daysLost - a.daysLost);
+  const sum = (rows) => rows.reduce((total, entry) => total + entry.daysLost, 0);
+  return { entries, totalDays: sum(entries), topDays: sum(entries.slice(0, top)) };
+}

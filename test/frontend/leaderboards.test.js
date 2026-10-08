@@ -10,6 +10,7 @@ import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
 import { buildEpisodes } from '../../frontend/src/model/episodes.js';
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import {
+  soldierLoad,
   rankUnits,
   topByCount,
   topByDays,
@@ -131,5 +132,23 @@ describe('rankUnits', () => {
   test('splits by platoon at the platoon level', () => {
     const ranked = rankUnits(episodes, DUTY_CLASS.ATT_C, 'platoon');
     expect(ranked[0]).toMatchObject({ company: 'Archer', platoon: '1', count: 3, soldiers: 2 });
+  });
+});
+
+describe('soldierLoad', () => {
+  test('lists each soldier by days lost and sums what the top few hold', () => {
+    const episodes = [
+      { key: 'a', name: 'A', company: 'Archer', dutyClass: DUTY_CLASS.ATT_C, daysLost: 2, startDate: '2026-10-01' },
+      { key: 'a', name: 'A', company: 'Archer', dutyClass: DUTY_CLASS.ATT_C, daysLost: 1, startDate: '2026-10-05' },
+      { key: 'b', name: 'B', company: 'Braves', dutyClass: DUTY_CLASS.ATT_C, daysLost: 10, startDate: '2026-10-02' },
+      { key: 'c', name: 'C', company: 'Cougar', dutyClass: DUTY_CLASS.ATT_C, daysLost: 1, startDate: '2026-10-02' },
+    ];
+    const load = soldierLoad(episodes, DUTY_CLASS.ATT_C, 1);
+    expect(load.entries.map((e) => [e.name, e.episodes, e.daysLost])).toEqual([
+      ['B', 1, 10],
+      ['A', 2, 3],
+      ['C', 1, 1],
+    ]);
+    expect([load.topDays, load.totalDays]).toEqual([10, 14]);
   });
 });

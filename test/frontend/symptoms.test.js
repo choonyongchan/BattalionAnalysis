@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { clinicalBucketOf, CLINICAL_BUCKETS, reasonKeywords, infectiousByPlatoon } from '../../frontend/src/model/symptoms.js';
+import { clinicalBucketOf, CLINICAL_BUCKETS, reasonKeywords, infectiousByPlatoon, lengthBySymptom } from '../../frontend/src/model/symptoms.js';
 
 const URTI = 'Upper Respiratory Tract Infection (Fever/Flu etc.)';
 const FEVER_HEADACHE = 'Fever / Headache (High Temp, Severe Migraine etc.)';
@@ -108,5 +108,20 @@ describe('infectiousByPlatoon', () => {
       value: 1,
       names: ['PTE B'],
     });
+  });
+});
+
+describe('lengthBySymptom', () => {
+  test('bands episodes by length under each symptom, most episodes first', () => {
+    const { rows, cells } = lengthBySymptom(
+      [
+        { daysLost: 1, symptoms: ['Fever'] },
+        { daysLost: 3, symptoms: ['Fever', 'Cough'] },
+        { daysLost: 9, symptoms: [] },
+      ],
+      2
+    );
+    expect(rows).toEqual(['Fever', 'Cough']);
+    expect(cells.filter((c) => c.row === 'Fever').map((c) => c.value)).toEqual([1, 1, 0, 0]);
   });
 });

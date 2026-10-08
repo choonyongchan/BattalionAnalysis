@@ -21,6 +21,7 @@ import {
   LineChart,
   PieChart,
   SankeyChart,
+  ScatterChart,
 } from 'echarts/charts';
 import {
   GridComponent,
@@ -43,6 +44,7 @@ use([
   LineChart, // Line (and the empty carrier series that holds its annotations)
   PieChart, // Donut
   SankeyChart, // Sankey
+  ScatterChart, // Scatter
 
   // Components.
   GridComponent,

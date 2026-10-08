@@ -4,9 +4,12 @@
  * long-term MC cases are running, and where soldiers are actually being seen.
  */
 
-import { Bar, ChartCard } from '../charts/index.js';
+import { Bar, ChartCard, Heatmap, Scatter } from '../charts/index.js';
 import { DUTY_CLASS, extractSymptoms, isDuty, MC_MA } from '../model/classify.js';
 import { startsByWeekday } from '../model/episodes.js';
+import { soldierLoad } from '../model/leaderboards.js';
+import { LENGTH_BANDS, lengthBySymptom } from '../model/symptoms.js';
+import { COMPANIES } from '../../../shared/domain.js';
 import { fmtInt } from '../format.js';
 import { WEEKDAY_NAMES } from '../../../shared/dates.js';
 import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
@@ -42,6 +45,67 @@ function McStartsCard({ range }) {
   );
 }
 
+/** @type {number} Soldiers the days-lost concentration figure names. */
+const TOP_SOLDIERS = 10;
+
+/**
+ * Every soldier on MC in range as one dot: MCs across, days lost up.
+ * @param {{range: !Object}} props The range from `useCategory`.
+ * @returns {!preact.VNode} The card.
+ */
+function McPatternCard({ range }) {
+  const { entries, totalDays, topDays } = soldierLoad(range.episodes, DUTY_CLASS.ATT_C, TOP_SOLDIERS);
+  const points = entries.map((entry) => ({
+    x: entry.episodes,
+    y: entry.daysLost,
+    label: (entry.rank + ' ' + entry.name).trim(),
+    group: entry.company,
+    slot: COMPANIES.indexOf(entry.company),
+  }));
+  return (
+    <ChartCard
+      title="MC Pattern, by Soldier"
+      note={
+        'The ' + TOP_SOLDIERS + ' soldiers with the most MC days hold ' + fmtInt(topDays) + ' of ' +
+        fmtInt(totalDays) + ' days. Right and low: many short MCs. High and left: few long ones.'
+      }
+      coverage="One dot per soldier, in their company's colour; MCs that started in range."
+      empty="No MC started in range."
+    >
+      <Scatter points={points} xName="MCs" yName="days lost" />
+    </ChartCard>
+  );
+}
+
+/**
+ * How long MCs ran, by the symptom the parade state names.
+ * @param {{range: !Object}} props The range from `useCategory`.
+ * @returns {!preact.VNode} The card.
+ */
+function McLengthCard({ range }) {
+  const { rows, cells } = lengthBySymptom(
+    range.episodes.filter((episode) => episode.dutyClass === DUTY_CLASS.ATT_C),
+    8
+  );
+  return (
+    <ChartCard
+      title="MC Length, by Symptom"
+      coverage="MCs that started in range, by the symptom in the parade-state reason; the stated day count, else the dates. An MC naming two symptoms counts under each."
+      empty="No MC started in range."
+    >
+      <Heatmap
+        rows={rows}
+        columns={LENGTH_BANDS.map((band) => band.label)}
+        cells={cells}
+        rowName="Symptom"
+        valueName="MCs"
+        showValues
+        height={Math.max(160, rows.length * 32 + 60)}
+      />
+    </ChartCard>
+  );
+}
+
 /**
  * The MC/MA page.
  * @returns {!preact.VNode} The page.
@@ -67,6 +131,10 @@ export function McMa() {
         labelsOf={(e) => (e.symptoms.length > 0 ? e.symptoms : extractSymptoms(e.reasons.join(' ')))}
         range={range}
       />
+      <div class="grid-2">
+        <McPatternCard range={range} />
+        <McLengthCard range={range} />
+      </div>
       <McStartsCard range={range} />
       <LocationsCard personnel={data.personnel} range={range} />
       <LongMcCard episodes={episodes} range={range} />

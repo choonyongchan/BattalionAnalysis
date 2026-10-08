@@ -139,3 +139,43 @@ export function infectiousByPlatoon(episodes, to, days, platoonOf) {
   });
   return { days: window, rows, cells, clusters };
 }
+
+/**
+ * Day bands for MC length, shortest first.
+ * @type {!Array<{label: string, max: number}>}
+ */
+export const LENGTH_BANDS = [
+  { label: '1 day', max: 1 },
+  { label: '2–3 days', max: 3 },
+  { label: '4–7 days', max: 7 },
+  { label: '8+ days', max: Infinity },
+];
+
+/**
+ * How long episodes ran, by the symptom their reason names: episodes per symptom per
+ * length band. An episode naming two symptoms counts under each; one naming none is
+ * 'Not stated'. Uses each episode's `daysLost` (stated, else its dates, else days seen).
+ * @param {Array<!Object>} episodes Episodes, already narrowed to the range and duty class.
+ * @param {number} limit Symptoms to keep, most episodes first.
+ * @returns {{rows: string[], cells: Array<{row: string, column: string, value: number}>}}
+ *     Symptoms, and one cell per symptom and band.
+ */
+export function lengthBySymptom(episodes, limit) {
+  const counts = new Map();
+  episodes.forEach((episode) => {
+    const band = LENGTH_BANDS.find((entry) => episode.daysLost <= entry.max).label;
+    (episode.symptoms.length > 0 ? episode.symptoms : ['Not stated']).forEach((symptom) => {
+      const row = counts.get(symptom) || new Map();
+      row.set(band, (row.get(band) || 0) + 1);
+      counts.set(symptom, row);
+    });
+  });
+  const total = (row) => Array.from(row.values()).reduce((a, b) => a + b, 0);
+  const rows = Array.from(counts.keys())
+    .sort((a, b) => total(counts.get(b)) - total(counts.get(a)) || a.localeCompare(b))
+    .slice(0, limit);
+  const cells = rows.flatMap((row) =>
+    LENGTH_BANDS.map(({ label }) => ({ row, column: label, value: counts.get(row).get(label) || 0 }))
+  );
+  return { rows, cells };
+}
