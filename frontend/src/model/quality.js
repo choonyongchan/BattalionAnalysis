@@ -15,11 +15,12 @@ import { platoonCoverage } from './platoon.js';
 
 /**
  * The first and last date a set of rows covers.
- * @param {Array<!Object>} rows Records with a `date` field readable by `toIsoDate`.
+ * @param {Array<!Object>} rows Records with a date-bearing field readable by `toIsoDate`.
+ * @param {string=} field The field to read; `date` unless named (FormSG rows carry `Timestamp`).
  * @returns {{from: ?string, to: ?string}} The span, or nulls when there are no rows.
  */
-function dateSpan_(rows) {
-  const dates = rows.map((row) => toIsoDate(row.date)).filter((date) => date !== null).sort();
+function dateSpan_(rows, field = 'date') {
+  const dates = rows.map((row) => toIsoDate(row[field])).filter((date) => date !== null).sort();
   return dates.length === 0 ? { from: null, to: null } : { from: dates[0], to: dates[dates.length - 1] };
 }
 
@@ -58,7 +59,7 @@ export function dataQuality(dataset) {
     },
     optionalTabs: dataset.notes || {},
     paradeStateSpan: dateSpan_(strength),
-    formSgSpan: dateSpan_(formSg),
+    formSgSpan: dateSpan_(formSg, 'Timestamp'),
     platoon: platoonCoverage(personnel),
     fourD: { total: personnel.length, blank: blankFourD },
     statusDuration: { total: statusRows.length, blank: blankStatusDays },

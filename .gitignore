@@ -22,9 +22,10 @@ runner/output.txt
 # erasable in practice. The FormSG export holds NRICs and full names; the parade
 # state samples and the format template hold full names, 4D numbers and diagnoses.
 parade-state-example/*
-backup/
+backup/*
 parade-state-example.txt
 parade_state_template_new.md
+*.csv
 
 # bun test --coverage output.
 coverage/

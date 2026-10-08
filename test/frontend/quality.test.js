@@ -42,7 +42,7 @@ describe('dataQuality', () => {
       { date: '2026-07-11', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
       { date: '2026-09-02', session: 'FPS', company: 'Archer', platoon: 'Company', unit_type: 'Company', total_strength: 100 },
     ]);
-    const formSg = [{ date: '2026-05-07' }, { date: '2026-09-02' }];
+    const formSg = [{ Timestamp: '2026-05-07T08:15:00' }, { Timestamp: '2026-09-02T21:40:00' }];
     const quality = dataQuality({ strength, personnel: [], formSg, notes: {} });
     expect(quality.paradeStateSpan).toEqual({ from: '2026-07-11', to: '2026-09-02' });
     expect(quality.formSgSpan).toEqual({ from: '2026-05-07', to: '2026-09-02' });
