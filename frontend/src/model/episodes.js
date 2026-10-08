@@ -17,10 +17,10 @@
  * Every function here is pure.
  */
 
-import { classify, extractSymptoms } from './classify.js';
+import { classify, extractSymptoms, isDuty } from './classify.js';
 import { PERM_STATUS_NUM_DAYS } from '../../../shared/domain.js';
 import { identityOf } from '../../../shared/identity.js';
-import { inclusiveDaySpan, isoToUtcMs } from '../../../shared/dates.js';
+import { addDays, inclusiveDaySpan, isoToUtcMs, weekdayOf } from '../../../shared/dates.js';
 import { withinRange } from './dateRange.js';
 import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
 
@@ -222,4 +222,30 @@ function byParadeDate_(a, b) {
     return isoToUtcMs(dateA) - isoToUtcMs(dateB);
   }
   return toText(a.session).localeCompare(toText(b.session));
+}
+
+/**
+ * When episodes of one duty class start, by weekday, and how many start next to a break.
+ *
+ * "Next to a break" is a Monday or a Friday, or the day before or after a public holiday:
+ * the days an MC also lengthens a weekend or a holiday. With no pattern, about two in seven
+ * starts would land on a Monday or a Friday by chance alone.
+ * @param {Array<!Object>} episodes Episodes, already narrowed to the range.
+ * @param {string|!Array<string>} dutyClass Duty class(es) to count, from DUTY_CLASS.
+ * @param {Array<{date: string}>} holidays Public holidays, as from `toHolidays`.
+ * @returns {{counts: number[], nextToBreak: number, total: number}} Starts per weekday,
+ *     Monday first; starts next to a break; all starts counted.
+ */
+export function startsByWeekday(episodes, dutyClass, holidays) {
+  const holidayDates = new Set(holidays.map((holiday) => holiday.date));
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  let nextToBreak = 0;
+  const starts = episodes.filter((episode) => isDuty(dutyClass, episode.dutyClass) && episode.startDate);
+  starts.forEach((episode) => {
+    const { index } = weekdayOf(episode.startDate);
+    counts[index] += 1;
+    const besideHoliday = holidayDates.has(addDays(episode.startDate, 1)) || holidayDates.has(addDays(episode.startDate, -1));
+    if (index === 0 || index === 4 || besideHoliday) nextToBreak += 1;
+  });
+  return { counts, nextToBreak, total: starts.length };
 }

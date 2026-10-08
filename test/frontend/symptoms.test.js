@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { clinicalBucketOf, CLINICAL_BUCKETS, reasonKeywords } from '../../frontend/src/model/symptoms.js';
+import { clinicalBucketOf, CLINICAL_BUCKETS, reasonKeywords, infectiousByPlatoon } from '../../frontend/src/model/symptoms.js';
 
 const URTI = 'Upper Respiratory Tract Infection (Fever/Flu etc.)';
 const FEVER_HEADACHE = 'Fever / Headache (High Temp, Severe Migraine etc.)';
@@ -78,5 +78,35 @@ describe('reasonKeywords', () => {
     const words = reasonKeywords(submissions, 10).map((entry) => entry.word);
     expect(words).toContain('blocked');
     expect(words).not.toContain('respiratory');
+  });
+});
+
+describe('infectiousByPlatoon', () => {
+  const ep = (company, platoon, startDate, name, reason) => ({ company, platoon, startDate, name, rank: 'PTE', reasons: [reason] });
+  const platoon = (episode) => episode.platoon;
+
+  test('counts infectious starts per platoon per day and flags 3 within 3 days', () => {
+    const { days, rows, cells, clusters } = infectiousByPlatoon(
+      [
+        ep('Cougar', '8', '2026-10-06', 'A', 'MC (Fever)'),
+        ep('Cougar', '8', '2026-10-07', 'B', 'Flu, cough'),
+        ep('Cougar', '8', '2026-10-08', 'C', 'Food poisoning'),
+        ep('Archer', '1', '2026-10-08', 'D', 'Sprained ankle'),
+        ep('Archer', '2', '2026-10-08', 'E', 'Fever'),
+        ep('Archer', '2', '2026-09-01', 'F', 'Fever'),
+      ],
+      '2026-10-08',
+      3,
+      platoon
+    );
+    expect(days).toEqual(['2026-10-06', '2026-10-07', '2026-10-08']);
+    expect(rows).toEqual(['Archer 2', 'Cougar 8']);
+    expect(clusters).toEqual(['Cougar 8']);
+    expect(cells.find((c) => c.row === 'Cougar 8' && c.column === '2026-10-07')).toEqual({
+      row: 'Cougar 8',
+      column: '2026-10-07',
+      value: 1,
+      names: ['PTE B'],
+    });
   });
 });

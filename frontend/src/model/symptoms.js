@@ -17,6 +17,7 @@
  */
 
 import { keywords } from './classify.js';
+import { addDays } from '../../../shared/dates.js';
 import { toText } from '../../../shared/values.js';
 
 /**
@@ -83,4 +84,58 @@ export function reasonKeywords(submissions, limit) {
     .map(([word, count]) => ({ word, count }))
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
     .slice(0, limit || 40);
+}
+
+/**
+ * Words in a parade-state reason that point to something catching: fever, flu, a cough or
+ * cold, a stomach bug, conjunctivitis.
+ * ponytail: a word list over free text; a reason that says only "MC" is not counted.
+ * @type {!RegExp}
+ */
+const INFECTIOUS = /fever|flu|cough|cold|sore throat|urti|runny|diarrh|vomit|gastr|food poison|nausea|conjunctivitis|pink eye/i;
+
+/** @type {number} Cases in one platoon within `CLUSTER_DAYS` that make a cluster. */
+export const CLUSTER_CASES = 3;
+
+/** @type {number} The window, in days, a cluster's cases fall within. */
+export const CLUSTER_DAYS = 3;
+
+/**
+ * New infectious-sounding cases per platoon per day, and the platoons where they cluster.
+ *
+ * A case is an episode (report sick, MC or MA) starting on the day whose reason names an
+ * infectious symptom. The platoon is the sub-header (`platoon.js`); a platoon with no case
+ * in the window is left off.
+ * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
+ * @param {string} to The last day of the window, inclusive.
+ * @param {number} days How many days the window holds.
+ * @param {function(!Object): string} platoonOf Resolves an episode's platoon.
+ * @returns {{days: string[], rows: string[], cells: Array<{row: string, column: string,
+ *     value: number, names: string[]}>, clusters: string[]}} Window days, `Company Platoon`
+ *     rows, one cell per row and day, and the rows holding a cluster.
+ */
+export function infectiousByPlatoon(episodes, to, days, platoonOf) {
+  const window = Array.from({ length: days }, (_, offset) => addDays(to, offset - days + 1));
+  const byCell = new Map();
+  episodes
+    .filter((episode) => window.includes(episode.startDate) && INFECTIOUS.test(episode.reasons.join(' ')))
+    .forEach((episode) => {
+      const row = episode.company + ' ' + platoonOf(episode);
+      const key = row + '|' + episode.startDate;
+      const names = byCell.get(key) || new Set();
+      names.add((episode.rank + ' ' + episode.name).trim());
+      byCell.set(key, names);
+    });
+  const rows = Array.from(new Set(Array.from(byCell.keys(), (key) => key.split('|')[0]))).sort();
+  const cells = rows.flatMap((row) =>
+    window.map((day) => {
+      const names = byCell.get(row + '|' + day) || new Set();
+      return { row, column: day, value: names.size, names: Array.from(names).sort() };
+    })
+  );
+  const clusters = rows.filter((row) => {
+    const counts = window.map((day) => (byCell.get(row + '|' + day) || new Set()).size);
+    return counts.some((_, i) => counts.slice(i, i + CLUSTER_DAYS).reduce((a, b) => a + b, 0) >= CLUSTER_CASES);
+  });
+  return { days: window, rows, cells, clusters };
 }

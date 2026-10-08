@@ -26,7 +26,8 @@ import {
   topSubmitters,
 } from '../model/formsg.js';
 import { episodeCounts } from '../model/metrics.js';
-import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
+import { CLUSTER_CASES, CLUSTER_DAYS, clinicalBucketOf, infectiousByPlatoon, reasonKeywords } from '../model/symptoms.js';
+import { platoonOf } from '../model/platoon.js';
 import { WEEKDAY_NAMES } from '../../../shared/dates.js';
 import { withinRange } from '../model/dateRange.js';
 import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
@@ -117,6 +118,44 @@ function FormSgTrend({ submissions, strength, range }) {
 /** @type {string[]} The punch card's columns, midnight to 23:00. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
 
+/** @type {number} Days the outbreak watch looks back from the end of the range. */
+const WATCH_DAYS = 14;
+
+/**
+ * Infectious-sounding cases per platoon over the last two weeks of the range, with any
+ * platoon where they cluster named above the grid: an early warning for the MO.
+ * @param {{episodes: Array<!Object>, to: string}} props All episodes, and the range's end.
+ * @returns {!preact.VNode} The card.
+ */
+function OutbreakCard({ episodes, to }) {
+  const platoon = (episode) =>
+    platoonOf({ company: episode.company, platoon: episode.platoon, four_d: episode.fourD }).platoon;
+  const watch = infectiousByPlatoon(episodes, to, WATCH_DAYS, platoon);
+  const note =
+    watch.clusters.length > 0
+      ? 'Cluster: ' + watch.clusters.join(', ') + ' (' + CLUSTER_CASES + ' or more new cases within ' + CLUSTER_DAYS + ' days).'
+      : 'No platoon has ' + CLUSTER_CASES + ' new cases within ' + CLUSTER_DAYS + ' days.';
+  return (
+    <ChartCard
+      title="Outbreak Watch"
+      note={note}
+      coverage="New report-sick, MC, MA or Status lines whose reason names fever, flu, cough, cold, a stomach bug or conjunctivitis, by the platoon sub-header. A line that says only MC is not counted."
+      empty="No infectious-sounding case in the last two weeks of the range."
+    >
+      <Heatmap
+        rows={watch.rows}
+        columns={watch.days}
+        cells={watch.cells}
+        rowName="Platoon"
+        valueName="new cases"
+        detail={(cell) => cell.names}
+        showValues
+        height={Math.max(160, watch.rows.length * 32 + 60)}
+      />
+    </ChartCard>
+  );
+}
+
 /**
  * The Report Sick page.
  *
@@ -151,6 +190,7 @@ export function ReportSick() {
         />
         <Tile label="Δ Report Sick" value={fmtInt(Math.abs(paradeEpisodes - formSg.submissions))} />
       </TileRow>
+      <OutbreakCard episodes={episodes} to={range.to} />
       <DutyTrend title="Reporting Sick (Parade State) Trend" data={data} dutyClass={DUTY} range={range} />
       <FormSgTrend submissions={submissions} strength={data.strength} range={range} />
       <PlatoonHeatmap

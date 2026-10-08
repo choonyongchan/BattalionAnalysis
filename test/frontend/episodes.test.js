@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { activeWithin, buildEpisodes } from '../../frontend/src/model/episodes.js';
+import { activeWithin, buildEpisodes, startsByWeekday } from '../../frontend/src/model/episodes.js';
 import { identityOf } from '../../shared/identity.js';
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import { toRecords } from '../../frontend/src/data/records.js';
@@ -231,5 +231,22 @@ describe('activeWithin', () => {
       { date: '2026-09-28', session: 'FPS', name: 'CAI YICHEN', reason_category: DUTY_CLASS.STATUS, reason: 'Perm Excuse FLEGS', start_date: '', end_date: '' },
     ]);
     expect(activeWithin(perm, '2026-09-28', '2026-09-28')).toBe(true);
+  });
+});
+
+describe('startsByWeekday', () => {
+  test('counts starts per weekday, and those on a Monday, a Friday or beside a holiday', () => {
+    const episodes = [
+      { dutyClass: DUTY_CLASS.ATT_C, startDate: '2026-10-05' }, // Mon
+      { dutyClass: DUTY_CLASS.ATT_C, startDate: '2026-10-09' }, // Fri
+      { dutyClass: DUTY_CLASS.ATT_C, startDate: '2026-10-07' }, // Wed, day before a holiday
+      { dutyClass: DUTY_CLASS.ATT_C, startDate: '2026-10-13' }, // Tue
+      { dutyClass: DUTY_CLASS.STATUS, startDate: '2026-10-05' },
+    ];
+    expect(startsByWeekday(episodes, DUTY_CLASS.ATT_C, [{ date: '2026-10-08' }])).toEqual({
+      counts: [1, 1, 1, 0, 1, 0, 0],
+      nextToBreak: 3,
+      total: 4,
+    });
   });
 });
