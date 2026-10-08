@@ -33,7 +33,7 @@ import { toSubmissions, submissionTrend } from '../../model/formsg.js';
 import { filingsOn, toFilings } from '../../model/submissions.js';
 import { dutyTrend, presentTrend } from '../../model/strength.js';
 import { DEFAULT_PROJECTION_DAYS } from '../../model/projection.js';
-import { TrendSection } from '../shared/category.jsx';
+import { TrendSection } from '../shared/trends.jsx';
 import { RecentReturnsCard, ReturnsCard, SankeyCard, TierCard } from './cards.jsx';
 
 /** @type {string} Session every "today" figure and trend describes. */

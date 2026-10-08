@@ -1,7 +1,8 @@
 /**
  * Report sick: the parade-state and FormSG picture of who is reporting sick.
  *
- * The sections shared with MC/MA and Status come from `shared/category.jsx`; this file
+ * The sections shared with MC/MA and Status come from `shared/` (category, trends, grids,
+ * rankings); this file
  * adds what is unique to report sick: the FormSG side of every panel, the type split, the
  * free-text reasons, and when soldiers file, none of which the other two categories have a
  * source for.
@@ -28,18 +29,10 @@ import { episodeCounts } from '../model/metrics.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { WEEKDAY_NAMES } from '../../../shared/dates.js';
 import { withinRange } from '../model/dateRange.js';
-import {
-  CategoryPage,
-  DutyTrend,
-  EpisodeTiles,
-  PlatoonHeatmap,
-  ReasonsOverTime,
-  SoldierLookup,
-  TrendSection,
-  UnitRankings,
-  episodeCells,
-  useCategory,
-} from './shared/category.jsx';
+import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
+import { DutyTrend, TrendSection } from './shared/trends.jsx';
+import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.jsx';
+import { SoldierLookup, UnitRankings } from './shared/rankings.jsx';
 
 /** @type {string} The duty class this page is about. */
 const DUTY = DUTY_CLASS.REPORT_SICK;

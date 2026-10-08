@@ -14,18 +14,10 @@ import { useMemo } from 'preact/hooks';
 import { DUTY_CLASS } from '../model/classify.js';
 import { activeWithin } from '../model/episodes.js';
 import { bucketsFor } from '../model/statusBuckets.js';
-import {
-  CategoryPage,
-  DutyTrend,
-  EpisodeLeaderboard,
-  EpisodeTiles,
-  PlatoonHeatmap,
-  ReasonsOverTime,
-  SoldierLookup,
-  UnitRankings,
-  episodeCells,
-  useCategory,
-} from './shared/category.jsx';
+import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
+import { DutyTrend } from './shared/trends.jsx';
+import { EpisodeLeaderboard, SoldierLookup, UnitRankings } from './shared/rankings.jsx';
+import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.jsx';
 
 /** @type {string} The duty class this page is about. */
 const DUTY = DUTY_CLASS.STATUS;

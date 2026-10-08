@@ -5,20 +5,10 @@
  */
 
 import { extractSymptoms, isDuty, MC_MA } from '../model/classify.js';
-import {
-  CategoryPage,
-  DutyTrend,
-  EpisodeLeaderboard,
-  EpisodeTiles,
-  LocationsCard,
-  LongMcCard,
-  PlatoonHeatmap,
-  ReasonsOverTime,
-  SoldierLookup,
-  UnitRankings,
-  episodeCells,
-  useCategory,
-} from './shared/category.jsx';
+import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
+import { DutyTrend } from './shared/trends.jsx';
+import { EpisodeLeaderboard, LocationsCard, LongMcCard, SoldierLookup, UnitRankings } from './shared/rankings.jsx';
+import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.jsx';
 
 /**
  * The duty classes this page is about: MC (Att C) and MA together, the same pair the
