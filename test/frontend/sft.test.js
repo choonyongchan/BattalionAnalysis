@@ -11,6 +11,7 @@ import {
   groupSizes,
   soldierCount,
   toSftRecords,
+  sftAgainstStatus,
   topExercises,
   topLocations,
 } from '../../frontend/src/model/sft.js';
@@ -145,5 +146,24 @@ describe('group size', () => {
 
   test('no groups means no average', () => {
     expect(averageGroupSize([])).toBeNull();
+  });
+});
+
+describe('sftAgainstStatus', () => {
+  const status = (name, fields) => ({ reason_category: 'Status', name, date: '', start_date: '', end_date: '', ...fields });
+
+  test('lists sessions on a day the soldier held a training restriction, by date or dated span', () => {
+    const records = [
+      { date: '2026-10-03', rank: 'PTE', name: 'Tan Ah Kow', company: 'Archer', exercises: ['Run'] },
+      { date: '2026-10-05', rank: 'PTE', name: 'Lim Bee', company: 'Archer', exercises: ['Gym'] },
+      { date: '2026-10-05', rank: 'PTE', name: 'Ng Chee', company: 'Archer', exercises: ['Run'] },
+    ];
+    const personnel = [
+      status('TAN AH KOW', { start_date: '2026-10-01', end_date: '2026-10-07', reason: 'Excuse RMJ' }),
+      status('LIM BEE', { date: '2026-10-05', reason: 'Excuse Stay-In' }),
+    ];
+    expect(sftAgainstStatus(records, personnel)).toEqual([
+      { date: '2026-10-03', rank: 'PTE', name: 'Tan Ah Kow', company: 'Archer', exercises: 'Run', restrictions: 'Excuse RMJ' },
+    ]);
   });
 });

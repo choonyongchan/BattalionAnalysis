@@ -13,6 +13,7 @@ import Fuse from 'fuse.js';
 import { COMPANIES } from '../../../shared/domain.js';
 import { nameTokens, namesMatch, normaliseName } from '../../../shared/identity.js';
 import { toIsoDate, toText } from '../../../shared/values.js';
+import { bucketsFor } from './statusBuckets.js';
 
 /** @type {string} How the form joins a checkbox answer's selections. */
 const EXERCISE_SEPARATOR = /\s*;\s*/;
@@ -290,4 +291,55 @@ export function groupSizeDistribution(groups) {
     size: index + 1,
     count: groups.filter((group) => group.size === index + 1).length,
   }));
+}
+
+/**
+ * The restrictions SFT can break: the ones that limit physical training.
+ * @type {string[]}
+ */
+const TRAINING_RESTRICTIONS = [
+  'Light Duty',
+  'Excuse RMJ',
+  'Excuse Heavy Load',
+  'Excuse Upper Limb',
+  'Excuse Kneeling/Squatting',
+];
+
+/**
+ * SFT sessions logged on a day the soldier held a training restriction.
+ *
+ * A restriction holds on a day when a Status line for the soldier is on that day's parade
+ * state or its stated dates cover the day (an SFT on a weekend has no parade state of its
+ * own). Names are matched with `namesMatch`, so word order and a missing word still match.
+ * Each line is for a person to judge: "Gym" under Excuse RMJ may be allowed.
+ * @param {Array<!Object>} records SFT records from `toSftRecords`.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @returns {Array<{date: string, rank: string, name: string, company: string,
+ *     exercises: string, restrictions: string}>} One line per session, newest first.
+ */
+export function sftAgainstStatus(records, personnelRows) {
+  const status = personnelRows.filter((row) => toText(row.reason_category) === 'Status');
+  const heldOn = (row, date) => {
+    const start = toIsoDate(row.start_date);
+    const end = toIsoDate(row.end_date);
+    return toIsoDate(row.date) === date || (start !== null && end !== null && start <= date && date <= end);
+  };
+  return records
+    .map((record) => {
+      const restrictions = new Set();
+      status
+        .filter((row) => heldOn(row, record.date) && namesMatch(record.name, row.name))
+        .forEach((row) => bucketsFor(row.reason).forEach((bucket) => restrictions.add(bucket)));
+      const breaking = TRAINING_RESTRICTIONS.filter((bucket) => restrictions.has(bucket));
+      return {
+        date: record.date,
+        rank: record.rank,
+        name: record.name,
+        company: record.company,
+        exercises: record.exercises.join(', '),
+        restrictions: breaking.join(', '),
+      };
+    })
+    .filter((line) => line.restrictions !== '')
+    .sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 }
