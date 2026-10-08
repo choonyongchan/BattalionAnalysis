@@ -28,6 +28,7 @@ import {
   FORBIDDEN_SUBMISSION_HEADERS,
   FORMSG_HEADERS,
   PERSONNEL_HEADERS,
+  SECTION_COUNT_HEADERS,
   SFT_HEADERS,
   STRENGTH_HEADERS,
   TABS as SHEET_TABS,
@@ -48,7 +49,10 @@ import {
 import { allEntries, companyTotals, expectedCounts, expectedKey, renderEntry, renderParadeState } from '../../support/paradeState.ts';
 import { SCENARIOS } from '../../support/scenarios.ts';
 
-const TABS = SHEET_TABS as Record<'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT', string>;
+const TABS = SHEET_TABS as Record<
+  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT' | 'SECTION_COUNTS',
+  string
+>;
 
 describe('platoonOf', () => {
   test.each([
@@ -183,6 +187,20 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     const [header, ...rows] = tabs[tab] as [string[], ...unknown[][]];
     return rows.map((row) => Object.fromEntries(header.map((name, index) => [name, row[index]])));
   }
+
+  test('Section Counts states, for each section, the number of names the section lists', () => {
+    expect(tabs[TABS.SECTION_COUNTS]![0]).toEqual(SECTION_COUNT_HEADERS);
+    const listed = new Map<string, number>();
+    for (const row of records(TABS.PERSONNEL)) {
+      const key = [row.parade_response_id, row.platoon, row.reason_category].join('|');
+      listed.set(key, (listed.get(key) ?? 0) + 1);
+    }
+    const counts = records(TABS.SECTION_COUNTS);
+    expect(counts.length).toBeGreaterThan(0);
+    for (const row of counts) {
+      expect(Number(row.stated_count)).toBe(listed.get([row.parade_response_id, row.platoon, row.reason_category].join('|')) ?? 0);
+    }
+  });
 
   test('answers every tab the dashboard reads, under its own header rows', () => {
     expect(Object.keys(tabs).sort()).toEqual(Object.values(SHEET_TABS as Record<string, string>).sort());

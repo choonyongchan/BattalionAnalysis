@@ -29,6 +29,7 @@ export const TABS = {
   FORMSG: 'Report Sick FormSG Responses',
   SUBMISSIONS: 'Parade State Responses',
   SFT: 'SFT Responses',
+  SECTION_COUNTS: 'Section Counts',
 };
 
 /**
@@ -162,6 +163,13 @@ export const FORBIDDEN_HEADERS = ['SingPass Validated NRIC', 'Masked NRIC'];
  * role cannot) and it is named here so a test can prove it is never requested.
  * @type {string[]}
  */
+/**
+ * Headers read from "Section Counts": the count each section header of a parade state
+ * states, beside which the names it lists can be counted.
+ * @type {string[]}
+ */
+export const SECTION_COUNT_HEADERS = ['parade_response_id', 'date', 'company', 'platoon', 'reason_category', 'stated_count'];
+
 export const FORBIDDEN_SUBMISSION_HEADERS = ['Drop your Parade State here'];
 
 /**
@@ -176,4 +184,5 @@ export const OPTIONAL_TABS = {
   [TABS.FORMSG]: 'Report-sick submissions are unavailable.',
   [TABS.SUBMISSIONS]: 'Parade-state filing times are unavailable.',
   [TABS.SFT]: 'SFT submissions are unavailable.',
+  [TABS.SECTION_COUNTS]: 'Stated section counts are unavailable.',
 };

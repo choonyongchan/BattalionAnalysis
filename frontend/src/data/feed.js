@@ -17,6 +17,7 @@ import {
   SFT_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
+  SECTION_COUNT_HEADERS,
   TABS,
 } from '../../../shared/tabs.js';
 import { setActiveSettings } from '../model/activeSettings.js';
@@ -54,6 +55,7 @@ const OPTIONAL_TAB_SPECS = [
   { key: 'formSg', tab: TABS.FORMSG, headers: FORMSG_HEADERS },
   { key: 'submissions', tab: TABS.SUBMISSIONS, headers: SUBMISSION_HEADERS },
   { key: 'sft', tab: TABS.SFT, headers: SFT_HEADERS },
+  { key: 'sectionCounts', tab: TABS.SECTION_COUNTS, headers: SECTION_COUNT_HEADERS },
 ];
 
 /**

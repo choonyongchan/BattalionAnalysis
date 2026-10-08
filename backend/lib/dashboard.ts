@@ -19,6 +19,7 @@ import {
   personnelRows,
   rawMessages,
   reportSickFormsg,
+  sectionCounts,
   sftFormsg,
   strengthRows,
 } from '../db/schema.ts';
@@ -29,6 +30,7 @@ import {
   FORMSG_STATUS_HEADERS,
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
+  SECTION_COUNT_HEADERS,
   SFT_HEADERS,
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
@@ -44,7 +46,7 @@ export type Tabs = Record<string, unknown[][]>;
 
 /** The tab names, typed: the JSDoc on the browser module does not carry through. */
 const TABS = SHEET_TABS as Record<
-  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT',
+  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT' | 'SECTION_COUNTS',
   string
 >;
 
@@ -377,19 +379,50 @@ async function sftTab(db: Db): Promise<Row[]> {
 }
 
 /**
+ * Reads the Section Counts tab: the count each first-parade section header states.
+ *
+ * @param db The read-only handle.
+ * @returns Records keyed by the headers in `SECTION_COUNT_HEADERS`.
+ */
+async function sectionCountsTab(db: Db): Promise<Row[]> {
+  const rows = await db
+    .select({
+      id: sectionCounts.paradeResponseId,
+      date: paradeSubmissions.date,
+      company: paradeSubmissions.company,
+      unitLabel: sectionCounts.unitLabel,
+      reasonCategory: sectionCounts.reasonCategory,
+      statedCount: sectionCounts.statedCount,
+    })
+    .from(sectionCounts)
+    .innerJoin(paradeSubmissions, eq(sectionCounts.paradeResponseId, paradeSubmissions.paradeResponseId))
+    .where(eq(paradeSubmissions.session, 'FPS'))
+    .orderBy(asc(paradeSubmissions.date));
+  return rows.map((r) => ({
+    parade_response_id: r.id,
+    date: r.date,
+    company: r.company,
+    platoon: platoonOf(r.unitLabel),
+    reason_category: r.reasonCategory,
+    stated_count: r.statedCount,
+  }));
+}
+
+/**
  * Reads every tab the dashboard charts.
  *
  * @param db A handle connected as `dashboard_read`.
  * @returns Tab name to values, header row first.
  */
 export async function loadTabs(db: Db): Promise<Tabs> {
-  const [strength, personnel, roster, formSg, submissions, sft] = await Promise.all([
+  const [strength, personnel, roster, formSg, submissions, sft, counts] = await Promise.all([
     strengthTab(db),
     personnelTab(db),
     rosterTab(db),
     formSgTab(db),
     submissionsTab(db),
     sftTab(db),
+    sectionCountsTab(db),
   ]);
   return {
     [TABS.STRENGTH]: toTab(STRENGTH_HEADERS, strength),
@@ -398,5 +431,6 @@ export async function loadTabs(db: Db): Promise<Tabs> {
     [TABS.FORMSG]: toTab(FORMSG_HEADERS, formSg),
     [TABS.SUBMISSIONS]: toTab(SUBMISSION_HEADERS, submissions),
     [TABS.SFT]: toTab(SFT_HEADERS, sft),
+    [TABS.SECTION_COUNTS]: toTab(SECTION_COUNT_HEADERS, counts),
   };
 }

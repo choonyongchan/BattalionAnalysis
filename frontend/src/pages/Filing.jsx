@@ -3,10 +3,26 @@
  * how much of the battalion the data covers.
  */
 
-import { dataset } from '../app/state.js';
+import { useMemo } from 'preact/hooks';
+import { company } from '../app/state.js';
 import { Banner, Card } from '../components/Card.jsx';
+import { ChartCard, Heatmap } from '../charts/index.js';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { dataQuality } from '../model/quality.js';
+import { COMPANIES } from '../../../shared/domain.js';
+import { withinRange } from '../model/dateRange.js';
+import { countMismatches, dataQuality } from '../model/quality.js';
+import { ALL_COMPANIES } from '../model/scope.js';
+import { FILING_CUTOFF_MINUTES, filingTimes, toFilings } from '../model/submissions.js';
+import { CategoryPage, useCategory } from './shared/category.jsx';
+
+/**
+ * A count of minutes after midnight as a clock time.
+ * @param {number} minutes Minutes after midnight.
+ * @returns {string} `HH:mm`.
+ */
+function fmtClock(minutes) {
+  return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
+}
 
 /**
  * The data-quality panel: row counts, tab availability, date spans, and the named
@@ -87,23 +103,89 @@ function DataQualityPanel({ quality }) {
 }
 
 /**
+ * How late each company's first parade state arrived, day by day.
+ * @param {{filings: Array<!Object>, range: !Object}} props Filings from `toFilings`
+ *     (already scoped), and the range.
+ * @returns {!preact.VNode} The card.
+ */
+function TimelinessCard({ filings, range }) {
+  const { cells, onTime, filed, nextDay } = filingTimes(filings, range.days);
+  const companies = COMPANIES.filter((company) => filed[company] > 0);
+  return (
+    <ChartCard
+      title="First Parade State, Minutes Late"
+      note={
+        'Minutes past ' + fmtClock(FILING_CUTOFF_MINUTES) + ' the first parade state arrived; 0 is on time. On time: ' +
+        companies.map((company) => company + ' ' + fmtFraction(onTime[company], filed[company])).join(', ') + '.'
+      }
+      coverage={
+        'A blank cell is a day with no filing' +
+        (nextDay > 0 ? ', or one of the ' + fmtInt(nextDay) + ' parade states filed on a later day.' : '.')
+      }
+      empty="No parade state filed in range."
+    >
+      <Heatmap
+        rows={companies}
+        columns={range.days}
+        cells={cells}
+        valueName="minutes late"
+        detail={(cell) => ['Arrived ' + cell.at]}
+        showValues
+        height={Math.max(160, companies.length * 36 + 60)}
+      />
+    </ChartCard>
+  );
+}
+
+/**
+ * Sections whose stated count differs from the names listed under them, by company and day.
+ * @param {{sectionCounts: Array<!Object>, personnel: Array<!Object>, range: !Object}} props
+ *     The scoped stated counts and personnel rows, and the range.
+ * @returns {!preact.VNode} The card.
+ */
+function AccuracyCard({ sectionCounts, personnel, range }) {
+  const inRange = sectionCounts.filter((row) => withinRange(row.date, range.from, range.to));
+  const { cells, checked, mismatched } = countMismatches(inRange, personnel);
+  const companies = COMPANIES.filter((company) => cells.some((cell) => cell.row === company));
+  return (
+    <ChartCard
+      title="Sections That Do Not Add Up"
+      note={fmtInt(mismatched) + ' of ' + fmtInt(checked) + ' section headers state a count that differs from the names listed under them.'}
+      coverage="Each cell counts one company's mismatched sections that day; hover for which."
+      empty="No stated section counts in range."
+    >
+      <Heatmap
+        rows={companies}
+        columns={range.days}
+        cells={cells}
+        valueName="sections"
+        detail={(cell) => cell.sections}
+        showValues
+        height={Math.max(160, companies.length * 36 + 60)}
+      />
+    </ChartCard>
+  );
+}
+
+/**
  * The Filing & Accuracy page.
  * @returns {!preact.VNode} The page.
  */
 export function Filing() {
-  const data = dataset.value;
-  if (!data) {
-    return null;
-  }
+  const { data, range } = useCategory();
+  const filings = useMemo(
+    () => toFilings(data.submissions).filter((filing) => company.value === ALL_COMPANIES || filing.company === company.value),
+    [data.submissions, company.value]
+  );
+  const sectionCounts = useMemo(
+    () => (data.sectionCounts || []).filter((row) => company.value === ALL_COMPANIES || row.company === company.value),
+    [data.sectionCounts, company.value]
+  );
   return (
-    <div class="page">
-      <header class="pagehead">
-        <div>
-          <h1 class="pagehead__title">Filing &amp; Accuracy</h1>
-          <p class="pagehead__sub">Whether parade states arrive on time and add up, and what the data covers.</p>
-        </div>
-      </header>
+    <CategoryPage title="Filing & Accuracy" range={range}>
+      <TimelinessCard filings={filings} range={range} />
+      <AccuracyCard sectionCounts={sectionCounts} personnel={data.personnel} range={range} />
       <DataQualityPanel quality={dataQuality(data)} />
-    </div>
+    </CategoryPage>
   );
 }

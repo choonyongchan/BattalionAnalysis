@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { filingsOn, latestFilingPerCompany, toFilings } from '../../frontend/src/model/submissions.js';
+import { filingTimes, filingsOn, latestFilingPerCompany, toFilings } from '../../frontend/src/model/submissions.js';
 import { COMPANIES } from '../../shared/domain.js';
 
 /**
@@ -32,6 +32,7 @@ describe('toFilings', () => {
       date: '2026-07-22',
       session: 'FPS',
       at: { hour: 7, minute: 12, minutes: 432 },
+      filedOn: '2026-07-22',
       id: 'Archer_2026-07-22_FPS',
     });
   });
@@ -117,5 +118,22 @@ describe('latestFilingPerCompany', () => {
     ]);
     const latest = latestFilingPerCompany(filings, '2026-07-22', 'FPS');
     expect(latest.get('Archer').at.minutes).toBe(510);
+  });
+});
+
+describe('filingTimes', () => {
+  test('values the first filing of each company-day in minutes past 08:00, counting next-day filings apart', () => {
+    const filings = toFilings([
+      { Timestamp: '2026-10-08T07:17:00', parade_response_id: 'Archer_2026-10-08_FPS' },
+      { Timestamp: '2026-10-08T09:30:00', parade_response_id: 'Archer_2026-10-08_FPS' },
+      { Timestamp: '2026-10-08T11:11:00', parade_response_id: 'Stallion_2026-10-08_FPS' },
+      { Timestamp: '2026-10-08T08:05:00', parade_response_id: 'Braves_2026-10-07_FPS' },
+    ]);
+    const { cells, onTime, filed, nextDay } = filingTimes(filings, ['2026-10-07', '2026-10-08']);
+    expect(cells.map((c) => [c.row, c.column, c.value])).toEqual([
+      ['Archer', '2026-10-08', 0],
+      ['Stallion', '2026-10-08', 191],
+    ]);
+    expect([onTime.Archer, onTime.Stallion, filed.Braves, nextDay]).toEqual([1, 0, 1, 1]);
   });
 });

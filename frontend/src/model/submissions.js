@@ -28,8 +28,8 @@ const ID_PATTERN = /^([A-Za-z]+)_(\d{4}-\d{2}-\d{2})_([A-Za-z0-9]+)$/;
 /**
  * Parses one submissions row into a filing, or null when it cannot be trusted.
  * @param {!Object} row A "Parade State Responses" row: `Timestamp`, `parade_response_id`.
- * @returns {?{company: string, date: string, session: string, at: ?Object, id: string}}
- *     The filing, or null when the id does not parse or names an unknown company.
+ * @returns {?{company: string, date: string, session: string, at: ?Object, filedOn: ?string,
+ *     id: string}} The filing, or null when the id does not parse or names an unknown company.
  */
 function parseFiling_(row) {
   const id = toText(row && row.parade_response_id);
@@ -45,7 +45,7 @@ function parseFiling_(row) {
   if (!date) {
     return null;
   }
-  return { company, date, session, at: toTimeOfDay(row.Timestamp), id };
+  return { company, date, session, at: toTimeOfDay(row.Timestamp), filedOn: toIsoDate(row.Timestamp), id };
 }
 
 /**
@@ -122,4 +122,48 @@ export function filingsOn(filings, isoDate, session) {
   });
 }
 
-
+
+
+/** @type {number} The first-parade cut-off, in minutes after midnight (08:00). ponytail: a constant; a Settings field when someone needs to change it. */
+export const FILING_CUTOFF_MINUTES = 8 * 60;
+
+/**
+ * How late each company's first parade state arrived on each day: minutes past the cut-off.
+ *
+ * The first filing of the day counts, not a later correction. A filing that arrived on a
+ * later day than its parade has no cell, so it cannot swamp the scale; it is counted in
+ * `nextDay` instead. A day with no filing has no cell either.
+ * @param {Array<!Object>} filings Filings from `toFilings`.
+ * @param {string[]} days The days to cover, ascending.
+ * @param {string=} session Session to read; defaults to 'FPS'.
+ * @returns {{cells: Array<{row: string, column: string, value: number, at: string}>,
+ *     onTime: !Object<string, number>, filed: !Object<string, number>, nextDay: number}}
+ *     One cell per company-day filed the same day, valued in minutes late (0 when on
+ *     time); per company, the days filed on time and the days filed at all; and the
+ *     filings that arrived on a later day.
+ */
+export function filingTimes(filings, days, session) {
+  const first = new Map();
+  filings
+    .filter((filing) => filing.session === (session || DEFAULT_SESSION) && filing.at && days.includes(filing.date))
+    .forEach((filing) => {
+      const key = filing.company + '|' + filing.date;
+      if (!first.has(key)) first.set(key, filing);
+    });
+  const onTime = Object.fromEntries(COMPANIES.map((company) => [company, 0]));
+  const filed = Object.fromEntries(COMPANIES.map((company) => [company, 0]));
+  let nextDay = 0;
+  const cells = [];
+  first.forEach((filing) => {
+    filed[filing.company] += 1;
+    if (filing.filedOn && filing.filedOn !== filing.date) {
+      nextDay += 1;
+      return;
+    }
+    const late = Math.max(0, filing.at.minutes - FILING_CUTOFF_MINUTES);
+    if (late === 0) onTime[filing.company] += 1;
+    const at = String(filing.at.hour).padStart(2, '0') + ':' + String(filing.at.minute).padStart(2, '0');
+    cells.push({ row: filing.company, column: filing.date, value: late, at });
+  });
+  return { cells, onTime, filed, nextDay };
+}

@@ -33,7 +33,8 @@ GRANT SELECT ON
   command_roster_rows,
   report_sick_formsg,
   sft_formsg,
-  settings
+  settings,
+  section_counts
 TO dashboard_read;
 --> statement-breakpoint
 GRANT SELECT (id, received_at) ON raw_messages TO dashboard_read;

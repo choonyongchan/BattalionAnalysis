@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../shared/tabs.js';
-import { dataQuality } from '../../frontend/src/model/quality.js';
+import { dataQuality, countMismatches } from '../../frontend/src/model/quality.js';
 
 /**
  * Builds Strength Data records from column-keyed row specs.
@@ -77,5 +77,24 @@ describe('dataQuality', () => {
     const quality = dataQuality({ strength: [], personnel, formSg: [], notes: {} });
     expect(quality.permanentStatusSentinel.readAsPermanent).toBe(1);
     expect(quality.permanentStatusSentinel.carryingSentinel).toBe(0);
+  });
+});
+
+describe('countMismatches', () => {
+  test('counts sections whose stated count differs from the names listed under them', () => {
+    const counts = [
+      { parade_response_id: 'p1', date: '2026-10-08', company: 'Archer', platoon: '1', reason_category: 'Att C', stated_count: 2 },
+      { parade_response_id: 'p1', date: '2026-10-08', company: 'Archer', platoon: '1', reason_category: 'MA', stated_count: 1 },
+      { parade_response_id: 'p1', date: '2026-10-08', company: 'Archer', platoon: '2', reason_category: 'Status', stated_count: '' },
+    ];
+    const personnel = [
+      { parade_response_id: 'p1', platoon: '1', reason_category: 'Att C' },
+      { parade_response_id: 'p1', platoon: '1', reason_category: 'MA' },
+    ];
+    expect(countMismatches(counts, personnel)).toEqual({
+      cells: [{ row: 'Archer', column: '2026-10-08', value: 1, sections: ['1 Att C: states 2, lists 1'] }],
+      checked: 2,
+      mismatched: 1,
+    });
   });
 });

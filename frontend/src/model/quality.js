@@ -72,3 +72,40 @@ export function dataQuality(dataset) {
     },
   };
 }
+
+/**
+ * Sections whose stated count differs from the names listed under them, per company per
+ * day: how often a parade state does not add up.
+ * @param {Array<!Object>} sectionCounts "Section Counts" records: `parade_response_id`,
+ *     `date`, `company`, `platoon`, `reason_category`, `stated_count`.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @returns {{cells: Array<{row: string, column: string, value: number, sections: string[]}>,
+ *     checked: number, mismatched: number}} One cell per company-day with a stated count,
+ *     valued in mismatched sections and naming them; sections checked and mismatched.
+ */
+export function countMismatches(sectionCounts, personnelRows) {
+  const listed = new Map();
+  personnelRows.forEach((row) => {
+    const key = [toText(row.parade_response_id), toText(row.platoon), toText(row.reason_category)].join('|');
+    listed.set(key, (listed.get(key) || 0) + 1);
+  });
+  const byDay = new Map();
+  let checked = 0;
+  let mismatched = 0;
+  sectionCounts.forEach((row) => {
+    const stated = toNumber(row.stated_count);
+    if (stated === null) return;
+    checked += 1;
+    const key = [toText(row.parade_response_id), toText(row.platoon), toText(row.reason_category)].join('|');
+    const cellKey = toText(row.company) + '|' + toIsoDate(row.date);
+    const cell = byDay.get(cellKey) || { row: toText(row.company), column: toIsoDate(row.date), value: 0, sections: [] };
+    const count = listed.get(key) || 0;
+    if (count !== stated) {
+      mismatched += 1;
+      cell.value += 1;
+      cell.sections.push((toText(row.platoon) || 'Company') + ' ' + toText(row.reason_category) + ': states ' + stated + ', lists ' + count);
+    }
+    byDay.set(cellKey, cell);
+  });
+  return { cells: Array.from(byDay.values()), checked, mismatched };
+}
