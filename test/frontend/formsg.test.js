@@ -12,7 +12,6 @@ import {
   reportSickTypeOf,
   typeShares,
   submissionCounts,
-  submissionPlatoonOf,
   submissionTrend,
   toSubmissions,
 } from '../../frontend/src/model/formsg.js';
@@ -126,25 +125,6 @@ describe('submissionTrend', () => {
       asRate: false,
     });
     expect(trend.series[0].values[0]).toBe(2);
-  });
-});
-
-describe('submissionPlatoonOf', () => {
-  test('reads the platoon digit that leads the 4D', () => {
-    expect(submissionPlatoonOf({ fourD: '3203' })).toBe('3');
-  });
-
-  test('skips a single company-letter prefix on the 4D', () => {
-    expect(submissionPlatoonOf({ fourD: 'C1204' })).toBe('1');
-  });
-
-  test('a blank 4D lands under HQ, not a separate unassigned bucket', () => {
-    expect(submissionPlatoonOf({ fourD: '' })).toBe('HQ');
-  });
-
-  test('a 4D whose leading digit is not a platoon lands under HQ', () => {
-    expect(submissionPlatoonOf({ fourD: '9203' })).toBe('HQ');
-    expect(submissionPlatoonOf({ fourD: 'ABCD' })).toBe('HQ');
   });
 });
 

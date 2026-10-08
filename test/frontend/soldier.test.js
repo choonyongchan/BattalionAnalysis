@@ -63,10 +63,10 @@ describe('soldierIndex', () => {
   test('a platoon filled in on a later submission overwrites an earlier blank', () => {
     const rows = personnelRows([
       { date: '2026-07-01', session: 'FPS', company: 'Hercules', four_d: '3210', name: 'TAN', reason_category: 'Others', platoon: '' },
-      { date: '2026-08-01', session: 'FPS', company: 'Hercules', four_d: '3210', name: 'TAN', reason_category: 'Others', platoon: '3' },
+      { date: '2026-08-01', session: 'FPS', company: 'Hercules', four_d: '3210', name: 'TAN', reason_category: 'Others', platoon: 'SIG' },
     ]);
     const index = soldierIndex(rows, []);
-    expect(index[0].platoon).toBe('3');
+    expect(index[0].platoon).toBe('SIG');
     expect(index[0].platoonInferred).toBe(false);
   });
 });

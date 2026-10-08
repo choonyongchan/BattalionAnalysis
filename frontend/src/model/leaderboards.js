@@ -18,12 +18,12 @@ import { toText } from '../../../shared/values.js';
 import { settingOf } from './activeSettings.js';
 
 /**
- * Resolves a leaderboard row's platoon through the 4D-inference rule.
+ * Resolves a leaderboard row's platoon from its sub-header (`platoon.js`).
  * @param {!Object} entry A row from `metrics.leaderboard`.
  * @returns {{platoon: string, inferred: boolean}} The platoon to display.
  */
 function platoonFor_(entry) {
-  return platoonOf({ platoon: entry.platoon, four_d: entry.fourD });
+  return platoonOf({ company: entry.company, platoon: entry.platoon, four_d: entry.fourD });
 }
 
 /**
@@ -150,7 +150,7 @@ export function topByStatusCount(episodes, limit) {
  * Companies or platoons ranked by episode count, with the number of distinct soldiers
  * behind those episodes.
  *
- * A platoon left blank is inferred from the 4D through `platoon.js`, as the leaderboards do.
+ * The platoon is the sub-header, through `platoon.js`, as the leaderboards use.
  * @param {Array<!Object>} episodes Episodes from `buildEpisodes`, already restricted to the range.
  * @param {string|!Array<string>} dutyClass Duty class(es) to rank, from DUTY_CLASS.
  * @param {string} level 'company' or 'platoon'.
@@ -164,7 +164,7 @@ export function rankUnits(episodes, dutyClass, level) {
     .forEach((episode) => {
       const unit = toText(episode.company);
       if (episode.key === '' || unit === '') return;
-      const platoon = platoonOf({ platoon: episode.platoon, four_d: episode.fourD }).platoon;
+      const platoon = platoonOf({ company: unit, platoon: episode.platoon, four_d: episode.fourD }).platoon;
       const key = level === 'platoon' ? unit + '\u0000' + platoon : unit;
       const entry = units.get(key) || { count: 0, soldiers: new Set() };
       entry.count += 1;

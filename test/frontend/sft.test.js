@@ -76,6 +76,20 @@ describe('counts', () => {
       { label: 'Push-ups', count: 1 },
     ]);
   });
+
+  test('spellings of one exercise are counted once per session, under one label', () => {
+    const records = [
+      { exercises: ['Running', 'ER'] },
+      { exercises: ['Endurance run'] },
+      { exercises: ['Gym / Weights', 'Chest and shoulders'] },
+      { exercises: ['Swim'] },
+    ];
+    expect(topExercises(records, 5)).toEqual([
+      { label: 'Run', count: 2 },
+      { label: 'Gym / Weights', count: 1 },
+      { label: 'Swim', count: 1 },
+    ]);
+  });
 });
 
 describe('group size', () => {

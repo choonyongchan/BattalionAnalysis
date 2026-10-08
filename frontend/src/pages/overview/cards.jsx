@@ -36,8 +36,7 @@ export function SankeyCard({ episodes, submissions, from, to }) {
       coverage={
         fmtInt(c.reportingSick) + ' reporting sick on the parade state, ' + fmtInt(c.reportedSick) +
         ' reported sick on FormSG. Of those, the form records ' + fmtInt(c.mc) + ' MC, ' + fmtInt(c.status) +
-        ' Status, ' + fmtInt(c.both) + ' both and ' + fmtInt(c.none) + ' neither; ' + fmtInt(c.notRecorded) +
-        ' have no outcome recorded yet.'
+        ' Status, ' + fmtInt(c.both) + ' both and ' + fmtInt(c.none) + ' no outcome.'
       }
     >
       <Sankey nodes={flow.nodes} links={flow.links} />

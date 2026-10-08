@@ -106,13 +106,37 @@ export function topLocations(records, limit) {
 }
 
 /**
- * The most common exercises; a session doing three counts once for each.
+ * Free-text exercise names folded into one label each. First match wins.
+ * ponytail: hard-coded; move to Settings if clerks need to edit it.
+ * @type {!Array<{pattern: !RegExp, label: string}>}
+ */
+const EXERCISE_GROUPS = [
+  { pattern: /\b(run|running|jog|jogging|walk|walking|er|endurance)\b/i, label: 'Run' },
+  { pattern: /\b(gym|weights?|strength|power|chest|shoulders?|legs?|arms?)\b/i, label: 'Gym / Weights' },
+];
+
+/**
+ * An exercise's folded label, or the text as typed when no group claims it.
+ * @param {string} exercise One exercise as typed.
+ * @returns {string} The label.
+ */
+function exerciseLabel_(exercise) {
+  const group = EXERCISE_GROUPS.find((entry) => entry.pattern.test(exercise));
+  return group ? group.label : exercise;
+}
+
+/**
+ * The most common exercises, spellings of one exercise counted together; a session doing
+ * three counts once for each.
  * @param {Array<!Object>} records SFT records.
  * @param {number} limit How many to keep.
  * @returns {Array<{label: string, count: number}>} Sessions per exercise.
  */
 export function topExercises(records, limit) {
-  return topLabels_(records.flatMap((record) => record.exercises), limit);
+  return topLabels_(
+    records.flatMap((record) => Array.from(new Set(record.exercises.map(exerciseLabel_)))),
+    limit
+  );
 }
 
 /**

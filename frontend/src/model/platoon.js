@@ -1,28 +1,27 @@
 /**
- * Infers a platoon from the 4D when a Personnel Data row states none.
+ * Resolves a soldier's platoon from the sub-header their line sits under.
  *
- * `platoon` is blank for whole companies — Hercules, Cougar, Braves and Stallion among
- * them — which would leave a Company x Platoon heatmap empty for half the battalion.
- * `four_d` encodes the platoon in its leading digit (optionally behind a single
- * company-letter prefix, e.g. `C1204`), so it stands in when the cell itself is silent.
+ * The sub-header (`unit_label`, read by `backend/lib/dashboard.ts#platoonOf`) is the
+ * platoon: `7`, `SIG`, `OPR+ASA`, `HQ`. It counts only when the soldier's company has that
+ * sub-unit (`COMPANY_SUBUNITS`); anything else is Unassigned.
  *
- * This is the one place in the model that derives a value the message does not state,
- * against `docs/architecture_patterns.md`'s "read what the message says; derive nothing".
- * The exception is deliberate and bounded: a stated platoon always wins, never the 4D, so
- * the derived value only ever fills a gap and never overrides what was actually read.
+ * The 4D also encodes a platoon in its leading digit (optionally behind one company letter,
+ * e.g. `C1204`). That reading is supported but switched off (`USE_FOURD_PLATOON`) until the
+ * 4D scheme is confirmed: with it on, a 4D digit fills a missing sub-header and is marked
+ * `inferred`, and it never overrides a stated sub-header.
  *
  * Every function here is pure.
  */
 
-import {
-  COMPANIES,
-  COMPANY_SUBUNITS,
-  PLATOONS,
-  SUBUNIT_POSITIONS,
-  UNASSIGNED,
-  subunitPosition,
-} from '../../../shared/domain.js';
+import { COMPANIES, COMPANY_SUBUNITS, SUBUNIT_POSITIONS, UNASSIGNED, subunitPosition } from '../../../shared/domain.js';
 import { toText } from '../../../shared/values.js';
+
+/**
+ * Whether a 4D digit may stand in for a missing sub-header.
+ * ponytail: off until the 4D scheme is confirmed; flip to true to fill gaps from the 4D.
+ * @type {boolean}
+ */
+export const USE_FOURD_PLATOON = false;
 
 /**
  * Reads the platoon digit that leads a 4D, skipping an optional single letter prefix.
@@ -40,58 +39,53 @@ function platoonDigitOf_(fourD) {
 }
 
 /**
- * Normalises a stated platoon cell to the PLATOONS roll.
+ * The company's own name for a platoon cell, or '' when the company has no such sub-unit.
+ * @param {string} company Company name.
  * @param {*} platoon Raw platoon cell.
- * @returns {string} A member of PLATOONS, or '' when the cell states none.
+ * @returns {string} A member of `COMPANY_SUBUNITS[company]`, or ''.
  */
-function normaliseStated_(platoon) {
-  const text = toText(platoon).toUpperCase();
-  return PLATOONS.includes(text) ? text : '';
+function subunitOf_(company, platoon) {
+  const position = subunitPosition(company, toText(platoon));
+  return position < 0 ? '' : COMPANY_SUBUNITS[company][position];
 }
 
 /**
- * Resolves a row's platoon, stating it when the row does and inferring it otherwise.
- * @param {!Object} row A Personnel Data record with `platoon` and `four_d`.
- * @returns {{platoon: string, inferred: boolean}} The platoon and whether it was inferred.
+ * Resolves a row's platoon from its sub-header.
+ * @param {!Object} row A record with `company`, `platoon` (the sub-header) and `four_d`.
+ * @param {boolean=} useFourD Whether a 4D digit may fill a missing sub-header.
+ * @returns {{platoon: string, inferred: boolean, fourD: string}} The platoon, whether it
+ *     came from the 4D, and the platoon the 4D alone suggests ('' when none).
  */
-export function platoonOf(row) {
-  const stated = normaliseStated_(row && row.platoon);
+export function platoonOf(row, useFourD = USE_FOURD_PLATOON) {
+  const company = toText(row && row.company);
+  const fourD = subunitOf_(company, platoonDigitOf_(row && row.four_d));
+  const stated = subunitOf_(company, row && row.platoon);
   if (stated !== '') {
-    return { platoon: stated, inferred: false };
+    return { platoon: stated, inferred: false, fourD };
   }
-  const digit = platoonDigitOf_(row && row.four_d);
-  if (digit !== '') {
-    return { platoon: digit, inferred: true };
+  if (useFourD && fourD !== '') {
+    return { platoon: fourD, inferred: true, fourD };
   }
-  return { platoon: UNASSIGNED, inferred: false };
+  return { platoon: UNASSIGNED, inferred: false, fourD };
 }
 
 /**
- * Summarises how much of a row set states its platoon versus needs it inferred.
+ * Summarises how many rows sit under a known sub-header, and how often the 4D agrees.
  * @param {Array<!Object>} rows Personnel Data records.
- * @returns {{total: number, stated: number, inferred: number, unknown: number,
- *     inferredShare: number}} Counts, plus inferred as a 0..1 share of total.
+ * @returns {{total: number, stated: number, unknown: number, fourDDisagrees: number}}
+ *     Rows under a known sub-header, rows without one, and stated rows whose 4D names a
+ *     different platoon (the check to run before switching `USE_FOURD_PLATOON` on).
  */
 export function platoonCoverage(rows) {
-  const total = rows.length;
   let stated = 0;
-  let inferred = 0;
+  let fourDDisagrees = 0;
   rows.forEach((row) => {
-    const result = platoonOf(row);
-    if (result.inferred) {
-      inferred += 1;
-    } else if (result.platoon !== UNASSIGNED) {
-      stated += 1;
-    }
+    const result = platoonOf(row, false);
+    if (result.platoon === UNASSIGNED) return;
+    stated += 1;
+    if (result.fourD !== '' && result.fourD !== result.platoon) fourDDisagrees += 1;
   });
-  const unknown = total - stated - inferred;
-  return {
-    total,
-    stated,
-    inferred,
-    unknown,
-    inferredShare: total === 0 ? 0 : inferred / total,
-  };
+  return { total: rows.length, stated, unknown: rows.length - stated, fourDDisagrees };
 }
 
 /**

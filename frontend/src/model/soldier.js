@@ -91,7 +91,7 @@ export function soldierIndex(personnel, submissions) {
     });
 
   return Array.from(bySoldier.values()).map((entry) => {
-    const { platoon, inferred } = platoonOf({ platoon: entry.platoon, four_d: entry.fourD });
+    const { platoon, inferred } = platoonOf({ company: entry.company, platoon: entry.platoon, four_d: entry.fourD });
     return {
       key: entry.key,
       fourD: entry.fourD,

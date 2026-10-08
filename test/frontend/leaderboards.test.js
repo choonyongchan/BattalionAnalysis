@@ -56,14 +56,14 @@ describe('topByCount', () => {
     expect(top[0].name).toBe('3SG COMMANDER');
   });
 
-  test('fills in the platoon from the 4D when the row leaves it blank', () => {
+  test('takes the platoon from the sub-header, never from the 4D', () => {
     const rows = personnelRows([
-      { date: '2026-07-20', session: 'FPS', company: 'Hercules', four_d: '3210', name: 'TAN', reason_category: 'Report Sick', start_date: '2026-07-20', end_date: '2026-07-20' },
+      { date: '2026-07-20', session: 'FPS', company: 'Hercules', platoon: 'SIG', four_d: '3210', name: 'TAN', reason_category: 'Report Sick', start_date: '2026-07-20', end_date: '2026-07-20' },
+      { date: '2026-07-20', session: 'FPS', company: 'Cougar', four_d: '7210', name: 'LIM', reason_category: 'Report Sick', start_date: '2026-07-20', end_date: '2026-07-20' },
     ]);
-    const episodes = buildEpisodes(rows);
-    const top = topByCount(episodes, DUTY_CLASS.REPORT_SICK, 10);
-    expect(top[0].platoon).toBe('3');
-    expect(top[0].platoonInferred).toBe(true);
+    const top = topByCount(buildEpisodes(rows), DUTY_CLASS.REPORT_SICK, 10);
+    expect(top.find((row) => row.name === 'TAN').platoon).toBe('SIG');
+    expect(top.find((row) => row.name === 'LIM').platoon).toBe('Unassigned');
   });
 });
 
@@ -110,26 +110,26 @@ describe('topByStatusCount', () => {
 });
 
 describe('rankUnits', () => {
-  // Two episodes for 1101 (separate days), one for 1102, all Att C in Big 1; one in Small 1.
+  // Two episodes for 1101 (separate days), one for 1102, all Att C in Archer 1; one in Braves 4.
   const episodes = buildEpisodes(
     personnelRows([
-      { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', four_d: '1101', reason_category: 'Att C' },
-      { date: '2026-07-24', session: 'FPS', company: 'Big', platoon: '1', four_d: '1101', reason_category: 'Att C' },
-      { date: '2026-07-20', session: 'FPS', company: 'Big', platoon: '1', four_d: '1102', reason_category: 'Att C' },
-      { date: '2026-07-20', session: 'FPS', company: 'Small', platoon: '1', four_d: '1201', reason_category: 'Att C' },
+      { date: '2026-07-20', session: 'FPS', company: 'Archer', platoon: '1', four_d: '1101', reason_category: 'Att C' },
+      { date: '2026-07-24', session: 'FPS', company: 'Archer', platoon: '1', four_d: '1101', reason_category: 'Att C' },
+      { date: '2026-07-20', session: 'FPS', company: 'Archer', platoon: '1', four_d: '1102', reason_category: 'Att C' },
+      { date: '2026-07-20', session: 'FPS', company: 'Braves', platoon: '4', four_d: '1201', reason_category: 'Att C' },
     ])
   );
 
   test('ranks companies by episode count and counts each soldier once', () => {
     const ranked = rankUnits(episodes, DUTY_CLASS.ATT_C, 'company');
     expect(ranked.map((row) => [row.company, row.count, row.soldiers])).toEqual([
-      ['Big', 3, 2],
-      ['Small', 1, 1],
+      ['Archer', 3, 2],
+      ['Braves', 1, 1],
     ]);
   });
 
   test('splits by platoon at the platoon level', () => {
     const ranked = rankUnits(episodes, DUTY_CLASS.ATT_C, 'platoon');
-    expect(ranked[0]).toMatchObject({ company: 'Big', platoon: '1', count: 3, soldiers: 2 });
+    expect(ranked[0]).toMatchObject({ company: 'Archer', platoon: '1', count: 3, soldiers: 2 });
   });
 });

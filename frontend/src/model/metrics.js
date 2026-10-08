@@ -18,7 +18,7 @@
 
 import { classify, DUTY_CLASS, isAbsent, isDuty, isRestricted } from './classify.js';
 import { identityOf } from '../../../shared/identity.js';
-import { COMPANIES, PLATOONS, UNASSIGNED, UNIT_TYPE_COMPANY } from '../../../shared/domain.js';
+import { COMPANIES, UNASSIGNED, UNIT_TYPE_COMPANY } from '../../../shared/domain.js';
 import { inclusiveDaySpan } from '../../../shared/dates.js';
 import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
 import { eachDay, withinRange } from './dateRange.js';
@@ -341,15 +341,14 @@ function countGroups_(episodes, keyOf) {
  * thirty soldiers filing one each.
  *
  * This is a raw volume, not a size-fair rate: a bigger unit sits higher on both counts
- * for being bigger. The battalion and per-platoon soldier counts are taken from the episode list
+ * for being bigger. The battalion soldier count are taken from the episode list
  * whole, never summed from `byCompany`: a soldier who files under two companies across
  * the range is one soldier to the battalion but a member of two company groups.
  * @param {Array<!Object>} episodes Episodes to count, any duty class.
  * @param {string|!Array<string>} dutyClass Duty class(es) to keep, from DUTY_CLASS.
  * @returns {{byCompany: Array<{key: string, episodes: number, soldiers: number}>,
- *   byPlatoon: Array<{key: string, episodes: number, soldiers: number}>,
  *   total: {episodes: number, soldiers: number, perSoldier: ?number}}} Company groups
- *   most-episodes first, platoon groups in roll order, and the battalion total with
+ *   most-episodes first, and the battalion total with
  *   episodes per soldier (null when no soldier was counted).
  */
 export function episodeCounts(episodes, dutyClass) {
@@ -359,15 +358,9 @@ export function episodeCounts(episodes, dutyClass) {
     (a, b) => b.episodes - a.episodes || a.key.localeCompare(b.key)
   );
 
-  const byPlatoonKey = new Map(
-    countGroups_(scoped, (episode) => toText(episode.platoon)).map((group) => [group.key, group])
-  );
-  const byPlatoon = PLATOONS.map((key) => byPlatoonKey.get(key)).filter(Boolean);
-
   const soldiers = new Set(scoped.map((episode) => episode.key)).size;
   return {
     byCompany,
-    byPlatoon,
     total: {
       episodes: scoped.length,
       soldiers,

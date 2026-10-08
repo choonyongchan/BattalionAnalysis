@@ -70,12 +70,11 @@ function DataQualityPanel({ quality }) {
     { label: 'FormSG submissions', value: fmtInt(quality.rowCounts.formSg) },
     { label: 'Parade-state filings read', value: fmtInt(quality.rowCounts.submissions) },
     {
-      label: 'Platoon stated vs inferred',
+      label: 'Rows under a known platoon sub-header',
       value:
         fmtFraction(quality.platoon.stated, quality.platoon.total) +
-        ' stated, ' +
-        fmtFraction(quality.platoon.inferred, quality.platoon.total) +
-        ' inferred',
+        '; 4D names another platoon on ' +
+        fmtInt(quality.platoon.fourDDisagrees),
     },
     { label: 'Personnel rows with no 4D', value: fmtFraction(quality.fourD.blank, quality.fourD.total) },
     {

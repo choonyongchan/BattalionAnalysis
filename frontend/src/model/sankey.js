@@ -7,7 +7,7 @@
  *   Reporting sick / Unaccounted                 (parade-state report-sick episodes)
  *     -> Reported sick / No FormSG submission     (FormSG submissions)
  *     -> Type (RSO / RSI / FFI / Medical Review / not recorded)
- *     -> Outcome (MC / Status / MC and Status / No MC or Status / not recorded)
+ *     -> Outcome (MC / Status / MC and Status / No MC or Status)
  *     -> Status bucket, for submissions whose outcome includes a Status
  *
  * **The first link is not reconciled.** No name, 4D or company matching links the parade
@@ -18,8 +18,8 @@
  *
  * **Everything after `Reported sick` is one submission's own answers.** Type, outcome and
  * Status are all fields of the same FormSG response, so each submission is followed
- * exactly and nothing downstream can outnumber the submissions. A submission filed before
- * the soldier saw the MO has no outcome yet and ends at `Outcome: Not recorded`.
+ * exactly and nothing downstream can outnumber the submissions. A blank outcome means the
+ * soldier picked no outcome, so it ends at `Outcome: No MC or Status` with `None`.
  *
  * Every function here is pure.
  */
@@ -45,8 +45,8 @@ const NODE_REPORTED = 'Reported sick';
 const NODE_NO_FORMSG = 'No FormSG submission';
 
 /**
- * The outcome-stage nodes in column order, keyed by the stored FormSG outcome; '' is a
- * submission whose outcome is still blank, and must stay last as the fallback.
+ * The outcome-stage nodes in column order, keyed by the stored FormSG outcome. `None` is
+ * last: it is also the fallback for a blank or unknown outcome.
  * @type {!Array<{outcome: string, name: string}>}
  */
 const OUTCOME_NODES = [
@@ -54,7 +54,6 @@ const OUTCOME_NODES = [
   { outcome: 'Status', name: 'Outcome: Status' },
   { outcome: 'Both', name: 'Outcome: MC and Status' },
   { outcome: 'None', name: 'Outcome: No MC or Status' },
-  { outcome: '', name: 'Outcome: Not recorded' },
 ];
 
 /** @type {!Set<string>} Outcomes that carry a Status, and so flow on to a bucket. */
@@ -117,7 +116,7 @@ function typeNodeOf_(submission) {
 }
 
 /**
- * The outcome-stage node a submission belongs to; an unknown value reads as not recorded.
+ * The outcome-stage node a submission belongs to; a blank or unknown value reads as none.
  * @param {!Object} submission A normalised submission.
  * @returns {string} An `Outcome: ...` node name.
  */
@@ -186,16 +185,15 @@ function nodesOf_(links) {
 /**
  * Counts submissions per stored outcome, for the coverage line.
  * @param {Array<!Object>} submissions In-range submissions.
- * @returns {{mc: number, status: number, both: number, none: number, notRecorded: number}}
- *     Submissions per outcome; `notRecorded` takes every blank or unknown one.
+ * @returns {{mc: number, status: number, both: number, none: number}} Submissions per
+ *     outcome; `none` takes every blank or unknown one.
  */
 function outcomeCounts_(submissions) {
   const count = (outcome) => submissions.filter((submission) => submission.outcome === outcome).length;
   const mc = count('MC');
   const status = count('Status');
   const both = count('Both');
-  const none = count('None');
-  return { mc, status, both, none, notRecorded: submissions.length - mc - status - both - none };
+  return { mc, status, both, none: submissions.length - mc - status - both };
 }
 
 /**

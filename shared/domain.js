@@ -16,18 +16,6 @@
 export const COMPANIES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Hercules'];
 
 /**
- * The platoons a per-platoon rate is drawn for.
- *
- * A company's Strength Data also carries a command element ("COMMANDERS") and its own
- * total row. Neither is a platoon, and putting them on a platoon axis produces columns
- * that cannot be compared with the rest. Rates are computed over this roll only, on both
- * sides of the fraction.
- * @type {string[]}
- */
-export const PLATOONS = ['1', '2', '3', '4', 'HQ'];
-
-
-/**
  * The `unit_type` marking a Strength Data row as a whole-company total.
  *
  * Battalion strength sums only these rows. Summing platoon rows instead would

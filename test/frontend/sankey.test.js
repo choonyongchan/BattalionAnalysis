@@ -136,17 +136,16 @@ describe('reportSickFlow — type, outcome, status', () => {
     expect(linkValue(flow, 'Type: RSO', 'Outcome: MC')).toBe(1);
     expect(linkValue(flow, 'Type: RSI', 'Outcome: Status')).toBe(1);
     expect(linkValue(flow, 'Type: RSI', 'Outcome: MC and Status')).toBe(1);
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: No MC or Status')).toBe(1);
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: Not recorded')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: No MC or Status')).toBe(2);
     expect(linkValue(flow, 'Outcome: Status', 'Status: Excuse RMJ')).toBe(1);
     expect(linkValue(flow, 'Outcome: MC and Status', 'Status: Light Duty')).toBe(1);
-    expect(flow.coverage).toMatchObject({ mc: 1, status: 1, both: 1, none: 1, notRecorded: 1 });
+    expect(flow.coverage).toMatchObject({ mc: 1, status: 1, both: 1, none: 2 });
   });
 
   test('parade-state MC and Status episodes do not feed the outcome stage', () => {
     const episodes = episodesOf([row('1101', 'Att C'), row('1102', 'Att C'), row('1103', 'Status', { reason: 'LD' })]);
     const flow = flowOf(episodes, submissions(['RSI']));
-    expect(linkValue(flow, 'Type: RSI', 'Outcome: Not recorded')).toBe(1);
+    expect(linkValue(flow, 'Type: RSI', 'Outcome: No MC or Status')).toBe(1);
     expect(linkValue(flow, 'Type: RSI', 'Outcome: MC')).toBe(0);
     expect(flow.coverage.mc).toBe(0);
   });
@@ -180,6 +179,6 @@ describe('reportSickFlow — range and empty inputs', () => {
     expect(stageOf('Reporting sick')).toBe('reporting');
     expect(stageOf('Reported sick')).toBe('reported');
     expect(stageOf('Type: RSI')).toBe('type');
-    expect(stageOf('Outcome: Not recorded')).toBe('outcome');
+    expect(stageOf('Outcome: No MC or Status')).toBe('outcome');
   });
 });

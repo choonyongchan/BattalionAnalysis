@@ -17,8 +17,7 @@ import { extractSymptoms, keywords } from './classify.js';
 import { identityKey, normaliseFourD } from '../../../shared/identity.js';
 import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.js';
 import { weekdayOf } from '../../../shared/dates.js';
-import { COMPANIES, UNASSIGNED } from '../../../shared/domain.js';
-import { platoonOf } from './platoon.js';
+import { COMPANIES } from '../../../shared/domain.js';
 import { battalionStrength } from './metrics.js';
 import { settingOf } from './activeSettings.js';
 
@@ -30,23 +29,6 @@ import { settingOf } from './activeSettings.js';
 function companyFrom_(text) {
   const value = toText(text).toUpperCase();
   return COMPANIES.filter((company) => value.includes(company.toUpperCase()))[0] || '';
-}
-
-/**
- * The platoon a FormSG submission belongs to, inferred from the submitter's 4D.
- *
- * FormSG's "Unit & Coy" answer names a company but never a platoon, so — for the Report
- * Sick page's heatmap and company/platoon rankings — the platoon is taken from the 4D's
- * leading digit through the same bounded inference `model/platoon.js` applies to a
- * Personnel Data row with a blank platoon cell. A submission whose 4D yields no platoon
- * digit (a blank or malformed "4D Number (REC Only)" answer) is placed under `HQ` rather
- * than a separate "Unassigned" bucket, so every submission lands on the platoon axis.
- * @param {!Object} submission A normalised submission from `toSubmissions`.
- * @returns {string} A member of `PLATOONS` (`'1'`-`'4'` or `'HQ'`).
- */
-export function submissionPlatoonOf(submission) {
-  const { platoon } = platoonOf({ platoon: '', four_d: submission.fourD });
-  return platoon === UNASSIGNED ? 'HQ' : platoon;
 }
 
 /**

@@ -211,7 +211,6 @@ describe('episode counts split volume from headcount', () => {
       DUTY_CLASS.ATT_C
     );
     expect(counts.byCompany.map((row) => row.key)).toEqual(['Braves', 'Archer']);
-    expect(counts.byPlatoon.map((row) => row.key)).toEqual(['2', '4', 'HQ']);
   });
 
   test('the battalion soldier count is counted whole, not summed from the company groups', () => {
@@ -228,17 +227,6 @@ describe('episode counts split volume from headcount', () => {
     expect(counts.total.episodes).toBe(2);
   });
 
-  test('an episode naming no platoon still counts for the battalion but has no platoon bar', () => {
-    const counts = episodeCounts(
-      episodesOf([
-        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
-        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '', four_d: 'B', name: 'B', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
-      ]),
-      DUTY_CLASS.ATT_C
-    );
-    expect(counts.total.episodes).toBe(2);
-    expect(counts.byPlatoon).toEqual([{ key: '1', episodes: 1, soldiers: 1 }]);
-  });
 
   test('only the requested duty class is counted', () => {
     const counts = episodeCounts(

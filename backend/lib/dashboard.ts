@@ -58,9 +58,9 @@ const UNTIMED_MODEL = 'sheet:untimed';
 /**
  * The platoon the dashboard reads out of a unit label.
  *
- * `src/model/platoon.js` accepts `1`–`4` and `HQ` as a stated platoon and infers one from the
- * 4D number otherwise, so a numbered block becomes its number, a headquarters block `HQ`, the
- * company roll-up blank, and any named sub-unit (SIG, MED, ...) passes through as written.
+ * A numbered block becomes its number, a headquarters block `HQ`, the company roll-up blank,
+ * and any named sub-unit (SIG, MED, ...) passes through as written.
+ * `frontend/src/model/platoon.js` then keeps it only if the company has that sub-unit.
  *
  * @param unitLabel The block label: `PLATOON 1`, `PL2`, `COY HQ`, `Company`, `SIG`, or the
  *   bare `3` the Sheet stored.
