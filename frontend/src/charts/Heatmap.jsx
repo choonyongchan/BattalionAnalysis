@@ -234,10 +234,11 @@ function option_(props, palette) {
  * @param {{rows: string[], columns: string[],
  *     cells: Array<{row: string, column: string, value: ?number,
  *         inferred: (boolean|undefined), platoon: (string|undefined)}>,
- *     valueName: (string|undefined), detail: (function(!Object): string[]|undefined),
+ *     valueName: (string|undefined), rowName: (string|undefined),
+ *     detail: (function(!Object): string[]|undefined),
  *     showValues: (boolean|undefined), height: (number|undefined),
  *     view: (string|undefined)}} props
- *     `rows` are normally `COMPANIES`; a cell naming a row or column not on the axis is
+ *     `rows` are normally `COMPANIES`, and `rowName` (default 'Company') heads them in the table; a cell naming a row or column not on the axis is
  *     dropped rather than drawn somewhere wrong; `inferred` marks a cell whose platoon was
  *     worked out from the 4D and draws the hatch; `platoon` is the company's own name for
  *     the cell's column, written in the cell, when the columns are positions rather than
@@ -248,13 +249,13 @@ function option_(props, palette) {
  * @returns {!Object} The chart, or its table twin.
  */
 export function Heatmap(props) {
-  const { rows, columns, cells, valueName, height = 300, view } = props;
+  const { rows, columns, cells, valueName, rowName = 'Company', height = 300, view } = props;
   if (view === 'table') {
     const byKey = new Map(cells.map((cell) => [cell.row + '|' + cell.column, cell]));
     return (
       <>
         <TableTwin
-          columns={[{ label: 'Company' }, ...columns.map((column) => ({ label: column, numeric: true }))]}
+          columns={[{ label: rowName }, ...columns.map((column) => ({ label: column, numeric: true }))]}
           rows={rows.map((row) => [
             row,
             ...columns.map((column) => {
@@ -266,7 +267,7 @@ export function Heatmap(props) {
               };
             }),
           ])}
-          caption={(valueName || 'Value') + ' by company and platoon; hatched cells are inferred'}
+          caption={(valueName || 'Value') + ' by ' + rowName.toLowerCase() + '; hatched cells are inferred'}
         />
       </>
     );

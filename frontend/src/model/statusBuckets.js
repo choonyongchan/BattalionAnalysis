@@ -17,8 +17,10 @@
  * Every function here is pure.
  */
 
-import { PERM_STATUS_NUM_DAYS } from '../../../shared/domain.js';
-import { toNumber, toText } from '../../../shared/values.js';
+import { classify, DUTY_CLASS } from './classify.js';
+import { COMPANIES, PERM_STATUS_NUM_DAYS } from '../../../shared/domain.js';
+import { identityOf } from '../../../shared/identity.js';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
 
 /**
  * The ten Status buckets, in report order.
@@ -86,4 +88,47 @@ export function isPermanentStatus(row) {
   }
   return /\bperm/i.test(toText(row && row.reason));
 }
-
+
+
+/**
+ * The restrictions in force on one parade, restriction by company: who cannot do what.
+ *
+ * A soldier with two restrictions counts once under each; a soldier listed in two
+ * sessions counts once. 'Other' is left out: it names no activity to plan around.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {?string} session Session to restrict to, or null for both.
+ * @returns {{rows: string[], cells: Array<{row: string, column: string, value: number,
+ *     names: string[]}>}} Restrictions with anyone under them, in `STATUS_BUCKETS` order,
+ *     and one cell per restriction and company with the soldiers' names, sorted.
+ */
+export function restrictionsOn(personnelRows, isoDate, session) {
+  const byCell = new Map();
+  personnelRows
+    .filter(
+      (row) =>
+        toIsoDate(row.date) === isoDate &&
+        (!session || toText(row.session) === session) &&
+        classify(row) === DUTY_CLASS.STATUS
+    )
+    .forEach((row) => {
+      const key = identityOf(row).key;
+      if (key === '') return;
+      bucketsFor(row.reason)
+        .filter((bucket) => bucket !== 'Other')
+        .forEach((bucket) => {
+          const cellKey = bucket + '|' + toText(row.company);
+          const soldiers = byCell.get(cellKey) || new Map();
+          soldiers.set(key, (toText(row.rank) + ' ' + toText(row.name)).trim());
+          byCell.set(cellKey, soldiers);
+        });
+    });
+  const rows = STATUS_BUCKETS.filter((bucket) => COMPANIES.some((company) => byCell.has(bucket + '|' + company)));
+  const cells = rows.flatMap((bucket) =>
+    COMPANIES.map((company) => {
+      const soldiers = byCell.get(bucket + '|' + company) || new Map();
+      return { row: bucket, column: company, value: soldiers.size, names: Array.from(soldiers.values()).sort() };
+    })
+  );
+  return { rows, cells };
+}

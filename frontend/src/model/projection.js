@@ -111,3 +111,22 @@ export function returnsToDuty(personnelRows, isoDate, session) {
       a.name.localeCompare(b.name)
   );
 }
+
+/**
+ * How many soldiers already on MC or leave are still away on each of the coming days.
+ *
+ * A floor, not a forecast: it counts only absences on this parade that state an end date,
+ * so tomorrow's new MCs and an absence with no stated end are not in it.
+ * @param {Array<!Object>} returns The rows `returnsToDuty` gives for the parade.
+ * @param {string} isoDate Parade date; the first day counted.
+ * @param {number} days How many days to count.
+ * @returns {{days: string[], away: number[]}} Each day, and the soldiers away on it.
+ */
+export function awayAhead(returns, isoDate, days) {
+  const dated = returns.filter((row) => row.backOn !== null);
+  const dates = Array.from({ length: days }, (_, offset) => addDays(isoDate, offset));
+  return {
+    days: dates,
+    away: dates.map((day) => dated.filter((row) => row.from <= day && day < row.backOn).length),
+  };
+}

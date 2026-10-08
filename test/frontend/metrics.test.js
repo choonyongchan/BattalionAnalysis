@@ -17,6 +17,7 @@ import {
   longMcRoster,
   longMcTrend,
   distinctDutyOn,
+  otherDutiesOn,
 } from '../../frontend/src/model/metrics.js';
 import { DUTY_CLASS, MC_MA } from '../../frontend/src/model/classify.js';
 import { UNASSIGNED } from '../../shared/domain.js';
@@ -369,6 +370,26 @@ describe('absenceParts', () => {
       { name: 'MA', value: 1 },
       { name: 'Off / leave', value: 4 },
       { name: 'Other duties', value: 0 },
+    ]);
+  });
+});
+
+describe('otherDutiesOn', () => {
+  test('groups other duties by the name before any bracket, counting soldiers once', () => {
+    const rows = toRecords(
+      personnelValues([
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', four_d: '1', name: 'A', reason_category: 'Others', reason: 'Course (Safety)' },
+        { date: '2026-06-22', session: 'LPS', company: 'Archer', four_d: '1', name: 'A', reason_category: 'Others', reason: 'COURSE' },
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', four_d: '2', name: 'B', reason_category: 'Others', reason: 'Course' },
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', four_d: '3', name: 'C', reason_category: 'Others', reason: 'Guard duty' },
+        { date: '2026-06-22', session: 'FPS', company: 'Archer', four_d: '4', name: 'D', reason_category: 'Att C', reason: 'MC' },
+      ]),
+      PERSONNEL_HEADERS,
+      TABS.PERSONNEL
+    );
+    expect(otherDutiesOn(rows, '2026-06-22', null)).toEqual([
+      { name: 'COURSE', value: 2 },
+      { name: 'GUARD DUTY', value: 1 },
     ]);
   });
 });

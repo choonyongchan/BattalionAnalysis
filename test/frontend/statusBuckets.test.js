@@ -10,7 +10,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { bucketsFor, isPermanentStatus, STATUS_BUCKETS } from '../../frontend/src/model/statusBuckets.js';
+import { bucketsFor, isPermanentStatus, restrictionsOn, STATUS_BUCKETS } from '../../frontend/src/model/statusBuckets.js';
+import { toRecords } from '../../frontend/src/data/records.js';
+import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
 import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.js';
 
 describe('STATUS_BUCKETS', () => {
@@ -121,5 +123,31 @@ describe('isPermanentStatus', () => {
 
   test('a dated status is not permanent', () => {
     expect(isPermanentStatus({ reason: 'Excuse RMJ', num_days: 14 })).toBe(false);
+  });
+});
+
+describe('restrictionsOn', () => {
+  test('counts each soldier once per restriction and company, with names, leaving Other out', () => {
+    const specs = [
+      { company: 'Archer', four_d: '1', name: 'A', reason: 'Excuse RMJ, Heavy Load' },
+      { company: 'Archer', four_d: '1', name: 'A', reason: 'Excuse RMJ', session: 'LPS' },
+      { company: 'Cougar', four_d: '7', name: 'C', reason: 'LD' },
+      { company: 'Cougar', four_d: '8', name: 'D', reason: 'Excuse something new' },
+    ];
+    const values = [
+      PERSONNEL_HEADERS.slice(),
+      ...specs.map((spec) =>
+        PERSONNEL_HEADERS.map((h) => ({ date: '2026-09-22', session: 'FPS', reason_category: 'Status', ...spec })[h] ?? '')
+      ),
+    ];
+    const { rows, cells } = restrictionsOn(toRecords(values, PERSONNEL_HEADERS, 'test'), '2026-09-22', null);
+    expect(rows).toEqual(['Light Duty', 'Excuse RMJ', 'Excuse Heavy Load']);
+    expect(cells.find((c) => c.row === 'Excuse RMJ' && c.column === 'Archer')).toEqual({
+      row: 'Excuse RMJ',
+      column: 'Archer',
+      value: 1,
+      names: ['A'],
+    });
+    expect(cells.find((c) => c.row === 'Light Duty' && c.column === 'Cougar').value).toBe(1);
   });
 });

@@ -387,3 +387,36 @@ export function absenceParts(duty) {
     ['Other duties', DUTY_CLASS.OTHERS],
   ].map(([name, dutyClass]) => ({ name, value: duty.counts[dutyClass] || 0 }));
 }
+
+/**
+ * What "Other duties" is made of on one parade: distinct soldiers per duty, as the line names
+ * it before any bracketed detail (`COURSE (SAFETY)` is `COURSE`).
+ *
+ * The other-duties slice is usually the largest absence and says nothing on its own; this
+ * says which courses, attachments and exercises it holds.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {?string} session Session to restrict to, or null for both.
+ * @returns {Array<{name: string, value: number}>} Duties, most soldiers first.
+ */
+export function otherDutiesOn(personnelRows, isoDate, session) {
+  const byDuty = new Map();
+  personnelRows
+    .filter(
+      (row) =>
+        toIsoDate(row.date) === isoDate &&
+        (!session || toText(row.session) === session) &&
+        classify(row) === DUTY_CLASS.OTHERS
+    )
+    .forEach((row) => {
+      const key = identityOf(row).key;
+      if (key === '') return;
+      const name = toText(row.reason).split('(')[0].trim().toUpperCase() || 'NOT STATED';
+      const soldiers = byDuty.get(name) || new Set();
+      soldiers.add(key);
+      byDuty.set(name, soldiers);
+    });
+  return Array.from(byDuty, ([name, soldiers]) => ({ name, value: soldiers.size })).sort(
+    (a, b) => b.value - a.value || a.name.localeCompare(b.name)
+  );
+}

@@ -25,8 +25,7 @@ import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../
 import { absenceParts, datesPresent, battalionStrength, dutyCountsOn, distinctDutyOn } from '../../model/metrics.js';
 import { toSubmissions } from '../../model/formsg.js';
 import { filingsOn, toFilings } from '../../model/submissions.js';
-import { DEFAULT_PROJECTION_DAYS } from '../../model/projection.js';
-import { RecentReturnsCard, ReturnsCard, TierCard } from './cards.jsx';
+import { AwayAheadCard, OtherDutiesCard, RecentReturnsCard, RestrictionsCard, ReturnsCard, TierCard } from './cards.jsx';
 
 /** @type {string} Session every "today" figure and trend describes. */
 const SESSION = 'FPS';
@@ -125,10 +124,13 @@ export function Today() {
         >
           <Donut slices={duty ? absenceParts(duty) : []} valueName="soldiers" />
         </ChartCard>
+        <OtherDutiesCard data={data} date={today} />
+        <RestrictionsCard data={data} date={today} />
         <TierCard strength={data.strength} date={today} scoped={Boolean(scopedCompany)} />
       </div>
 
-      <h2 class="section-title">Next {DEFAULT_PROJECTION_DAYS} Days</h2>
+      <h2 class="section-title">Ahead</h2>
+      <AwayAheadCard data={data} date={today} />
       <ReturnsCard data={data} date={today} />
       <RecentReturnsCard data={data} date={today} />
 

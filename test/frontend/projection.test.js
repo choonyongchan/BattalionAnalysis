@@ -9,7 +9,7 @@
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
 import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
-import { returnsToDuty } from '../../frontend/src/model/projection.js';
+import { awayAhead, returnsToDuty } from '../../frontend/src/model/projection.js';
 
 const DAY = '2026-09-22';
 
@@ -50,5 +50,19 @@ describe('returnsToDuty', () => {
       ['OPEN', null],
     ]);
     expect(rows[0].from).toBe('2026-09-20');
+  });
+});
+
+describe('awayAhead', () => {
+  test('counts dated absences still running each day, and leaves open-ended ones out', () => {
+    const returns = [
+      { from: '2026-09-22', backOn: '2026-09-24' },
+      { from: '2026-09-23', backOn: '2026-09-25' },
+      { from: '2026-09-22', backOn: null },
+    ];
+    expect(awayAhead(returns, DAY, 4)).toEqual({
+      days: ['2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25'],
+      away: [1, 2, 1, 0],
+    });
   });
 });

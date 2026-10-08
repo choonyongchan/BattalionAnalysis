@@ -1,16 +1,101 @@
 /**
- * The Today page's tables: presence by rank, who is due back, and who is just back.
+ * The Today page's cards beyond the tiles: what other duties hold, which restrictions are in
+ * force, presence by rank, who is away in the days ahead, who is due back, who is just back.
  */
 
 import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { fmtDate, fmtInt, fmtPercent } from '../../format.js';
+import { Bar, ChartCard, Heatmap, Line } from '../../charts/index.js';
+import { COMPANIES } from '../../../../shared/domain.js';
+import { weekendBands } from '../../model/calendarMarks.js';
+import { otherDutiesOn } from '../../model/metrics.js';
+import { restrictionsOn } from '../../model/statusBuckets.js';
 import { tierPresence } from '../../model/strength.js';
-import { returnsToDuty } from '../../model/projection.js';
+import { awayAhead, returnsToDuty } from '../../model/projection.js';
 import { recentlyReturned } from '../../model/recentReturns.js';
 
 /** @type {string} Session every "today" figure describes. */
 const SESSION = 'FPS';
+
+/** @type {number} Days the away-ahead chart covers. */
+const AHEAD_DAYS = 14;
+
+/** @type {number} Names a restriction cell's tooltip lists before "and N more". */
+const TOOLTIP_NAMES = 10;
+
+/**
+ * Other duties on one parade, by duty: the largest absence slice, broken open.
+ * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
+ * @returns {!preact.VNode} The card.
+ */
+export function OtherDutiesCard({ data, date }) {
+  const duties = otherDutiesOn(data.personnel, date, SESSION).slice(0, 8);
+  return (
+    <ChartCard
+      title="Other Duties, by Duty"
+      note={'The commonest duties under Others on the ' + fmtDate(date) + ' parade state'}
+      empty="Nobody is listed under other duties."
+    >
+      <Bar categories={duties.map((d) => d.name)} values={duties.map((d) => d.value)} valueName="soldiers" />
+    </ChartCard>
+  );
+}
+
+/**
+ * The restrictions in force on one parade, by company, with names in the tooltip: what a
+ * training plan has to work around.
+ * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
+ * @returns {!preact.VNode} The card.
+ */
+export function RestrictionsCard({ data, date }) {
+  const { rows, cells } = restrictionsOn(data.personnel, date, SESSION);
+  const detail = (cell) =>
+    cell.names.length > TOOLTIP_NAMES
+      ? [...cell.names.slice(0, TOOLTIP_NAMES), 'and ' + (cell.names.length - TOOLTIP_NAMES) + ' more']
+      : cell.names;
+  return (
+    <ChartCard
+      title="Restrictions in Force"
+      note={'Soldiers on Status on the ' + fmtDate(date) + ' parade state, by what they are excused; one soldier can hold several'}
+      empty="Nobody is on a restricting Status."
+    >
+      <Heatmap
+        rows={rows}
+        columns={COMPANIES}
+        cells={cells}
+        rowName="Restriction"
+        valueName="soldiers"
+        detail={detail}
+        showValues
+        height={Math.max(160, rows.length * 36 + 60)}
+      />
+    </ChartCard>
+  );
+}
+
+/**
+ * Soldiers already on MC or leave who are still away on each of the next days.
+ * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
+ * @returns {!preact.VNode} The card.
+ */
+export function AwayAheadCard({ data, date }) {
+  const { days, away } = awayAhead(returnsToDuty(data.personnel, date, SESSION), date, AHEAD_DAYS);
+  return (
+    <ChartCard
+      title={'Known Away, Next ' + AHEAD_DAYS + ' Days'}
+      coverage="A floor: only MC and leave on this parade with a stated end date. New MCs and open-ended absences add to it."
+      empty={away.every((n) => n === 0) ? 'Nobody on this parade is away with a stated end date.' : undefined}
+    >
+      <Line
+        categories={days}
+        series={[{ name: 'Away', values: away, neutral: true }]}
+        weekends={weekendBands(days[0], days[days.length - 1])}
+        valueName="soldiers"
+      />
+    </ChartCard>
+  );
+}
 
 /**
  * Formats one tier cell: the percentage present, then present over strength.
