@@ -33,23 +33,28 @@ it shows soldiers' names and medical information.
 
 - **All / Archer / Braves / Cougar / Stallion / Hercules** narrows every chart on the page to one
   company.
-- **All dates** opens the date range. Trends, rankings and heatmaps follow it; the Overview's
-  "today" figures always describe the single parade picked there.
+- **All dates** opens the date range. Trends, rankings and heatmaps follow it. The figures on
+  **Today** always describe that day's single parade.
 - Every chart has a **Chart / Table** switch. The table holds the exact numbers.
 
 ## The pages
 
 | Page | Use it to answer |
 |---|---|
-| **Overview** | Which companies have filed this morning? How many soldiers do I have and how many are present? Who is out of camp and why? Who is back next week, and who just came back? How are the numbers trending? |
-| **Report Sick** | How many are reporting sick, on the parade state and on FormSG? Which company and platoon? Which type (RSO, RSI, FFI, Medical Review)? What do soldiers say is wrong, and at what time of day do they report? |
-| **MC / MA** | Who is on MC or medical appointment, which clinics, and who has been on MC the longest? |
-| **Status** | Who holds an excuse or light duty, and which kinds are most common? |
+| **Today** | Which companies have filed this morning? How many soldiers do I have and how many are present? Who is out of camp and why, and what are the "other duties"? Which restrictions are in force in each company (hover a cell for names)? How many are already known to be away over the next 14 days, who is back when, and who just came back? |
+| **Duty Roster** | Who is on duty today, from the CDO down, and which posts were filed vacant? Who has done the most duties (weekends counted apart), and was anyone rostered on a day they were on MC or leave? |
+| **Report Sick** | Is an illness spreading? **Outbreak Watch** shows new fever, flu and stomach cases by platoon over the last two weeks and names any platoon with 3 cases in 3 days. Also: how many are reporting sick on the parade state and on FormSG, which company and platoon, which type, what soldiers say is wrong, and at what time they report. |
+| **MC / MA** | Who is on MC or medical appointment, and which clinics? **MC Pattern** puts each soldier on a chart, number of MCs against days lost, so many short MCs stand apart from a few long ones. **MC Length** shows how long MCs run for each symptom. **When MCs Start** shows the weekday, and how many start on a Monday, a Friday or beside a public holiday. |
+| **Status & Restrictions** | Who holds an excuse or light duty, and which kinds are most common? **SFT While Restricted** lists SFT logged on a day the soldier held a training restriction. Check each one; some may be allowed. |
+| **Trends** | Strength, report sick (parade state against FormSG), MC / MA and Status over the date range, and how report sick flows into FormSG outcomes. |
 | **SFT** | How many soldiers trained, in which companies, in what group sizes, where and doing what? |
 | **Soldier** | One soldier's full history: search by name or 4D. |
-| **Duty Roster** | Who is on duty today, from the CDO down, and which posts were filed vacant? |
+| **Filing & Accuracy** | How many minutes past 08:00 each company's first parade state arrived each day, sections whose stated count does not match the names listed, and how much of the battalion the data covers. |
 | **Deposit** | Add a parade state WhatsApp missed, fix one the system could not read, or correct an SFT record. |
 | **Settings** | Unit name and crest, public holidays and rotations, thresholds, session length. |
+
+Platoons come from the sub-header each name is listed under in the parade state. A name under a
+sub-header the company does not have shows as **Unassigned**.
 
 Counts are of soldiers, not lines: a soldier listed twice on one day counts once. A day a company
 did not file shows as zero or a gap, and every chart says how much of the battalion it covers.

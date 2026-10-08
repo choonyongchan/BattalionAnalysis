@@ -8,12 +8,17 @@ The pages, in the order a commander reads them:
 
 | Page | Answers |
 |---|---|
-| **Overview** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? Are my officers there? How many will I have next week, and who is back when? |
-| **Report sick** · **MC / MA** · **Status** | Is it getting worse? Which company? Which platoon? Who, most often? |
+| **Today** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? What are the other duties? Who cannot do what? Are my officers there? How many will I have over the next two weeks, and who is back when? |
+| **Duty Roster** | Who is on duty today, from the CDO down, and which chairs were filed vacant? Is duty spread fairly, and was anyone rostered while on MC or leave? |
+| **Report Sick** · **MC / MA** · **Status & Restrictions** | Is it getting worse? Which company? Which platoon? Who, most often? Plus: is something spreading (Report Sick); when do MCs start, who has many short MCs against few long ones, how long do MCs run (MC / MA); who did SFT while restricted (Status & Restrictions). |
+| **Trends** | How have strength, report sick (both sources), MC / MA and Status moved over the range, and how does report sick flow into FormSG outcomes? |
 | **SFT** | How many soldiers have done self-regulated fitness training, and how many today? Which company? Where, doing what, and in how big a group? |
-| **Soldier** | How often has this man been out, and how long was each episode? |
-| **Duty Roster** | Who is on duty today, from the CDO down, and which chairs were filed vacant? |
-| **Settings** | What is the dashboard reading, and how much of the battalion does it cover? |
+| **Soldier** | How often has this soldier been out, and how long was each episode? |
+| **Filing & Accuracy** | Do companies file on time? Do the section counts match the names listed? How much of the battalion does the data cover? |
+| **Deposit** · **Settings** | Deposit or correct a parade state or SFT record; change what the dashboard is set up for. |
+
+Old links still work: `#/overview` opens Today and `#/status` opens Status & Restrictions
+(`ROUTE_ALIASES` in `frontend/src/app/routes.js`).
 
 The three medical pages are one layout asked three times. That is deliberate: the layout
 is learned once and read three times, and the three categories become comparable because
@@ -37,8 +42,15 @@ else. Every chart has a Table view.
 **Every chart states its coverage.** In the observed data only 5 of 45 parade days carry
 all six companies, and the two sources cover different spans — parade state from
 2026-07-11, FormSG from 2026-05-07 — so "all time" means different things on adjacent
-cards. Each panel prints its own coverage as a fraction with both parts, and the Settings
-page collects them all in one place.
+cards. Each panel prints its own coverage as a fraction with both parts, and the Filing &
+Accuracy page collects them all in one place.
+
+**A platoon is the sub-header a line sits under.** `frontend/src/model/platoon.js` keeps the
+sub-header only when the soldier's company has that sub-unit (`COMPANY_SUBUNITS`: Cougar has
+`8`, Hercules `SIG`); anything else is Unassigned. The 4D number also encodes a platoon, and
+that reading is supported but switched off (`USE_FOURD_PLATOON`) until the 4D scheme is
+confirmed. Filing & Accuracy counts how often the 4D disagrees with the sub-header, which is
+the check to run before switching it on.
 
 ## How it reads the data
 
@@ -200,7 +212,7 @@ least one parade in the range, so a status begun weeks earlier still counts on t
 listed, and a single day's range matches that day's trend point. The other medical pages keep
 the episodes whose start date falls in the range.
 
-**The Overview's MC / MA tile and trend count who is out on the day.** Every soldier listed as
+**Today's MC / MA tile, and the MC / MA trend, count who is out on the day.** Every soldier listed as
 MC (including one whose MC began earlier and is still listed) or MA on that parade date counts,
 once: a soldier with both an MC and an MA that day is one person (`distinctDutyOn`).
 
@@ -211,8 +223,10 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
 
 ## Looking ahead
 
-The Overview's **Next 7 Days** section is the one forward-looking view: **Returning to Duty**,
-the soldiers on MC or leave on the selected parade with the day each is expected back, soonest
+Today's **Ahead** section is the one forward-looking view. **Known Away, Next 14 Days** counts,
+for each coming day, the soldiers on this parade's MC or leave whose stated end date has not
+passed: a floor, since new MCs and absences with no end date are not in it. **Returning to Duty**
+lists the soldiers on MC or leave on the selected parade with the day each is expected back, soonest
 first. A soldier is back the day after his stated end date, and `From` is the earliest stated
 start, which is later than the parade date for an absence booked ahead. Only MC (`Att C`) and
 `Off/Leave` are listed. MA is a timed appointment later the same day, so the soldier is on
@@ -243,12 +257,12 @@ strength block's own split, so a company at 90% missing half its officers shows 
   While open, the page re-reads `/api/dashboard` every minute the tab is visible and as
   soon as a hidden tab is shown again, swapping the data in without leaving the page. That
   read is also where an ended session is noticed: the login screen returns.
-- **The Sankey's outcome is FormSG's, and often blank.** The Report-Sick Flow's outcome and
-  Status columns read each submission's own `report_sick_formsg.outcome` and `status_1…5`,
-  never the parade state's Att C / Status episodes. Rows imported from the Sheet have none
-  (its tab never carried those questions), and a soldier who files before seeing the MO
-  leaves them blank, so both land on `Outcome: Not recorded`. `mc_days` and the status
-  days are not charted, and `genuine` is never charted, for the reason below.
+- **The Sankey's outcome is FormSG's; blank means no outcome.** The Report-Sick Flow's outcome
+  and Status columns read each submission's own `report_sick_formsg.outcome` and `status_1…5`,
+  never the parade state's Att C / Status episodes. A blank outcome is read as no outcome and
+  joins `Outcome: No MC or Status` (decided 2026-10-08). `mc_days` and the status days are not
+  charted (MC length comes from the parade-state episodes), and `genuine` is never charted,
+  for the reason below.
 - **No inference about intent.** The leaderboards rank by episode count and days lost.
   They report what was recorded and nothing else — a soldier managing a chronic condition
   and a soldier avoiding training appear the same way, and the difference is a
@@ -262,7 +276,7 @@ strength block's own split, so a company at 90% missing half its officers shows 
   segmented row). Its popover holds the quick ranges (This week / Last week / This month /
   Last month / All) beside a two-click month grid; closed, it shows only the committed
   range. It bounds every trend, rate and
-  leaderboard so they all cover one named span; it defaults to All. The Today view and
+  leaderboard so they all cover one named span; it defaults to All. The Today page and
   the masthead describe a single parade and ignore the range, and the parade-date
   selector's options narrow to the dates inside it — so a "today" figure never sits
   under a span the reader has to remember.
@@ -324,8 +338,36 @@ with a filter on name, company, Group IC or location), and each can be edited or
 - **Group size.** A group is everyone naming the same Group IC on one day, and its size counts
   the IC too (once, if the IC also filed). IC names are typed by hand, so they are
   consolidated first: ranks and punctuation are stripped and word order ignored
-  (`reconcile.js#namesMatch`), then each word is compared with `fuse.js`, so a one-letter
+  (`shared/identity.js#namesMatch`), then each word is compared with `fuse.js`, so a one-letter
   slip ("LIM"/"LIMM") merges while a different given name ("MING"/"LIANG") does not. A
   session with no IC belongs to no group. A group's company is its members' most common one.
 - **Locations and exercises.** Ranked by sessions; case and spacing variants merge, and a
-  session doing three exercises counts once for each.
+  session doing three exercises counts once for each. Exercise spellings fold into one label
+  (Run, Running, ER, Endurance run, Jogging are `Run`; Gym, Weights, Strength are
+  `Gym / Weights`) by a short list in `model/sft.js#topExercises`.
+
+## Figures and why they exist
+
+Added 2026-10-08 after reading the real data, which showed: other duties were most of the
+absences and never broken down; about a quarter of the battalion held a Status; fever and stomach
+cases bunched in single platoons; one company's parade state arrived three hours after the
+others. Each figure below is one pure model function (tested in `test/frontend/`) drawn with an
+existing chart, except one new chart type (`Scatter`). Every one is a count, never a rate.
+
+| Figure (page) | Question, and who asks it | Source | Why this chart | Caveats |
+|---|---|---|---|---|
+| **Other Duties, by Duty** (Today) | What are the soldiers under "Others" actually doing? (CO, S1) | `metrics.js#otherDutiesOn`: the reason text before any bracket, distinct soldiers | Sorted bar: a ranking of named duties. The absence donut keeps its four parts; splitting Others inside it would pass six slices | Free text: `COURSE` and `COURSES` are two bars until clerks write them alike |
+| **Restrictions in Force** (Today) | Who cannot do tomorrow's training, by company? (OC, S3) | `statusBuckets.js#restrictionsOn`: Status lines on the parade, folded by `bucketsFor`; `Other` left out | Heatmap restriction × company: two dimensions of counts; names in the tooltip | One soldier with two restrictions counts under each |
+| **Known Away, Next 14 Days** (Today) | How many will I be missing on the exercise next week? (S1, OC) | `projection.js#awayAhead`, from `returnsToDuty` | Line over coming days, weekends banded: a quantity over time | A floor: only MC and leave with a stated end date |
+| **Outbreak Watch** (Report Sick) | Is an illness spreading in a platoon? (MO, OC) | `symptoms.js#infectiousByPlatoon`: new report-sick, MC, MA or Status lines whose reason names fever, flu, cough, cold, a stomach bug or conjunctivitis, by platoon sub-header, last 14 days of the range | Heatmap platoon × day, with clusters (3 cases in 3 days) named in the note: where and when at once | A word list over free text; a line that says only "MC" is not counted |
+| **When MCs Start** (MC / MA) | Do MCs bunch next to weekends and holidays? (CO, RSM) | `episodes.js#startsByWeekday`: MC (Att C) episodes starting in range | Column per weekday in calendar order (not ranked: the order is the point); the note compares Monday, Friday and holiday-adjacent starts with the 2 in 7 expected by chance | Needs the holidays set under Settings → Calendar |
+| **MC Pattern, by Soldier** (MC / MA) | Who needs a welfare conversation, and who an injury plan? (OC, MO) | `leaderboards.js#soldierLoad`: MCs and days lost per soldier; days held by the top 10 | Scatter: two measures per soldier separate many-short from few-long, which a ranking of either alone hides | Describes what was recorded, not why; see "No inference about intent" |
+| **MC Length, by Symptom** (MC / MA) | Which conditions keep soldiers away longest? (MO) | `symptoms.js#lengthBySymptom`: episode `daysLost` in bands 1, 2–3, 4–7, 8+ days, by symptom from the reason | Heatmap symptom × band: a distribution per category without a box plot | Duration as stated, else dated, else observed (`episodes.js`) |
+| **SFT While Restricted** (Status & Restrictions) | Is anyone training against their status? (S3, MO) | `sft.js#sftAgainstStatus`: SFT sessions on a day the soldier held Light Duty or an RMJ, heavy-load, upper-limb or kneeling excuse | A table: each line is a case to check, not a quantity | Names matched loosely (`namesMatch`); some sessions may be allowed |
+| **Duty Load** and **On Duty While Away** (Duty Roster) | Is duty spread fairly? Was anyone rostered while away? (RSM) | `dutyRoster.js#rosterLoad`, `#rosterClashes` | Tables: names with counts, and cases to check | A battalion CDO on five rosters is one duty; clashes need names to match loosely and stated ranks to agree |
+| **First Parade State, Minutes Late** (Filing & Accuracy) | Do companies file on time? (RSM, S1) | `submissions.js#filingTimes`: the first FPS filing per company per day, minutes past 08:00 | Heatmap company × day: a habit shows as a row, a bad day as a column | The 08:00 cut-off is a constant (`FILING_CUTOFF_MINUTES`); next-day filings are counted in the note, not drawn |
+| **Sections That Do Not Add Up** (Filing & Accuracy) | Does each section header's count match the names under it? (S1) | `quality.js#countMismatches` over the `Section Counts` tab (`section_counts`, granted to `dashboard_read` by migration 0008) | Heatmap company × day, mismatched sections in the tooltip | Compares per sub-header and section, as the parser stored them |
+
+Considered and left out: a rotation-aligned report-sick curve and control bands on the trends
+need about three months of history (it starts 14 Sep 26); FormSG `mc_days` would duplicate
+the episode durations; `genuine` stays uncharted.

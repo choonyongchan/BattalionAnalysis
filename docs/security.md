@@ -61,6 +61,9 @@ refused before it is written.
   logins, so the passwords must still be long.
 - **Whole history to every viewer.** `/api/dashboard` returns every record since the import to
   anyone with `DASHBOARD_PASSWORD`. Narrowing it means a date window or per-column grants.
+  Since 2026-10-08 the dashboard also draws per-soldier health patterns from that same data
+  (Outbreak Watch names, MC Pattern by soldier, SFT While Restricted); nothing new leaves the
+  database except `section_counts`, which holds counts and no names.
 - **Writes run as the owner role.** The intake and webhooks use `DATABASE_URL` (`neondb_owner`).
   A write-only role per route would limit what a bug could do.
 - **No retention policy.** Messages, reasons and FormSG rows are kept indefinitely.

@@ -97,6 +97,8 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
   `backend/lib/dashboard.ts` builds every tab from the header arrays in `shared/tabs.js`, so a column
   leaves the database only if the dashboard asks for it; `test/frontend/schema.test.js` and
   `test/backend/lib/dashboard.test.ts` guard that no NRIC or body header is asked for.
+  `dashboard_read` reads `section_counts` (migration 0008) for the Section Counts tab, which
+  carries no names.
 - **Read what the message says; derive nothing.** The parser records only stated values; the
   one sanctioned exception is the permanent-status `num_days` sentinel. See `backend/lib/parser/rows.ts`.
 - **Fail closed on missing configuration.** A route with an unset secret refuses every request
@@ -122,7 +124,7 @@ Layers, dependency direction strictly downward:
 
 | Layer | Holds | May import |
 |---|---|---|
-| `pages/` | one file per page; `pages/shared/` for the three category pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
+| `pages/` | one file per page, routed by `app/routes.js` (Today, Duty Roster, Report Sick, MC / MA, Status & Restrictions, Trends, SFT, Soldier, Filing & Accuracy, Deposit, Settings; `ROUTE_ALIASES` keeps old hashes working); `pages/today/` for Today's cards; `pages/shared/` for the range-bound pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
 | `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`), Vercel Web Analytics and Speed Insights (`telemetry.js`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
 | `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the Deposit page's `/api/parade` and `/api/sft` calls (`parade.js`, `sft.js`), both through `api.js#callJson`, carrying the session cookie | `model/` |
