@@ -96,6 +96,15 @@
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, system-ui, sans-serif;
 
+  /* Type scale, DESIGN.md's ladder. Every font-size in the theme is one of these. */
+  --text-fine: 12px;
+  --text-caption: 14px;
+  --text-body: 17px;
+  --text-tagline: 21px;
+  --text-lead: 28px;
+  --text-display-md: 34px;
+  --text-display-lg: 40px;
+
   /* Spacing. 8px base; the sub-base steps are for typographic nudges only. */
   --space-xxs: 4px;
   --space-xs: 8px;

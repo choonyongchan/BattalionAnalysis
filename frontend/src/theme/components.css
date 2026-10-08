@@ -30,7 +30,7 @@
 
 .card__title {
   font-family: var(--font-display);
-  font-size: 21px;
+  font-size: var(--text-tagline);
   font-weight: 600;
   letter-spacing: -0.231px;
   line-height: 1.19;
@@ -40,7 +40,7 @@
 .section-title {
   margin-top: var(--space-md);
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: var(--text-lead);
   font-weight: 600;
   letter-spacing: -0.28px;
   line-height: 1.14;
@@ -56,7 +56,7 @@
 
 .card__note {
   color: var(--ink-muted);
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
 }
 
@@ -67,7 +67,7 @@
  */
 .coverage {
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
 }
 
@@ -75,7 +75,7 @@
 .chart-hint {
   margin-top: var(--space-xs);
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
 }
 
@@ -99,13 +99,13 @@
 
 .tile__label {
   color: var(--ink-muted);
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
 }
 
 .tile__value {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: var(--text-display-md);
   font-weight: 600;
   letter-spacing: -0.374px;
   line-height: 1.1;
@@ -113,7 +113,7 @@
 
 .tile__foot {
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
 }
 
@@ -143,7 +143,7 @@
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
 }
 
@@ -180,7 +180,7 @@ th.th-sortable:hover {
 
 .th-sort-indicator {
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: var(--text-fine);
 }
 
 tbody tr:last-child td {
@@ -194,7 +194,7 @@ tbody tr:last-child td {
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline);
   background: var(--surface);
-  font-size: 14px;
+  font-size: var(--text-caption);
 }
 
 .banner--warning {
@@ -260,7 +260,7 @@ tbody tr:last-child td {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  font-size: 14px;
+  font-size: var(--text-caption);
   color: var(--ink);
 }
 
@@ -303,7 +303,7 @@ tbody tr:last-child td {
   max-width: 420px;
   white-space: normal;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--text-fine);
   color: var(--ink-muted);
 }
 
@@ -370,7 +370,7 @@ tbody tr:last-child td {
   border: 0;
   color: var(--ink);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--text-body);
 }
 
 /* The bar draws the focus, so the input inside it does not draw a second ring. */
@@ -457,7 +457,7 @@ tbody tr:last-child td {
 
 .soldierhome__title {
   margin: 0;
-  font-size: 40px;
+  font-size: var(--text-display-lg);
   font-weight: 600;
   letter-spacing: -0.5px;
   color: var(--ink);
@@ -465,7 +465,7 @@ tbody tr:last-child td {
 
 .soldierhome__hint {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-caption);
   color: var(--ink-muted);
 }
 
@@ -480,7 +480,7 @@ tbody tr:last-child td {
 }
 
 .soldiersearch__meta {
-  font-size: 14px;
+  font-size: var(--text-caption);
   color: var(--ink-muted);
 }
 
@@ -529,13 +529,13 @@ tbody tr:last-child td {
 }
 
 .loading__stage {
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
   color: var(--ink);
 }
 
 .loading__elapsed {
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
@@ -624,13 +624,13 @@ tbody tr:last-child td {
 }
 
 .filingchip__name {
-  font-size: 15px;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: -0.24px;
 }
 
 .filingchip__time {
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
@@ -655,7 +655,7 @@ tbody tr:last-child td {
   padding: var(--space-xs) var(--space-md);
   background: var(--company-fill);
   color: var(--company-on);
-  font-size: 15px;
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 
@@ -679,7 +679,7 @@ tbody tr:last-child td {
   gap: var(--space-sm);
   padding: 5px 0;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-caption);
 }
 
 .duty-roster__role--unfiled {
@@ -695,7 +695,7 @@ tbody tr:last-child td {
 .duty-roster__tag {
   flex: none;
   min-width: 2.8rem;
-  font-size: 12px;
+  font-size: var(--text-fine);
   font-weight: 600;
   letter-spacing: -0.12px;
   color: var(--ink-muted);
@@ -710,7 +710,7 @@ tbody tr:last-child td {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
   color: var(--ink-faint);
-  font-size: 14px;
+  font-size: var(--text-caption);
 }
 
 /* Settings forms: a column of labelled fields, list rows that wrap on a phone. */
@@ -719,10 +719,10 @@ tbody tr:last-child td {
 .settings-form__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
 .settings-field { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
 .settings-field .field { width: 100%; }
-.settings-field__error { font-size: 13px; color: var(--critical); }
+.settings-field__error { font-size: var(--text-fine); color: var(--critical); }
 .listrow { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: flex-end; padding-bottom: var(--space-sm); border-bottom: 1px solid var(--hairline); }
 .listrow .settings-field { flex: 1 1 140px; }
-.settings-subhead { margin: var(--space-md) 0 var(--space-xs); font-size: 15px; }
+.settings-subhead { margin: var(--space-md) 0 var(--space-xs); font-size: var(--text-caption); }
 .settings-list { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-xs) var(--space-md); margin: 0; }
 .settings-list dt { color: var(--ink-muted); }
 .settings-list dd { margin: 0; }

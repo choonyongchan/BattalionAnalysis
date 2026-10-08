@@ -36,7 +36,7 @@
   background: var(--accent);
   color: var(--ink-on-accent);
   border-radius: var(--radius-pill);
-  font-size: 17px;
+  font-size: var(--text-body);
   font-weight: 400;
 }
 
@@ -45,7 +45,7 @@
   padding: 7px var(--space-sm);
   color: var(--ink-muted);
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
 }
 
@@ -75,7 +75,7 @@
   padding: 5px 14px;
   border-radius: var(--radius-pill);
   color: var(--ink-muted);
-  font-size: 14px;
+  font-size: var(--text-caption);
   letter-spacing: -0.224px;
 }
 
@@ -97,7 +97,7 @@
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-caption);
 }
 
 /* Pasted parade states: multi-line, and the same shape as every other field. */
@@ -107,7 +107,7 @@
   min-height: 280px;
   padding: var(--space-sm) var(--space-md);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--text-caption);
   line-height: 1.5;
   resize: vertical;
 }
@@ -119,7 +119,7 @@ select.field {
 .field__label {
   display: block;
   margin-bottom: var(--space-xxs);
-  font-size: 12px;
+  font-size: var(--text-fine);
   letter-spacing: -0.12px;
   color: var(--ink-muted);
 }
@@ -177,7 +177,7 @@ select.field {
   padding: 7px var(--space-sm);
   border-radius: var(--radius-sm);
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-caption);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -221,7 +221,7 @@ select.field {
 }
 
 .calendar__month {
-  font-size: 14px;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: -0.224px;
 }
@@ -253,7 +253,7 @@ select.field {
 }
 
 .calendar__weekday {
-  font-size: 12px;
+  font-size: var(--text-fine);
   font-weight: 600;
   color: var(--ink-faint);
   text-align: center;
@@ -262,7 +262,7 @@ select.field {
 
 .calendar__day {
   font: inherit;
-  font-size: 14px;
+  font-size: var(--text-caption);
   color: var(--ink);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -295,7 +295,7 @@ select.field {
 }
 
 .calendar__hint {
-  font-size: 12px;
+  font-size: var(--text-fine);
   color: var(--ink-faint);
 }
 

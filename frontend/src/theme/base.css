@@ -25,7 +25,7 @@ body {
   background: var(--canvas-sunken);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 17px;
+  font-size: var(--text-body);
   font-weight: 400;
   line-height: 1.47;
   letter-spacing: -0.374px;
@@ -49,19 +49,19 @@ h1 {
 }
 
 h2 {
-  font-size: 28px;
+  font-size: var(--text-lead);
   line-height: 1.14;
   letter-spacing: -0.374px;
 }
 
 h3 {
-  font-size: 21px;
+  font-size: var(--text-tagline);
   line-height: 1.19;
   letter-spacing: -0.231px;
 }
 
 h4 {
-  font-size: 17px;
+  font-size: var(--text-body);
   line-height: 1.24;
   letter-spacing: -0.374px;
 }
@@ -130,14 +130,14 @@ button {
 }
 
 .caption {
-  font-size: 14px;
+  font-size: var(--text-caption);
   line-height: 1.43;
   letter-spacing: -0.224px;
   color: var(--ink-muted);
 }
 
 .fine {
-  font-size: 12px;
+  font-size: var(--text-fine);
   line-height: 1.4;
   letter-spacing: -0.12px;
   color: var(--ink-faint);
