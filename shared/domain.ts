@@ -24,9 +24,14 @@ export type ReasonCategory = (typeof REASON_CATEGORIES)[number];
 export type RoleKind = (typeof ROLE_KINDS)[number];
 export type ReportSickType = (typeof REPORT_SICK_TYPES)[number];
 
+/** Whether a value is one of a fixed list, narrowing it to that list's type. */
+export function isOneOf<T extends string>(list: readonly T[], value: unknown): value is T {
+  return list.includes(value as T);
+}
+
 /** Whether a value is one of the five companies. */
 export function isCompany(value: unknown): value is Company {
-  return COMPANIES.includes(value as Company);
+  return isOneOf(COMPANIES, value);
 }
 
 /** A company's place in parade order (its colour slot on every chart), or -1. */

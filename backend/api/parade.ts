@@ -16,7 +16,9 @@ import {
   ingestMessage,
   listMessages,
   type IngestOutcome,
+  type ModelParser,
 } from '../lib/pipeline.ts';
+import type { Db } from '../db/index.ts';
 
 /** The pipeline calls the route makes, injected so tests need no database. */
 export interface Store {
@@ -25,6 +27,17 @@ export interface Store {
   remove(id: number): Promise<boolean>;
   list(): Promise<unknown[]>;
   get(id: number): Promise<{ id: number; body: string } | null>;
+}
+
+/** The real pipeline over `db`; the route and the test app both wire it this way. */
+export function pipelineStore(db: Db, model: ModelParser | null, now: () => Date = () => new Date()): Store {
+  return {
+    ingest: (message) => ingestMessage(db, message, now(), model),
+    edit: (id, body) => editMessage(db, id, body, model),
+    remove: (id) => deleteMessage(db, id),
+    list: () => listMessages(db),
+    get: (id) => getMessage(db, id),
+  };
 }
 
 /** What `handle` needs. */
@@ -156,17 +169,9 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
  * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
-  const db = getDb();
-  // Null when OPENAI_API_KEY is unset: doubtful messages then wait for review, as before.
-  const model = OpenAiParser.fromEnv();
+  // A null model (OPENAI_API_KEY unset) leaves doubtful messages waiting for review.
   return handle(request, {
-    store: {
-      ingest: (message) => ingestMessage(db, message, new Date(), model),
-      edit: (id, body) => editMessage(db, id, body, model),
-      remove: (id) => deleteMessage(db, id),
-      list: () => listMessages(db),
-      get: (id) => getMessage(db, id),
-    },
+    store: pipelineStore(getDb(), OpenAiParser.fromEnv()),
     dashboardPassword: process.env.DASHBOARD_PASSWORD,
     ingestSecret: process.env.PARADE_INGEST_SECRET,
   });

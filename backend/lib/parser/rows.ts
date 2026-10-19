@@ -2,7 +2,19 @@
  * Validates an extraction and turns it into database rows, storing what the message says
  * without reconciling its arithmetic (disagreements surface as data-quality findings).
  */
-import { COMPANIES, REASON_CATEGORIES, unitTypeOf } from '../../../shared/domain.ts';
+import {
+  COMPANIES,
+  REASON_CATEGORIES,
+  isCompany,
+  isOneOf,
+  unitTypeOf,
+  type Company,
+  type ReasonCategory,
+  type ReportSickType,
+  type RoleKind,
+  type Session,
+} from '../../../shared/domain.ts';
+import type { commandRosterRows, paradeSubmissions, personnelRows, sectionCounts, strengthRows } from '../../db/schema.ts';
 import { fourDOrNull, normaliseName } from '../../../shared/identity.ts';
 import type { Extraction } from './extraction.ts';
 
@@ -13,20 +25,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HH_MM = /^\d{2}:\d{2}$/;
 
 /** The rows one message produces, ready for a single `db.batch`. */
-interface BuiltRows {
-  submission: {
-    paradeResponseId: string;
-    company: string;
-    date: string;
-    session: string;
-    paradeTime: string | null;
-    sourceMessageId: number | null;
-    model: string | null;
-  };
-  strength: Array<Record<string, unknown>>;
-  personnel: Array<Record<string, unknown>>;
-  roster: Array<Record<string, unknown>>;
-  sectionCounts: Array<Record<string, unknown>>;
+export interface BuiltRows {
+  submission: typeof paradeSubmissions.$inferInsert;
+  strength: Array<typeof strengthRows.$inferInsert>;
+  personnel: Array<typeof personnelRows.$inferInsert>;
+  roster: Array<typeof commandRosterRows.$inferInsert>;
+  sectionCounts: Array<typeof sectionCounts.$inferInsert>;
 }
 
 /** Context the row builder needs beyond the extraction itself. */
@@ -41,7 +45,7 @@ export function validate(extraction: Extraction): string {
   if (extraction.rejected) {
     return extraction.rejection_reason || 'Message was rejected without a stated reason.';
   }
-  if (!extraction.company || !COMPANIES.includes(extraction.company as never)) {
+  if (!isCompany(extraction.company)) {
     return `Company is missing or not one of ${COMPANIES.join(', ')}.`;
   }
   if (!extraction.date || !ISO_DATE.test(extraction.date)) {
@@ -63,7 +67,7 @@ export function validate(extraction: Extraction): string {
     if (!person.name || !person.name.trim()) {
       return 'A personnel entry has no name.';
     }
-    if (!REASON_CATEGORIES.includes(person.reason_category as never)) {
+    if (!isOneOf(REASON_CATEGORIES, person.reason_category)) {
       return `Unknown section "${person.reason_category}" for ${person.name}.`;
     }
     for (const field of ['start_date', 'end_date'] as const) {
@@ -79,15 +83,18 @@ export function validate(extraction: Extraction): string {
   return '';
 }
 
-/** Builds every row for one submission. */
+/**
+ * Builds every row for one submission, after `validate`. Enum fields `validate` does not check are
+ * cast: the database enum still refuses a stray value, which fails the batch and flags the message.
+ */
 export function buildRows(extraction: Extraction, context: BuildContext): BuiltRows {
   const key = context.paradeResponseId;
 
   const submission = {
     paradeResponseId: key,
-    company: extraction.company as string,
+    company: extraction.company as Company,
     date: extraction.date as string,
-    session: extraction.session as string,
+    session: extraction.session as Session,
     paradeTime: extraction.parade_time,
     sourceMessageId: context.sourceMessageId,
     model: context.model,
@@ -115,16 +122,16 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
    * abort the whole batch -- losing a real parade state over a cosmetic duplication.
    */
   const seenSections = new Set<string>();
-  const sectionCounts: Array<Record<string, unknown>> = [];
+  const counts: BuiltRows['sectionCounts'] = [];
   for (const unit of extraction.units) {
     for (const section of unit.section_counts ?? []) {
       const pair = JSON.stringify([unit.unit_label, section.reason_category]);
       if (seenSections.has(pair)) continue;
       seenSections.add(pair);
-      sectionCounts.push({
+      counts.push({
         paradeResponseId: key,
         unitLabel: unit.unit_label,
-        reasonCategory: section.reason_category,
+        reasonCategory: section.reason_category as ReasonCategory,
         statedCount: section.stated_count,
       });
     }
@@ -134,14 +141,14 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
     paradeResponseId: key,
     unitLabel: person.unit_label,
     entryIndex: person.entry_index,
-    reasonCategory: person.reason_category,
+    reasonCategory: person.reason_category as ReasonCategory,
     fourD: fourDOrNull(person.four_d),
     rank: person.rank,
     name: person.name.trim(),
     nameKey: normaliseName(person.name),
     dutyType: person.duty_type,
     subReason: person.sub_reason,
-    reportSickType: person.reason_category === 'Report Sick' ? person.report_sick_type : null,
+    reportSickType: person.reason_category === 'Report Sick' ? (person.report_sick_type as ReportSickType | null) : null,
     numDays: person.num_days,
     isPermanent: Boolean(person.is_permanent),
     startDate: person.start_date,
@@ -159,7 +166,7 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
     const name = blankToNull(member.name);
     return {
       paradeResponseId: key,
-      roleKind: member.role_kind,
+      roleKind: member.role_kind as RoleKind,
       unitLabel: blankToNull(member.unit_label),
       rank,
       name,
@@ -168,7 +175,7 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
     };
   });
 
-  return { submission, strength, personnel, roster, sectionCounts };
+  return { submission, strength, personnel, roster, sectionCounts: counts };
 }
 
 /** Placeholders a filer writes to mean "nothing here". */

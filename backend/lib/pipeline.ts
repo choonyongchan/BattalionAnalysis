@@ -2,6 +2,7 @@
  * The single parade-state write path: store and parse a message, edit or delete one. The rule-based
  * parser runs first; a message it doubts goes to the model, or is stored with reasons for a person.
  */
+import type { BatchItem } from 'drizzle-orm/batch';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import {
   commandRosterRows,
@@ -187,13 +188,13 @@ export async function deleteMessage(db: Db, id: number): Promise<boolean> {
     .where(eq(rawMessages.id, id));
   if (!row) return false;
 
-  const statements: unknown[] = [];
+  const statements: BatchItem<'pg'>[] = [];
   // The child rows cascade from the submission; the message's own link is only a text copy.
   if (row.paradeResponseId) {
     statements.push(db.delete(paradeSubmissions).where(eq(paradeSubmissions.paradeResponseId, row.paradeResponseId)));
   }
   statements.push(db.delete(rawMessages).where(eq(rawMessages.id, id)));
-  await db.batch(statements as never);
+  await db.batch(statements);
   return true;
 }
 
@@ -272,7 +273,7 @@ async function writeSubmission(
   timing: Timing,
   body?: string,
 ): Promise<void> {
-  const statements: unknown[] = [
+  const statements: BatchItem<'pg'>[] = [
     db
       .delete(paradeSubmissions)
       .where(
@@ -285,16 +286,16 @@ async function writeSubmission(
         ),
       ),
     db.delete(paradeSubmissions).where(eq(paradeSubmissions.paradeResponseId, key)),
-    db.insert(paradeSubmissions).values(rows.submission as never),
+    db.insert(paradeSubmissions).values(rows.submission),
   ];
 
   // Drizzle rejects an insert with no values, and a company can legitimately file a parade
   // state with an empty section, so each child insert is conditional.
-  if (rows.strength.length) statements.push(db.insert(strengthRows).values(rows.strength as never));
-  if (rows.personnel.length) statements.push(db.insert(personnelRows).values(rows.personnel as never));
-  if (rows.roster.length) statements.push(db.insert(commandRosterRows).values(rows.roster as never));
+  if (rows.strength.length) statements.push(db.insert(strengthRows).values(rows.strength));
+  if (rows.personnel.length) statements.push(db.insert(personnelRows).values(rows.personnel));
+  if (rows.roster.length) statements.push(db.insert(commandRosterRows).values(rows.roster));
   if (rows.sectionCounts.length) {
-    statements.push(db.insert(sectionCounts).values(rows.sectionCounts as never));
+    statements.push(db.insert(sectionCounts).values(rows.sectionCounts));
   }
 
   statements.push(
@@ -310,7 +311,7 @@ async function writeSubmission(
       .where(eq(rawMessages.id, messageId)),
   );
 
-  await db.batch(statements as never);
+  await db.batch(statements);
 }
 
 /** Records why a message produced no rows, so it is not retried and the list can show why. */

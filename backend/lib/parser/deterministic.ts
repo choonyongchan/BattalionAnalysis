@@ -2,7 +2,7 @@
  * Rule-based parser for the standard 40 SAR first-parade-state template.
  * Returns an `Extraction` plus the lines it could not read; any problem means "ask the model".
  */
-import { COMPANIES, REPORT_SICK_TYPES } from '../../../shared/domain.ts';
+import { COMPANIES, REPORT_SICK_TYPES, isOneOf } from '../../../shared/domain.ts';
 import { cleanText } from '../../../shared/identity.ts';
 import { isFirstParade, isLastParade } from '../../../shared/paradeMessage.ts';
 import type { ExtractedCommandMember, ExtractedPerson, ExtractedUnit, Extraction } from './extraction.ts';
@@ -465,7 +465,7 @@ function readBracket(
 ): void {
   inner = normaliseDates(inner);
   const token = inner.toUpperCase();
-  if (REPORT_SICK_TYPES.includes(token as never)) {
+  if (isOneOf(REPORT_SICK_TYPES, token)) {
     duty.report_sick_type = token;
     return;
   }

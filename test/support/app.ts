@@ -6,21 +6,14 @@
 import { handle as handleDashboard } from '../../backend/api/dashboard.ts';
 import { handle as handleReportSick } from '../../backend/api/reportsick.ts';
 import { handle as handleSft, type Deps as SftDeps } from '../../backend/api/sft.ts';
-import { handle as handleParade, type Deps as ParadeDeps } from '../../backend/api/parade.ts';
+import { handle as handleParade, pipelineStore, type Deps as ParadeDeps } from '../../backend/api/parade.ts';
 import { handle as handleSession } from '../../backend/api/session.ts';
 import { handle as handleSettings } from '../../backend/api/settings.ts';
 import type { Db } from '../../backend/db/index.ts';
 import { loadDashboard } from '../../backend/lib/dashboard.ts';
 import { readSettings, resetSection, saveSection } from '../../backend/lib/settings.ts';
 import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../backend/lib/sft.ts';
-import {
-  deleteMessage,
-  editMessage,
-  getMessage,
-  ingestMessage,
-  listMessages,
-  type ModelParser,
-} from '../../backend/lib/pipeline.ts';
+import type { ModelParser } from '../../backend/lib/pipeline.ts';
 import { FORM_KEYS, POST_URI, SFT_FORM_KEYS, SFT_POST_URI, testSdk } from './formsg.ts';
 
 /** The dashboard password the tests configure. */
@@ -34,16 +27,8 @@ export const INGEST_SECRET = 'relay-test-secret-long-enough';
 
 /** The parade route's dependencies over a real database, as `api/parade.ts#route` builds them. */
 export function paradeDeps(db: Db, options: { now?: () => Date; model?: ModelParser | null } = {}): ParadeDeps {
-  const now = options.now ?? (() => new Date());
-  const model = options.model ?? null;
   return {
-    store: {
-      ingest: (message) => ingestMessage(db, message, now(), model),
-      edit: (id, body) => editMessage(db, id, body, model),
-      remove: (id) => deleteMessage(db, id),
-      list: () => listMessages(db),
-      get: (id) => getMessage(db, id),
-    },
+    store: pipelineStore(db, options.model ?? null, options.now),
     dashboardPassword: DASHBOARD_PASSWORD,
     ingestSecret: INGEST_SECRET,
   };
