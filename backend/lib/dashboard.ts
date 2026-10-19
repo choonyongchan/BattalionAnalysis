@@ -1,15 +1,6 @@
 /**
- * The dashboard's read of Neon, shaped as the tabs the Sheet-era feed returned.
- *
- * `src/data/feed.js` maps `{ [tabName]: values[][] }` (header row first) to records by header
- * name, and every number in `src/model/` is computed from those records. Answering in the
- * same shape, with Neon columns aliased to the old Sheet headers, means the switch from the
- * Sheet changes where the data comes from and nothing about what is computed from it.
- *
- * Headers come from `src/data/tabs.js`, the dashboard's own list of what it reads, so a
- * column can only reach the browser if the dashboard asks for it. NRIC columns do not exist
- * in Neon, and `raw_messages.body` is neither selected here nor readable by the role this
- * runs as (`db/grants-dashboard.sql`).
+ * The dashboard's read of Neon: one typed array per dataset (`shared/dashboard.ts`).
+ * Only the selected columns leave the database; the `dashboard_read` role cannot read a message body.
  */
 import { asc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/index.ts';
@@ -24,52 +15,24 @@ import {
   strengthRows,
 } from '../db/schema.ts';
 import { SGT_OFFSET_MS } from '../../shared/dates.ts';
-import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.ts';
-import {
-  FORMSG_HEADERS,
-  FORMSG_STATUS_HEADERS,
-  PERSONNEL_HEADERS,
-  ROSTER_HEADERS,
-  SECTION_COUNT_HEADERS,
-  SFT_HEADERS,
-  STRENGTH_HEADERS,
-  SUBMISSION_HEADERS,
-  TABS as SHEET_TABS,
-} from '../../shared/tabs.ts';
-import { HQ_LABEL, PLATOON_LABEL } from '../../shared/domain.ts';
+import { HQ_LABEL, PERM_STATUS_NUM_DAYS, PLATOON_LABEL, companyFromUnitCoy } from '../../shared/domain.ts';
 import { cleanText } from '../../shared/identity.ts';
+import type {
+  DashboardData,
+  FilingRow,
+  PersonnelRow,
+  ReportSickRow,
+  RosterRow,
+  SectionCountRow,
+  SftSessionRow,
+  StrengthRow,
+} from '../../shared/dashboard.ts';
 
-/** One record keyed by Sheet header. */
-export type Row = Record<string, unknown>;
-
-/** Tab name to values, header row first: the reply `src/data/feed.js` reads. */
-export type Tabs = Record<string, unknown[][]>;
-
-/** The tab names, typed: the JSDoc on the browser module does not carry through. */
-const TABS = SHEET_TABS as Record<
-  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT' | 'SECTION_COUNTS',
-  string
->;
-
-/**
- * `parade_submissions.model` on a submission imported from the retired Sheet with no filing
- * Timestamp: it is left out of filing times.
- */
+/** `parade_submissions.model` of a Sheet-imported submission with no filing time; left out of filing times. */
 const UNTIMED_MODEL = 'sheet:untimed';
 
-
-/**
- * The platoon the dashboard reads out of a unit label.
- *
- * A numbered block becomes its number, a headquarters block `HQ`, the company roll-up blank,
- * and any named sub-unit (SIG, MED, ...) passes through as written.
- * `frontend/src/model/platoon.js` then keeps it only if the company has that sub-unit.
- *
- * @param unitLabel The block label: `PLATOON 1`, `PL2`, `COY HQ`, `Company`, `SIG`, or the
- *   bare `3` the Sheet stored.
- * @returns The platoon cell.
- */
-export function platoonOf(unitLabel: string | null | undefined): string {
+/** A block label as the dashboard's platoon: `PL 2` is `2`, `COY HQ` is `HQ`, the roll-up is '', a named sub-unit as written. */
+export function platoonFromLabel(unitLabel: string | null | undefined): string {
   const label = cleanText(unitLabel ?? '').toUpperCase().trim();
   if (label === '' || label === 'COMPANY') return '';
   if (HQ_LABEL.test(label)) return 'HQ';
@@ -77,27 +40,13 @@ export function platoonOf(unitLabel: string | null | undefined): string {
   return label;
 }
 
-/**
- * The roster role the dashboard reads: `CDO`, `CDS`, `COS`, or `PDS` + sub-unit (`PDS7`, `PDSSIG`).
- *
- * @param roleKind The appointment.
- * @param unitLabel The PDS's sub-unit, e.g. `1` or `SIG`; ignored for other roles.
- * @returns The role cell.
- */
+/** A roster role: `CDO`, `CDS`, `COS`, or `PDS` + sub-unit with no space (`PDS7`, `PDSSIG`). */
 export function rosterRole(roleKind: string, unitLabel: string | null | undefined): string {
   if (roleKind !== 'PDS') return roleKind;
   return 'PDS' + cleanText(unitLabel ?? '').toUpperCase().replace(/\s+/g, '');
 }
 
-/**
- * The single `reason` text the Sheet held, rebuilt from the parsed parts.
- *
- * `PERM` is kept in front because `src/model/statusBuckets.js` and `quality.js` recognise a
- * permanent status by that word.
- *
- * @param row The duty parts of one personnel row.
- * @returns e.g. `MC`, `EXCUSE (HEAVY LOADS)`, `PERM EXCUSE (KNEELING)`.
- */
+/** One reason text from the parsed parts, e.g. `PERM EXCUSE (KNEELING)`; the model spots permanence by `PERM`. */
 export function personnelReason(row: {
   dutyType: string | null;
   subReason: string | null;
@@ -110,27 +59,12 @@ export function personnelReason(row: {
   return text;
 }
 
-/**
- * The `num_days` cell: the stated count, or the sentinel the Sheet used for a permanent status.
- *
- * @param row The count and permanence of one personnel row.
- * @returns The cell value.
- */
-export function personnelNumDays(row: {
-  numDays: number | null;
-  isPermanent: boolean;
-  reasonCategory: string;
-}): number | null {
+/** The stated day count, or the permanent-status sentinel. */
+export function personnelNumDays(row: { numDays: number | null; isPermanent: boolean; reasonCategory: string }): number | null {
   return row.isPermanent && row.reasonCategory === 'Status' ? PERM_STATUS_NUM_DAYS : row.numDays;
 }
 
-/**
- * Renders a Postgres timestamp as Singapore-local `yyyy-MM-ddTHH:mm:ss`, the form the old
- * feed sent and `src/model/values.js` reads the date and time out of.
- *
- * @param value A timestamptz as the driver returns it, e.g. `2026-09-18 00:15:23.5+00`.
- * @returns The local rendering, or '' when blank or unparseable.
- */
+/** A driver timestamp (`2026-09-18 00:15:23.5+00`) as Singapore-local `yyyy-MM-ddTHH:mm:ss`, or ''. */
 export function sgtDateTime(value: string | null | undefined): string {
   if (!value) return '';
   const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
@@ -138,27 +72,11 @@ export function sgtDateTime(value: string | null | undefined): string {
   return Number.isNaN(ms) ? '' : new Date(ms + SGT_OFFSET_MS).toISOString().slice(0, 19);
 }
 
-/**
- * Lays records out as a tab: the header row, then each record's cells in header order.
- *
- * @param headers The Sheet headers, in order.
- * @param rows Records keyed by those headers.
- * @returns The tab's values.
- */
-export function toTab(headers: string[], rows: Row[]): unknown[][] {
-  return [headers, ...rows.map((row) => headers.map((header) => row[header] ?? ''))];
-}
-
-/**
- * Reads the Strength Data tab.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function strengthTab(db: Db): Promise<Row[]> {
+/** Every strength block of every parade state. */
+async function strength(db: Db): Promise<StrengthRow[]> {
   const rows = await db
     .select({
-      id: paradeSubmissions.paradeResponseId,
+      paradeResponseId: paradeSubmissions.paradeResponseId,
       date: paradeSubmissions.date,
       session: paradeSubmissions.session,
       company: paradeSubmissions.company,
@@ -176,34 +94,14 @@ async function strengthTab(db: Db): Promise<Row[]> {
     .from(strengthRows)
     .innerJoin(paradeSubmissions, eq(strengthRows.paradeResponseId, paradeSubmissions.paradeResponseId))
     .orderBy(asc(paradeSubmissions.date), asc(strengthRows.id));
-  return rows.map((r) => ({
-    parade_response_id: r.id,
-    date: r.date,
-    session: r.session,
-    company: r.company,
-    platoon: platoonOf(r.unitLabel),
-    unit_type: r.unitType,
-    total_strength: r.totalStrength,
-    total_present: r.totalPresent,
-    officer_strength: r.officerStrength,
-    officer_present: r.officerPresent,
-    wospec_strength: r.wospecStrength,
-    wospec_present: r.wospecPresent,
-    enlistee_strength: r.enlisteeStrength,
-    enlistee_present: r.enlisteePresent,
-  }));
+  return rows.map(({ unitLabel, ...row }) => ({ ...row, platoon: platoonFromLabel(unitLabel) }));
 }
 
-/**
- * Reads the Personnel Data tab.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function personnelTab(db: Db): Promise<Row[]> {
+/** Every person listed in every parade state. */
+async function personnel(db: Db): Promise<PersonnelRow[]> {
   const rows = await db
     .select({
-      id: paradeSubmissions.paradeResponseId,
+      paradeResponseId: paradeSubmissions.paradeResponseId,
       date: paradeSubmissions.date,
       session: paradeSubmissions.session,
       company: paradeSubmissions.company,
@@ -225,35 +123,28 @@ async function personnelTab(db: Db): Promise<Row[]> {
     .innerJoin(paradeSubmissions, eq(personnelRows.paradeResponseId, paradeSubmissions.paradeResponseId))
     .orderBy(asc(paradeSubmissions.date), asc(personnelRows.id));
   return rows.map((r) => ({
-    parade_response_id: r.id,
+    paradeResponseId: r.paradeResponseId,
     date: r.date,
     session: r.session,
     company: r.company,
-    platoon: platoonOf(r.unitLabel),
-    four_d: r.fourD,
+    platoon: platoonFromLabel(r.unitLabel),
+    fourD: r.fourD,
     name: r.name,
     rank: r.rank,
-    reason_category: r.reasonCategory,
-    start_date: r.startDate,
-    end_date: r.endDate,
-    num_days: personnelNumDays(r),
+    reasonCategory: r.reasonCategory,
+    startDate: r.startDate,
+    endDate: r.endDate,
+    numDays: personnelNumDays(r),
     reason: personnelReason(r),
     location: r.location,
   }));
 }
 
-/**
- * Reads the Command Roster tab, a vacant appointment included and marked `vacant`: a
- * company that filed `PDS 3: -` has told us the chair is empty, which is not the same as
- * not filing it.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function rosterTab(db: Db): Promise<Row[]> {
+/** Every command appointment, vacancies included and marked. */
+async function roster(db: Db): Promise<RosterRow[]> {
   const rows = await db
     .select({
-      id: paradeSubmissions.paradeResponseId,
+      paradeResponseId: paradeSubmissions.paradeResponseId,
       date: paradeSubmissions.date,
       session: paradeSubmissions.session,
       company: paradeSubmissions.company,
@@ -261,30 +152,16 @@ async function rosterTab(db: Db): Promise<Row[]> {
       unitLabel: commandRosterRows.unitLabel,
       rank: commandRosterRows.rank,
       name: commandRosterRows.name,
-      isVacant: commandRosterRows.isVacant,
+      vacant: commandRosterRows.isVacant,
     })
     .from(commandRosterRows)
     .innerJoin(paradeSubmissions, eq(commandRosterRows.paradeResponseId, paradeSubmissions.paradeResponseId))
     .orderBy(asc(paradeSubmissions.date), asc(commandRosterRows.id));
-  return rows.map((r) => ({
-    parade_response_id: r.id,
-    date: r.date,
-    session: r.session,
-    company: r.company,
-    role: rosterRole(r.roleKind, r.unitLabel),
-    rank: r.rank,
-    name: r.name,
-    vacant: r.isVacant,
-  }));
+  return rows.map(({ roleKind, unitLabel, ...row }) => ({ ...row, role: rosterRole(roleKind, unitLabel) }));
 }
 
-/**
- * Reads the Report Sick FormSG Responses tab, under FormSG's own question titles.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function formSgTab(db: Db): Promise<Row[]> {
+/** Every report-sick submission, in Singapore time. */
+async function formSg(db: Db): Promise<ReportSickRow[]> {
   const rows = await db
     .select({
       timestamp: reportSickFormsg.timestamp,
@@ -292,6 +169,7 @@ async function formSgTab(db: Db): Promise<Row[]> {
       name: reportSickFormsg.name,
       fourD: reportSickFormsg.fourD,
       unitCoy: reportSickFormsg.unitCoy,
+      company: reportSickFormsg.company,
       reportSickType: reportSickFormsg.reportSickType,
       reason: reportSickFormsg.reason,
       symptoms: reportSickFormsg.symptoms,
@@ -304,52 +182,31 @@ async function formSgTab(db: Db): Promise<Row[]> {
     })
     .from(reportSickFormsg)
     .orderBy(asc(reportSickFormsg.timestamp));
-  return rows.map((r) => ({
-    Timestamp: sgtDateTime(r.timestamp),
-    RANK: r.rank,
-    '[Myinfo] Name': r.name,
-    '4D Number (REC Only)': r.fourD,
-    'Unit & Coy': r.unitCoy,
-    'Report Sick Type': r.reportSickType,
-    'Reason for Reporting Sick (Keep Brief)': r.reason,
-    'I am experiencing _____________________ symptoms.': r.symptoms,
-    'Outcome given by the doctor/MO': r.outcome,
-    ...Object.fromEntries(
-      [r.status1, r.status2, r.status3, r.status4, r.status5].map((status, i) => [FORMSG_STATUS_HEADERS[i], status]),
-    ),
+  return rows.map(({ status1, status2, status3, status4, status5, ...row }) => ({
+    ...row,
+    timestamp: sgtDateTime(row.timestamp),
+    // Sheet-imported rows may predate the derived column.
+    company: row.company ?? companyFromUnitCoy(row.unitCoy),
+    statuses: [status1, status2, status3, status4, status5].map((status) => (status ?? '').trim()).filter(Boolean),
   }));
 }
 
-/**
- * Reads the Parade State Responses tab: when each company filed, and for which parade.
- *
- * The filing time is when its message arrived; a submission imported from the Sheet has no
- * message, so its `extracted_at` carries the Sheet's own Timestamp instead, and one with no
- * Timestamp in the Sheet is left out, as the Sheet left it out.
- *
- * @param db The read-only handle.
- * @returns Records keyed by Sheet header.
- */
-async function submissionsTab(db: Db): Promise<Row[]> {
+/** When each parade state was filed: its message's arrival, or a Sheet import's own timestamp. */
+async function submissions(db: Db): Promise<FilingRow[]> {
   const rows = await db
     .select({
-      id: paradeSubmissions.paradeResponseId,
+      paradeResponseId: paradeSubmissions.paradeResponseId,
       filedAt: sql<string>`coalesce(${rawMessages.receivedAt}, ${paradeSubmissions.extractedAt})`,
     })
     .from(paradeSubmissions)
     .leftJoin(rawMessages, eq(paradeSubmissions.sourceMessageId, rawMessages.id))
     .where(or(isNull(paradeSubmissions.model), ne(paradeSubmissions.model, UNTIMED_MODEL)))
     .orderBy(asc(paradeSubmissions.date));
-  return rows.map((r) => ({ Timestamp: sgtDateTime(r.filedAt), parade_response_id: r.id }));
+  return rows.map((r) => ({ timestamp: sgtDateTime(r.filedAt), paradeResponseId: r.paradeResponseId }));
 }
 
-/**
- * Reads the SFT Responses tab: one row per self-regulated fitness training session.
- *
- * @param db The read-only handle.
- * @returns Records keyed by the headers in `SFT_HEADERS`.
- */
-async function sftTab(db: Db): Promise<Row[]> {
+/** Every SFT session. */
+async function sft(db: Db): Promise<SftSessionRow[]> {
   const rows = await db
     .select({
       timestamp: sftFormsg.timestamp,
@@ -365,30 +222,14 @@ async function sftTab(db: Db): Promise<Row[]> {
     })
     .from(sftFormsg)
     .orderBy(asc(sftFormsg.timestamp));
-  return rows.map((r) => ({
-    Timestamp: sgtDateTime(r.timestamp),
-    date: r.date,
-    RANK: r.rank,
-    name: r.name,
-    company: r.company,
-    group_ic: r.groupIc,
-    'PES Status': r.pesStatus,
-    exercises: r.exercises,
-    sfabt_type: r.sfabtType,
-    location: r.location,
-  }));
+  return rows.map((row) => ({ ...row, timestamp: sgtDateTime(row.timestamp) }));
 }
 
-/**
- * Reads the Section Counts tab: the count each first-parade section header states.
- *
- * @param db The read-only handle.
- * @returns Records keyed by the headers in `SECTION_COUNT_HEADERS`.
- */
-async function sectionCountsTab(db: Db): Promise<Row[]> {
+/** The count each first-parade section header states. */
+async function statedCounts(db: Db): Promise<SectionCountRow[]> {
   const rows = await db
     .select({
-      id: sectionCounts.paradeResponseId,
+      paradeResponseId: sectionCounts.paradeResponseId,
       date: paradeSubmissions.date,
       company: paradeSubmissions.company,
       unitLabel: sectionCounts.unitLabel,
@@ -399,44 +240,31 @@ async function sectionCountsTab(db: Db): Promise<Row[]> {
     .innerJoin(paradeSubmissions, eq(sectionCounts.paradeResponseId, paradeSubmissions.paradeResponseId))
     .where(eq(paradeSubmissions.session, 'FPS'))
     .orderBy(asc(paradeSubmissions.date));
-  return rows.map((r) => ({
-    parade_response_id: r.id,
-    date: r.date,
-    company: r.company,
-    platoon: platoonOf(r.unitLabel),
-    reason_category: r.reasonCategory,
-    stated_count: r.statedCount,
-  }));
+  return rows.map(({ unitLabel, ...row }) => ({ ...row, platoon: platoonFromLabel(unitLabel) }));
 }
 
-/**
- * Reads every tab the dashboard charts.
- *
- * @param db A handle connected as `dashboard_read`.
- * @returns Tab name to values, header row first.
- */
-export async function loadTabs(db: Db): Promise<Tabs> {
-  const [strength, personnel, roster, formSg, submissions, sft, counts] = await Promise.all([
-    strengthTab(db),
-    personnelTab(db),
-    rosterTab(db),
-    formSgTab(db),
-    submissionsTab(db),
-    sftTab(db),
-    // Optional: before migration 0008 grants it, dashboard_read cannot read section_counts,
-    // and that must cost one empty tab, not the whole dashboard. Logs the driver code only.
-    sectionCountsTab(db).catch((error: { code?: string }) => {
+/** Reads every dataset the dashboard charts, connected as `dashboard_read`. */
+export async function loadDashboard(db: Db): Promise<DashboardData> {
+  const [strengthData, personnelData, rosterData, formSgData, submissionData, sftData, countData] = await Promise.all([
+    strength(db),
+    personnel(db),
+    roster(db),
+    formSg(db),
+    submissions(db),
+    sft(db),
+    // Before migration 0008 grants it, section_counts is unreadable: that costs one empty dataset, not the dashboard.
+    statedCounts(db).catch((error: { code?: string }) => {
       console.warn(`[dashboard] section_counts unreadable (${error?.code ?? 'no code'})`);
       return [];
     }),
   ]);
   return {
-    [TABS.STRENGTH]: toTab(STRENGTH_HEADERS, strength),
-    [TABS.PERSONNEL]: toTab(PERSONNEL_HEADERS, personnel),
-    [TABS.ROSTER]: toTab(ROSTER_HEADERS, roster),
-    [TABS.FORMSG]: toTab(FORMSG_HEADERS, formSg),
-    [TABS.SUBMISSIONS]: toTab(SUBMISSION_HEADERS, submissions),
-    [TABS.SFT]: toTab(SFT_HEADERS, sft),
-    [TABS.SECTION_COUNTS]: toTab(SECTION_COUNT_HEADERS, counts),
+    strength: strengthData,
+    personnel: personnelData,
+    roster: rosterData,
+    formSg: formSgData,
+    submissions: submissionData,
+    sft: sftData,
+    sectionCounts: countData,
   };
 }

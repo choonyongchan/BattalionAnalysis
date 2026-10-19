@@ -23,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
 import { OpenAiParser } from '../lib/parser/llm.ts';
 import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
+import { MANUAL_ID_PREFIX } from '../../shared/paradeMessage.ts';
 import { hasSession, isDashboardCaller } from '../lib/session.ts';
 import {
   deleteMessage,
@@ -112,7 +113,7 @@ function idOf(request: Request): number | null {
  * @returns The key.
  */
 function manualMessageId(body: string): string {
-  return 'manual:' + createHash('sha256').update(body.trim()).digest('hex');
+  return MANUAL_ID_PREFIX + createHash('sha256').update(body.trim()).digest('hex');
 }
 
 /**

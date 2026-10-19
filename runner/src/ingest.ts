@@ -3,6 +3,8 @@
  * The intake is idempotent on the WhatsApp message id, so a retry after a timeout is harmless.
  */
 
+import type { IntakeReply } from '../../shared/paradeMessage.ts';
+
 /** Attempts per message before giving up. */
 const MAX_ATTEMPTS = 3;
 
@@ -12,16 +14,9 @@ const RETRY_BASE_MS = 2_000;
 /** The intake's 300 s function limit, so a slow model fallback is not cut off and re-sent. */
 const REQUEST_TIMEOUT_MS = 300_000;
 
-/** The intake's answer; `status` is parsed, already_parsed, rejected, needs_review or invalid. */
-export interface IntakeOutcome {
-  status: string;
-  id?: number;
-  paradeResponseId?: string | null;
-}
-
 /** Relays one message and resolves with the intake's answer. */
 export interface Ingestor {
-  ingest(text: string, messageId: string): Promise<IntakeOutcome>;
+  ingest(text: string, messageId: string): Promise<IntakeReply>;
 }
 
 /** Raised when no attempt reached the intake or got a final answer. */
@@ -32,7 +27,7 @@ export class RelayError extends Error {
   }
 }
 
-type Attempt = { outcome: IntakeOutcome } | { retry: boolean; reason: string };
+type Attempt = { outcome: IntakeReply } | { retry: boolean; reason: string };
 
 /** Builds the relay; `fetchImpl` and `sleep` are injected in tests. */
 export function createIngestor({
@@ -61,14 +56,14 @@ export function createIngestor({
     }
     if (response.status >= 500) return { retry: true, reason: `intake answered ${response.status}` };
 
-    const outcome = (await response.json().catch(() => null)) as IntakeOutcome | null;
+    const outcome = (await response.json().catch(() => null)) as IntakeReply | null;
     // 200 (parsed) and 422 (a person must correct it) are both final answers.
     if ((response.ok || response.status === 422) && typeof outcome?.status === 'string') return { outcome };
     return { retry: false, reason: `intake answered ${response.status}` };
   }
 
   /** Relays one message, retrying with backoff; throws `RelayError` when every attempt fails. */
-  async function ingest(text: string, messageId: string): Promise<IntakeOutcome> {
+  async function ingest(text: string, messageId: string): Promise<IntakeReply> {
     let reason = '';
     for (let n = 1; n <= MAX_ATTEMPTS; n += 1) {
       const result = await attempt(text, messageId);

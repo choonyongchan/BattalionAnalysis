@@ -33,7 +33,7 @@ export function isCompany(value: unknown): value is Company {
 export const UNIT_TYPE_COMPANY: UnitType = 'Company';
 
 /** Company-level command roles, in duty roster order. */
-export const COMMAND_ROLES = ['CDO', 'CDS', 'COS'] as const;
+export const COMMAND_ROLES: readonly string[] = ['CDO', 'CDS', 'COS'];
 
 /** Each company's sub-units in roster order; rifle companies number on (Archer 1-3, Braves 4-6, Cougar 7-9). */
 export const COMPANY_SUBUNITS: Record<Company, string[]> = {

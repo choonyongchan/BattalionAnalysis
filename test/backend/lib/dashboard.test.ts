@@ -1,11 +1,6 @@
 /**
- * The dashboard's read of Neon: each Neon value must come back as the cell the retired Sheet
- * held, because every number in `src/model/` is computed from those cells.
- *
- * The cell helpers are pure. `loadTabs` runs against the Neon test branch (`TEST_DATABASE_URL`),
- * filled through the app's own write paths -- the parade pipeline and the FormSG route -- and
- * each tab is checked against the dummy data that went in.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The dashboard's read of Neon. The helpers are pure; `loadDashboard` runs against the Neon test branch,
+ * filled through the app's own write paths. NAMES ARE SYNTHETIC: no real name or 4D may appear here.
  */
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
@@ -14,25 +9,15 @@ import { handle as handleSft } from '../../../backend/api/sft.ts';
 import type { Db } from '../../../backend/db/index.ts';
 import { commandRosterRows } from '../../../backend/db/schema.ts';
 import {
-  loadTabs,
+  loadDashboard,
   personnelNumDays,
   personnelReason,
-  platoonOf,
+  platoonFromLabel,
   rosterRole,
   sgtDateTime,
-  toTab,
 } from '../../../backend/lib/dashboard.ts';
 import { ingestMessage } from '../../../backend/lib/pipeline.ts';
-import {
-  FORBIDDEN_HEADERS,
-  FORBIDDEN_SUBMISSION_HEADERS,
-  FORMSG_HEADERS,
-  PERSONNEL_HEADERS,
-  SECTION_COUNT_HEADERS,
-  SFT_HEADERS,
-  STRENGTH_HEADERS,
-  TABS as SHEET_TABS,
-} from '../../../shared/tabs.ts';
+import type { DashboardData } from '../../../shared/dashboard.ts';
 import { sftDeps } from '../../support/app.ts';
 import { DB_TIMEOUT_MS, hasTestDb, readOnlyTestDb, resetTestDb, TEST_DASHBOARD_DATABASE_URL } from '../../support/db.ts';
 import {
@@ -49,12 +34,7 @@ import {
 import { allEntries, companyTotals, expectedCounts, expectedKey, renderEntry, renderParadeState } from '../../support/paradeState.ts';
 import { SCENARIOS } from '../../support/scenarios.ts';
 
-const TABS = SHEET_TABS as Record<
-  'STRENGTH' | 'PERSONNEL' | 'ROSTER' | 'FORMSG' | 'SUBMISSIONS' | 'SFT' | 'SECTION_COUNTS',
-  string
->;
-
-describe('platoonOf', () => {
+describe('platoonFromLabel', () => {
   test.each([
     ['PLATOON 1', '1'],
     ['PL2', '2'],
@@ -67,7 +47,7 @@ describe('platoonOf', () => {
     [null, ''],
     ['SIG', 'SIG'],
   ])('%p reads as %p', (label, platoon) => {
-    expect(platoonOf(label)).toBe(platoon);
+    expect(platoonFromLabel(label)).toBe(platoon);
   });
 });
 
@@ -77,7 +57,7 @@ describe('rosterRole', () => {
     expect(rosterRole('COS', '1')).toBe('COS');
   });
 
-  test('a PDS carries its sub-unit with no space, as model/dutyRoster.js expects', () => {
+  test('a PDS carries its sub-unit with no space, as model/dutyRoster expects', () => {
     expect(rosterRole('PDS', '1')).toBe('PDS1');
     expect(rosterRole('PDS', ' 4 ')).toBe('PDS4');
     expect(rosterRole('PDS', 'SIG')).toBe('PDSSIG');
@@ -87,7 +67,7 @@ describe('rosterRole', () => {
 describe('personnelReason', () => {
   const base = { dutyType: null, subReason: null, reportSickType: null, isPermanent: false };
 
-  test('duty and detail combine as the Sheet wrote them', () => {
+  test('duty and detail combine into one reason', () => {
     expect(personnelReason({ ...base, dutyType: 'MC' })).toBe('MC');
     expect(personnelReason({ ...base, dutyType: 'EXCUSE', subReason: 'HEAVY LOADS' })).toBe('EXCUSE (HEAVY LOADS)');
     expect(personnelReason({ ...base, subReason: 'INJURED ARM' })).toBe('INJURED ARM');
@@ -127,24 +107,12 @@ describe('sgtDateTime', () => {
   });
 });
 
-describe('toTab', () => {
-  test('lays records out under the header row, blanks for missing cells', () => {
-    expect(toTab(['a', 'b'], [{ a: 1 }, { a: null, b: 'x' }])).toEqual([
-      ['a', 'b'],
-      [1, ''],
-      ['', 'x'],
-    ]);
-  });
-});
-
-
-describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’s own write paths', () => {
+describe.skipIf(!hasTestDb)("loadDashboard, over a database filled through the app's own write paths", () => {
   const SPECS = SCENARIOS.map(({ spec }) => spec);
-  let db: Db;
-  let tabs: Awaited<ReturnType<typeof loadTabs>>;
+  let data: DashboardData;
 
   beforeAll(async () => {
-    db = await resetTestDb();
+    const db: Db = await resetTestDb();
     for (const [index, spec] of SPECS.entries()) {
       await ingestMessage(db, { waMessageId: `wa-${index}`, body: renderParadeState(spec) }, new Date(`${spec.date}T00:30:00Z`));
     }
@@ -154,118 +122,97 @@ describe.skipIf(!hasTestDb)('loadTabs, over a database filled through the app’
     for (const spec of SFT_SPECS) {
       await handleSft(sftWebhookRequest(spec), sftDeps(db));
     }
-    tabs = await loadTabs(db);
+    data = await loadDashboard(db);
   }, DB_TIMEOUT_MS * 3);
 
-  test('SFT Responses has one row per session, under the SFT headers, as the webhook stored it', () => {
-    expect(tabs[TABS.SFT]![0]).toEqual(SFT_HEADERS);
-    const rows = records(TABS.SFT);
-    expect(rows).toHaveLength(SFT_SPECS.length);
+  test('answers every dataset the dashboard reads', () => {
+    expect(Object.keys(data).sort()).toEqual(['formSg', 'personnel', 'roster', 'sectionCounts', 'sft', 'strength', 'submissions']);
+  });
+
+  test('sft has one row per session, as the webhook stored it', () => {
+    expect(data.sft).toHaveLength(SFT_SPECS.length);
     SFT_SPECS.forEach((spec, index) => {
-      expect(rows[index]).toMatchObject({
-        Timestamp: sgtDateTime(spec.created),
+      expect(data.sft[index]).toEqual({
+        timestamp: sgtDateTime(spec.created),
         date: sgtDay(spec.created),
-        RANK: spec.rank,
+        rank: spec.rank,
         name: spec.name,
         company: spec.company,
-        group_ic: spec.groupIc,
-        'PES Status': spec.pes,
+        groupIc: spec.groupIc,
+        pesStatus: spec.pes,
         exercises: spec.exercises.join('; '),
-        sfabt_type: spec.sfabt,
+        sfabtType: spec.sfabt,
         location: spec.location,
       });
     });
   });
 
-  /**
-   * A tab's rows as records keyed by header.
-   *
-   * @param tab The tab name.
-   * @returns The records.
-   */
-  function records(tab: string): Array<Record<string, unknown>> {
-    const [header, ...rows] = tabs[tab] as [string[], ...unknown[][]];
-    return rows.map((row) => Object.fromEntries(header.map((name, index) => [name, row[index]])));
-  }
-
-  test('Section Counts states, for each section, the number of names the section lists', () => {
-    expect(tabs[TABS.SECTION_COUNTS]![0]).toEqual(SECTION_COUNT_HEADERS);
+  test('sectionCounts states, for each section, the number of names the section lists', () => {
+    const key = (row: { paradeResponseId: string; platoon: string; reasonCategory: string }) =>
+      [row.paradeResponseId, row.platoon, row.reasonCategory].join('|');
     const listed = new Map<string, number>();
-    for (const row of records(TABS.PERSONNEL)) {
-      const key = [row.parade_response_id, row.platoon, row.reason_category].join('|');
-      listed.set(key, (listed.get(key) ?? 0) + 1);
-    }
-    const counts = records(TABS.SECTION_COUNTS);
-    expect(counts.length).toBeGreaterThan(0);
-    for (const row of counts) {
-      expect(Number(row.stated_count)).toBe(listed.get([row.parade_response_id, row.platoon, row.reason_category].join('|')) ?? 0);
-    }
+    for (const row of data.personnel) listed.set(key(row), (listed.get(key(row)) ?? 0) + 1);
+    expect(data.sectionCounts.length).toBeGreaterThan(0);
+    for (const row of data.sectionCounts) expect(row.statedCount).toBe(listed.get(key(row)) ?? 0);
   });
 
-  test('answers every tab the dashboard reads, under its own header rows', () => {
-    expect(Object.keys(tabs).sort()).toEqual(Object.values(SHEET_TABS as Record<string, string>).sort());
-    expect(tabs[TABS.STRENGTH]![0]).toEqual(STRENGTH_HEADERS);
-    expect(tabs[TABS.PERSONNEL]![0]).toEqual(PERSONNEL_HEADERS);
-    expect(tabs[TABS.FORMSG]![0]).toEqual(FORMSG_HEADERS);
-  });
-
-  test('Strength Data has one row per strength block, with the stated figures', () => {
-    const rows = records(TABS.STRENGTH);
-    expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + expectedCounts(spec).strength, 0));
+  test('strength has one row per strength block, with the stated figures', () => {
+    expect(data.strength).toHaveLength(SPECS.reduce((sum, spec) => sum + expectedCounts(spec).strength, 0));
     for (const spec of SPECS) {
-      const company = rows.find((row) => row.parade_response_id === expectedKey(spec) && row.unit_type === 'Company');
+      const company = data.strength.find((row) => row.paradeResponseId === expectedKey(spec) && row.unitType === 'Company');
       const totals = companyTotals(spec);
       expect(company).toMatchObject({
         date: spec.date,
         company: spec.company,
-        total_present: totals.total.present,
-        officer_strength: totals.officer.strength,
-        officer_present: totals.officer.present,
-        wospec_present: totals.wospec.present,
-        enlistee_present: totals.enlistee.present,
+        totalPresent: totals.total.present,
+        officerStrength: totals.officer.strength,
+        officerPresent: totals.officer.present,
+        wospecPresent: totals.wospec.present,
+        enlisteePresent: totals.enlistee.present,
       });
     }
   });
 
-  test('Personnel Data has one row per entry line, with platoons and the PERM sentinel', () => {
-    const rows = records(TABS.PERSONNEL);
+  test('personnel has one row per entry line, with platoons and the PERM sentinel', () => {
     const entries = SPECS.flatMap((spec) => allEntries(spec).map((entry) => ({ spec, entry })));
-    expect(rows).toHaveLength(entries.length);
-    expect(rows.map((row) => row.name).sort()).toEqual(entries.map(({ entry }) => entry.name).sort());
+    expect(data.personnel).toHaveLength(entries.length);
+    expect(data.personnel.map((row) => row.name).sort()).toEqual(entries.map(({ entry }) => entry.name).sort());
     for (const { spec, entry } of entries) {
-      const row = rows.find((candidate) => candidate.parade_response_id === expectedKey(spec) && candidate.name === entry.name && candidate.reason_category === entry.section);
+      const row = data.personnel.find(
+        (candidate) =>
+          candidate.paradeResponseId === expectedKey(spec) && candidate.name === entry.name && candidate.reasonCategory === entry.section,
+      );
       expect(row!.platoon).toBe(entry.unit === 'HQ' ? 'HQ' : entry.unit.replace('PL ', ''));
-      if (entry.perm) expect(row).toMatchObject({ num_days: 999, reason: expect.stringContaining('PERM') });
+      if (entry.perm) expect(row).toMatchObject({ numDays: 999, reason: expect.stringContaining('PERM') });
     }
   });
 
-  test('Command Roster has every appointment, a PDS carrying its platoon', () => {
-    const rows = records(TABS.ROSTER);
-    expect(rows).toHaveLength(SPECS.reduce((sum, spec) => sum + spec.command.length, 0));
-    expect(rows.map((row) => row.role)).toContain('PDS1');
-    expect(rows.every((row) => row.vacant === false)).toBe(true);
+  test('roster has every appointment, a PDS carrying its platoon', () => {
+    expect(data.roster).toHaveLength(SPECS.reduce((sum, spec) => sum + spec.command.length, 0));
+    expect(data.roster.map((row) => row.role)).toContain('PDS1');
+    expect(data.roster.every((row) => row.vacant === false)).toBe(true);
   });
 
-  test('the FormSG tab has each submission once, in Singapore time, with no NRIC', () => {
-    const rows = records(TABS.FORMSG);
-    expect(rows).toHaveLength(SICK_SPECS.length);
+  test('formSg has each submission once, in Singapore time, with its company and no NRIC', () => {
+    expect(data.formSg).toHaveLength(SICK_SPECS.length);
     for (const spec of SICK_SPECS) {
-      const row = rows.find((candidate) => candidate['[Myinfo] Name'] === spec.name);
-      expect(String(row!.Timestamp)).toStartWith(sgtDay(spec.created));
+      const row = data.formSg.find((candidate) => candidate.name === spec.name);
+      expect(row!.timestamp).toStartWith(sgtDay(spec.created));
+      expect(row!.company).not.toBeNull();
     }
-    expect(JSON.stringify(tabs)).not.toContain(FAKE_NRIC);
+    expect(JSON.stringify(data)).not.toContain(FAKE_NRIC);
   });
 
-  test('the submissions tab lists each parade state once', () => {
-    expect(records(TABS.SUBMISSIONS).map((row) => row.parade_response_id).sort()).toEqual(SPECS.map(expectedKey).sort());
+  test('submissions lists each parade state once', () => {
+    expect(data.submissions.map((row) => row.paradeResponseId).sort()).toEqual(SPECS.map(expectedKey).sort());
   });
 
-  test('no NRIC header, and no message text, can leave the database', () => {
-    const headers = Object.values(tabs).flatMap((values) => values[0] as string[]);
-    for (const forbidden of [...FORBIDDEN_HEADERS, ...FORBIDDEN_SUBMISSION_HEADERS]) expect(headers).not.toContain(forbidden);
+  test('no NRIC field, and no message text, can leave the database', () => {
+    const fields = Object.values(data).flatMap((rows: object[]) => rows.flatMap((row) => Object.keys(row)));
+    expect(fields.filter((field) => /nric|body|message/i.test(field))).toEqual([]);
     // A whole entry line appears only in the message body and `source_line`, neither of which is read.
     const line = renderEntry(SCENARIOS[1]!.spec.units[0]!.entries[0]!, 1);
-    expect(JSON.stringify(tabs)).not.toContain(line);
+    expect(JSON.stringify(data)).not.toContain(line);
   });
 });
 
@@ -276,21 +223,18 @@ describe.skipIf(!hasTestDb)('a vacant appointment', () => {
     await ingestMessage(db, { waMessageId: 'wa-vacant', body: renderParadeState(spec) }, new Date(`${spec.date}T00:30:00Z`));
     await db.insert(commandRosterRows).values({ paradeResponseId: expectedKey(spec), roleKind: 'PDS', unitLabel: 'MED', isVacant: true });
 
-    const tabs = await loadTabs(db);
-    const [header, ...rows] = tabs[TABS.ROSTER] as [string[], ...unknown[][]];
-    const vacant = rows.map((row) => Object.fromEntries(header.map((name, index) => [name, row[index]]))).filter((row) => row.vacant === true);
-    expect(vacant).toEqual([expect.objectContaining({ role: 'PDSMED', name: '' })]);
+    const { roster } = await loadDashboard(db);
+    expect(roster.filter((row) => row.vacant)).toEqual([expect.objectContaining({ role: 'PDSMED', name: null })]);
   }, DB_TIMEOUT_MS);
 });
 
 describe.skipIf(!hasTestDb || !TEST_DASHBOARD_DATABASE_URL)('as the read-only dashboard_read role', () => {
-  test('reads every tab, but can neither read a message body nor write', async () => {
+  test('reads every dataset, but can neither read a message body nor write', async () => {
     const owner = await resetTestDb();
     await ingestMessage(owner, { waMessageId: 'wa-1', body: renderParadeState(SCENARIOS[1]!.spec) }, new Date('2026-09-18T00:30:00Z'));
     const reader = readOnlyTestDb();
 
-    const tabs = await loadTabs(reader);
-    expect(tabs[TABS.PERSONNEL]!.length).toBeGreaterThan(1);
+    expect((await loadDashboard(reader)).personnel.length).toBeGreaterThan(0);
     await expect(reader.execute(sql`select body from raw_messages`)).rejects.toThrow();
     await expect(reader.execute(sql`delete from raw_messages`)).rejects.toThrow();
   }, DB_TIMEOUT_MS);

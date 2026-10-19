@@ -1,15 +1,10 @@
 /**
- * The dashboard's read route: every tab it charts, from Neon.
- *
- *   GET    all tabs and the settings in force    a dashboard session cookie, or the password as a bearer token
- *
- * Answers `{ ok: true, generatedAt, tabs, settings }`, the shape the Apps Script feed answered
- * plus the settings in force, built by `lib/dashboard.ts#loadTabs` and `lib/settings.ts#readSettings`.
- * It connects as the read-only `dashboard_read` role (`DASHBOARD_DATABASE_URL`, see
- * `db/grants-dashboard.sql`), so a bug here cannot write, and cannot read a message body.
+ * GET `/api/dashboard`: every dataset and the settings in force, for a session cookie or the password as bearer.
+ * Connects as the read-only `dashboard_read` role, so a bug here cannot write or read a message body.
  */
 import { getDb } from '../db/index.ts';
-import { loadTabs, type Tabs } from '../lib/dashboard.ts';
+import { loadDashboard } from '../lib/dashboard.ts';
+import type { DashboardData } from '../../shared/dashboard.ts';
 import { bearerToken, json, methodNotAllowed, sameSecret, serverError } from '../lib/http.ts';
 import { readSettings } from '../lib/settings.ts';
 import type { ResolvedSettings } from '../../shared/settings/resolve.ts';
@@ -17,8 +12,8 @@ import { editSecret, hasSession, hasSettingsSession } from '../lib/session.ts';
 
 /** What `handle` needs. */
 export interface Deps {
-  /** Reads every tab; only called once the password checks out. */
-  loadTabs: () => Promise<Tabs>;
+  /** Reads every dataset; only called once the caller checks out. */
+  loadData: () => Promise<DashboardData>;
   /** Reads the settings in force; only called once the caller checks out. */
   loadSettings: () => Promise<ResolvedSettings>;
   dashboardPassword: string | undefined;
@@ -84,8 +79,8 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
   const now = (deps.now ?? (() => new Date()))();
   const canEdit = hasSettingsSession(request, editSecret(deps.dashboardPassword, deps.settingsPassword), now.getTime());
   try {
-    const [tabs, settings] = await Promise.all([deps.loadTabs(), deps.loadSettings()]);
-    return reply(200, { ok: true, generatedAt: now.toISOString(), tabs, settings, canEdit });
+    const [data, settings] = await Promise.all([deps.loadData(), deps.loadSettings()]);
+    return reply(200, { ok: true, generatedAt: now.toISOString(), data, settings, canEdit });
   } catch (error) {
     return serverError(error, 'api/dashboard');
   }
@@ -103,7 +98,7 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 function route(request: Request): Promise<Response> {
   const db = () => getDb('DASHBOARD_DATABASE_URL');
   return handle(request, {
-    loadTabs: () => loadTabs(db()),
+    loadData: () => loadDashboard(db()),
     loadSettings: () => readSettings(db()),
     dashboardPassword: process.env.DASHBOARD_PASSWORD,
     settingsPassword: process.env.SETTINGS_PASSWORD,

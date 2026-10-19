@@ -7,7 +7,7 @@ import { describe, expect, test } from 'bun:test';
 import { loadConfig } from '../../runner/src/config.ts';
 import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.ts';
 import { createMessageHandler } from '../../runner/src/index.ts';
-import type { IntakeOutcome } from '../../runner/src/ingest.ts';
+import type { IntakeReply } from '../../shared/paradeMessage.ts';
 import type { WAMessage } from '@whiskeysockets/baileys';
 
 /** A marker standing in for a name/NRIC that must never reach a log. */
@@ -104,7 +104,7 @@ describe('listener envelope filters', () => {
 
 describe('createMessageHandler', () => {
   /** An ingestor that records what it was given. */
-  function fakeIngestor(impl: () => Promise<IntakeOutcome> = async () => ({ status: 'parsed', id: 1 })) {
+  function fakeIngestor(impl: () => Promise<IntakeReply> = async () => ({ status: 'parsed', id: 1 })) {
     const calls: [string, string][] = [];
     return {
       calls,
@@ -188,7 +188,7 @@ describe('createMessageHandler', () => {
   test('never logs the problems or reason the intake quotes back', async () => {
     const logged: unknown[] = [];
     const capturingLogger = { ...silentLogger, warn: (fields: unknown, msg?: string) => logged.push([fields, msg]) };
-    const ingestor = fakeIngestor(async () => ({ status: 'needs_review', id: 7, problems: [MARKER], reason: MARKER }) as IntakeOutcome);
+    const ingestor = fakeIngestor(async () => ({ status: 'needs_review', id: 7, problems: [MARKER], reason: MARKER }) as IntakeReply);
     const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
 
     await handle(PARADE_STATE, withId('MSG5'));

@@ -4,7 +4,7 @@
  */
 import { COMPANIES, REPORT_SICK_TYPES } from '../../../shared/domain.ts';
 import { cleanText } from '../../../shared/identity.ts';
-import { isFirstParade, isLastParade } from '../../../shared/paradeHeader.ts';
+import { isFirstParade, isLastParade } from '../../../shared/paradeMessage.ts';
 import type { ExtractedCommandMember, ExtractedPerson, ExtractedUnit, Extraction } from './extraction.ts';
 
 /** What the parser made of a message, and why it is unsure of it (empty when it is sure). */

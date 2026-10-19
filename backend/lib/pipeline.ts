@@ -17,6 +17,7 @@ import {
 } from '../db/schema.ts';
 import { paradeResponseId } from '../../shared/domain.ts';
 import { cleanText } from '../../shared/identity.ts';
+import { needsReviewError, outcomeOf, type MessageSummary } from '../../shared/paradeMessage.ts';
 import { parseParadeState } from './parser/deterministic.ts';
 import type { Extraction } from './parser/extraction.ts';
 import type { OpenAiParser } from './parser/llm.ts';
@@ -27,9 +28,6 @@ const PARSER_NAME = 'deterministic';
 
 /** The model fallback as the pipeline uses it; tests pass a fake. */
 export type ModelParser = Pick<OpenAiParser, 'model' | 'parse'>;
-
-/** Prefixed to `raw_messages.error` when the parser was unsure, so the list can say so. */
-const NEEDS_REVIEW = 'Needs review: ';
 
 // neon-http's Drizzle handle; typed loosely so tests can pass a fake.
 type Db = any;
@@ -69,18 +67,6 @@ export type IngestOutcome =
   | ({ id: number } & Exclude<Parsed, { status: 'parsed' }>)
   | { status: 'not_found'; id: number };
 
-/** One stored message as the dashboard lists it. Carries no body. */
-interface MessageSummary {
-  id: number;
-  waMessageId: string;
-  receivedAt: Date;
-  processedAt: Date | null;
-  paradeResponseId: string | null;
-  /** Why no rows were written, without the reasons: those can quote a personnel line. */
-  outcome: 'needs_review' | 'rejected' | null;
-  /** How many lines the parser doubted; 0 unless `outcome` is `needs_review`. */
-  problems: number;
-}
 
 /**
  * Stores a relayed message, idempotently.
@@ -294,18 +280,6 @@ export async function listMessages(db: Db): Promise<MessageSummary[]> {
 }
 
 /**
- * Reads what a stored error says happened, without keeping its text.
- *
- * @param error `raw_messages.error`.
- * @returns The outcome and the number of doubted lines.
- */
-function outcomeOf(error: string | null): Pick<MessageSummary, 'outcome' | 'problems'> {
-  if (!error) return { outcome: null, problems: 0 };
-  if (!error.startsWith(NEEDS_REVIEW)) return { outcome: 'rejected', problems: 0 };
-  return { outcome: 'needs_review', problems: error.slice(NEEDS_REVIEW.length).split(' | ').length };
-}
-
-/**
  * Reads one stored message's text and why it produced no rows, for editing.
  *
  * @param db A database handle.
@@ -459,7 +433,7 @@ async function markFailed(db: Db, messageId: number, reason: string, timing: Tim
  * @returns The text.
  */
 function failureText(parsed: Exclude<Parsed, { status: 'parsed' }>): string {
-  return parsed.status === 'needs_review' ? NEEDS_REVIEW + parsed.problems.join(' | ') : parsed.reason;
+  return parsed.status === 'needs_review' ? needsReviewError(parsed.problems) : parsed.reason;
 }
 
 /**

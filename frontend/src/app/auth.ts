@@ -1,0 +1,197 @@
+/**
+ * The session's whole life, from the password typed to the session ended.
+ *
+ * This file holds no credential. The password is sent once, to `/api/session`, which
+ * answers with an `HttpOnly` session cookie the browser stores and no script here — or
+ * injected into this page — can read. Every later call simply carries that cookie.
+ *
+ * A reload therefore does not ask again: the cookie is still there, and `resume()` finds
+ * out by trying to read. The session lasts as long as the Session settings say (twelve
+ * hours by default), ends at once when **Lock** is pressed, and stops verifying the moment
+ * `DASHBOARD_PASSWORD` is rotated, because the token is signed with it (`lib/session.ts`).
+ *
+ * There is no password check in this file, and there must not be one. The check happens in
+ * `api/session.ts`, where the caller cannot see or skip it. A check here would be decoration.
+ */
+
+import { loadAll } from '../data/feed.ts';
+import { refreshMs } from '../data/settings.ts';
+import { endSession, startSession } from '../data/session.ts';
+import { dataset, loadError, status } from './state.ts';
+
+/**
+ * Deletes the password a previous build of this page kept in `localStorage`.
+ *
+ * That build is gone, but a browser that ran it is still holding the password until
+ * something removes it, and that something has to be this page.
+ * ponytail: one-off purge kept on purpose; delete once every clerk browser has loaded a
+ * build since 2026-09-21 (safe after 2026-12-31).
+ * @returns {void}
+ */
+function forgetStoredPassword_() {
+  try {
+    window.localStorage.removeItem('bda.dashboardPassword');
+  } catch {
+    // Storage can be blocked outright; there is then nothing left behind to remove.
+  }
+}
+
+forgetStoredPassword_();
+
+/** @type {?Promise<boolean>} The background refresh waiting on the server, if any. */
+let inFlight = null;
+
+/** @type {?Promise<boolean>} The one follow-up refresh queued behind `inFlight`, if any. */
+let queued = null;
+
+/**
+ * Opens the dashboard with the password the viewer typed.
+ *
+ * The password goes to the server and is not kept here, so a failed attempt leaves nothing
+ * behind and the next one types it again.
+ * @param {string} typed The password from the login form.
+ * @returns {!Promise<boolean>} True once data is loaded.
+ */
+export function unlock(typed) {
+  if (typed === '') {
+    loadError.value = 'Enter the password.';
+    return Promise.resolve(false);
+  }
+  loadError.value = '';
+  status.value = 'loading';
+  return startSession(typed)
+    .then(() => read_())
+    .catch((error) => fail_(error));
+}
+
+/**
+ * Opens the dashboard on the session from an earlier visit, if the browser still has one.
+ *
+ * Called once at start-up. There is no way to ask whether the cookie is there — it is
+ * `HttpOnly` — so this reads, and a 401 simply means the login screen stays up.
+ * @returns {!Promise<boolean>} True once data is loaded.
+ */
+export function resume() {
+  status.value = 'loading';
+  return read_().catch((error) => fail_(error));
+}
+
+/**
+ * Reads the dataset and moves the store to 'ready'.
+ * @returns {!Promise<boolean>} True once data is loaded.
+ */
+function read_() {
+  return loadAll().then((data) => {
+    dataset.value = data;
+    loadError.value = '';
+    status.value = 'ready';
+    return true;
+  });
+}
+
+/**
+ * Puts the login screen back up with the reason on it.
+ * @param {!Error} error What went wrong.
+ * @returns {boolean} False, so callers can return it.
+ */
+function fail_(error) {
+  loadError.value = error.message;
+  status.value = 'locked';
+  return false;
+}
+
+/**
+ * Re-reads the data in the background, leaving the page on screen while it waits.
+ *
+ * Only one read is ever in flight. A call made while one is in flight queues a single
+ * follow-up read, started when the current one finishes, and resolves with it: the caller
+ * may have just saved something (a setting, an unlock) that the in-flight read began too
+ * early to see. Further calls before the follow-up starts share it.
+ *
+ * Only an ended session changes what the viewer sees: the login screen returns. Any other
+ * failure keeps the data already drawn and waits for the next tick, since a dropped
+ * connection is not a reason to take the page away.
+ * @returns {!Promise<boolean>} True when fresh data replaced the old.
+ */
+export function refresh() {
+  if (queued) {
+    return queued;
+  }
+  if (inFlight) {
+    queued = inFlight.then(() => {
+      queued = null;
+      return refresh();
+    });
+    return queued;
+  }
+  inFlight = readInBackground_().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+/**
+ * One background read: replaces the dataset, or returns to the login screen on a 401.
+ * @returns {!Promise<boolean>} True when fresh data replaced the old.
+ */
+function readInBackground_() {
+  return loadAll()
+    .then((data) => {
+      dataset.value = data;
+      return true;
+    })
+    .catch((error) => {
+      if (error.status === 401) {
+        fail_(error);
+      }
+      return false;
+    });
+}
+
+/**
+ * Keeps an open dashboard current: re-reads at the Session settings' interval (every minute
+ * by default) while the tab is visible, and at once when a hidden tab is shown again.
+ *
+ * A hidden tab does not poll, so a dashboard left open overnight in a background tab costs
+ * no reads until someone looks at it.
+ * @returns {function(): void} Stops the refreshing.
+ */
+export function startAutoRefresh() {
+  let timer = 0;
+  /**
+   * Refreshes if the tab is visible, then waits the current interval again.
+   * @returns {void}
+   */
+  function tick() {
+    if (document.visibilityState === 'visible') {
+      refresh();
+    }
+    timer = window.setTimeout(tick, refreshMs());
+  }
+  timer = window.setTimeout(tick, refreshMs());
+  /**
+   * Refreshes when the tab comes back into view.
+   * @returns {void}
+   */
+  function onVisible() {
+    if (document.visibilityState === 'visible') {
+      refresh();
+    }
+  }
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    window.clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
+
+/**
+ * Ends the session at the server, then reloads to forget everything read with it.
+ *
+ * The reload is not the security boundary — deleting the cookie is — but it is the most
+ * complete way to clear the data already on screen.
+ * @returns {void}
+ */
+export function lock() {
+  endSession().finally(() => window.location.reload());
+}

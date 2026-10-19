@@ -4,7 +4,7 @@
  * Whether it really is a parade state is the parser's call on the server.
  */
 
-import { isFirstParade, isLastParade } from '../../shared/paradeHeader.ts';
+import { isFirstParade, isLastParade } from '../../shared/paradeMessage.ts';
 
 /** Minimum non-empty lines a parade state has. */
 const MIN_LINES = 8;

@@ -59,33 +59,33 @@ describe('normaliseFourD', () => {
 
 describe('identityOf', () => {
   test('the 4D wins when a row has one', () => {
-    expect(identityOf({ four_d: '1214', name: 'RYAN' })).toEqual({
+    expect(identityOf({ fourD: '1214', name: 'RYAN' })).toEqual({
       key: '4D:1214',
-      source: 'four_d',
+      source: 'fourD',
     });
   });
 
   test('a company-prefixed 4D keeps its prefix, so Cougar 1204 is not Archer 1204', () => {
-    expect(identityOf({ four_d: 'C1204', name: 'FAEGAN' }).key).toBe('4D:C1204');
+    expect(identityOf({ fourD: 'C1204', name: 'FAEGAN' }).key).toBe('4D:C1204');
   });
 
   test('a row with no 4D falls back to the name, and says so', () => {
-    expect(identityOf({ four_d: '', name: 'Marcus Tan' })).toEqual({
+    expect(identityOf({ fourD: '', name: 'Marcus Tan' })).toEqual({
       key: 'NAME:MARCUS TAN',
       source: 'name',
     });
   });
 
   test('a row with neither yields no key rather than a shared empty one', () => {
-    expect(identityOf({ four_d: '', name: '' })).toEqual({ key: '', source: 'none' });
+    expect(identityOf({ fourD: '', name: '' })).toEqual({ key: '', source: 'none' });
   });
 });
 
 describe('identityKey', () => {
   test('builds the same key a personnel row would, from fields held separately', () => {
-    expect(identityKey('1214', 'Ryan')).toBe(identityOf({ four_d: '1214', name: 'Ryan' }).key);
+    expect(identityKey('1214', 'Ryan')).toBe(identityOf({ fourD: '1214', name: 'Ryan' }).key);
     expect(identityKey('', 'Marcus Tan')).toBe(
-      identityOf({ four_d: '', name: 'Marcus Tan' }).key
+      identityOf({ fourD: '', name: 'Marcus Tan' }).key
     );
   });
 
@@ -100,7 +100,7 @@ describe('identityKey', () => {
     ['NIL', 'Nil', 'NA', 'N/A', 'NONE', '-', 'REC'].forEach((placeholder) => {
       expect(identityKey(placeholder, 'Marcus Tan')).toBe('NAME:MARCUS TAN');
       expect(identityKey(placeholder, 'Marcus Tan')).toBe(
-        identityOf({ four_d: placeholder, name: 'Marcus Tan' }).key
+        identityOf({ fourD: placeholder, name: 'Marcus Tan' }).key
       );
     });
   });

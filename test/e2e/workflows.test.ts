@@ -3,23 +3,23 @@
  *
  * The app's three routes run on a local port (`test/support/app.ts`). Each workflow is driven by
  * the code a person's action actually runs -- the WhatsApp bridge's handler and relay, the
- * dashboard's `src/data/` calls, a real signed FormSG webhook -- and is checked by what the
- * dashboard then shows, computed by `src/model/` from the records `src/data/feed.js` loads.
+ * dashboard's `frontend/src/data/` calls, a real signed FormSG webhook -- and is checked by what the
+ * dashboard then shows, computed by `frontend/src/model/` from what `frontend/src/data/feed.ts` loads.
  * The expected numbers are counted off the dummy data, not the code.
  * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Db } from '../../backend/db/index.ts';
-import { loadAll } from '../../frontend/src/data/feed.js';
-import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../frontend/src/data/parade.js';
-import { endSession, startSession } from '../../frontend/src/data/session.js';
-import { saveSection } from '../../frontend/src/data/settings.js';
-import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../frontend/src/data/sft.js';
-import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
-import { battalionStrength, dutyCountsOn } from '../../frontend/src/model/metrics.js';
-import { MESSAGE_STATUS, toMessageRows } from '../../frontend/src/model/paradeMessages.js';
+import { loadAll } from '../../frontend/src/data/feed.ts';
+import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../frontend/src/data/parade.ts';
+import { endSession, startSession } from '../../frontend/src/data/session.ts';
+import { saveSection } from '../../frontend/src/data/settings.ts';
+import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../frontend/src/data/sft.ts';
+import { DUTY_CLASS } from '../../frontend/src/model/classify.ts';
+import { battalionStrength, dutyCountsOn } from '../../frontend/src/model/metrics.ts';
+import { MESSAGE_STATUS, toMessageRows } from '../../frontend/src/model/paradeMessages.ts';
 import { toEditForm } from '../../shared/sftEdit.ts';
-import { toSftRecords } from '../../frontend/src/model/sft.js';
+import { toSftSessions } from '../../frontend/src/model/sft.ts';
 import { loadConfig } from '../../runner/src/config.ts';
 import { createMessageHandler } from '../../runner/src/index.ts';
 import { createIngestor } from '../../runner/src/ingest.ts';
@@ -34,17 +34,8 @@ const SPECS = SCENARIOS.map(({ spec }) => spec);
 const GROUP = '120363000000000000@g.us';
 const E2E_TIMEOUT_MS = DB_TIMEOUT_MS * 4;
 
-/*
- * The browser modules are untyped JavaScript (`!Object` in JSDoc), so their answers are typed
- * loosely here; each test asserts the shape it relies on.
- */
-const page = {
-  deposit: (text: string): Promise<any> => depositMessage(text),
-  list: (): Promise<any[]> => listMessages(),
-  get: (id: number): Promise<any> => getMessage(id),
-  edit: (id: number, text: string): Promise<any> => editMessage(id, text),
-  remove: (id: number): Promise<any> => deleteMessage(id),
-};
+/** What the Deposit page calls. */
+const page = { deposit: depositMessage, list: listMessages, get: getMessage, edit: editMessage, remove: deleteMessage };
 
 /**
  * Unlocks the dashboard the way the login screen does: the password once, for a session
@@ -88,9 +79,9 @@ function expectedDashboard(specs: ParadeSpec[]) {
  * @returns The loaded records and the computed figures.
  */
 async function dashboardOn(origin: string, date: string) {
-  const data: any = await withOrigin(origin, () => loadAll());
-  const strength: any = battalionStrength(data.strength, date, 'FPS');
-  const duties: any = dutyCountsOn(data.personnel, date, 'FPS');
+  const data = await withOrigin(origin, () => loadAll());
+  const strength = battalionStrength(data.strength, date, 'FPS');
+  const duties = dutyCountsOn(data.personnel, date, 'FPS');
   const bySection = Object.fromEntries(
     Object.values(DUTY_CLASS)
       .filter((dutyClass) => duties.counts[dutyClass] > 0)
@@ -183,21 +174,22 @@ describe.skipIf(!hasTestDb)('end to end', () => {
       expect((await page.deposit(renderParadeState(second))).status).toBe('parsed');
       const review = await page.deposit(doubtful);
       expect(review.status).toBe('needs_review');
+      const id = review.id!;
 
       const rows = toMessageRows(await page.list());
-      expect(rows.map((row: any) => row.status)).toEqual([MESSAGE_STATUS.NEEDS_REVIEW, MESSAGE_STATUS.PARSED]);
-      expect(rows.every((row: any) => row.source === 'Manual')).toBe(true);
+      expect(rows.map((row) => row.status)).toEqual([MESSAGE_STATUS.NEEDS_REVIEW, MESSAGE_STATUS.PARSED]);
+      expect(rows.every((row) => row.source === 'Manual')).toBe(true);
       // The list says how many lines to fix but never quotes them; opening the message does.
       expect(rows[0]!.problems).toBeGreaterThan(0);
       expect(JSON.stringify(await page.list())).not.toContain('SOMETHING UNHEARD OF');
-      const opened = await page.get(review.id);
+      const opened = await page.get(id);
       expect(opened.body).toBe(doubtful);
       expect(opened.error).toContain('SOMETHING UNHEARD OF');
 
       // The clerk fixes the doubtful line.
-      expect((await page.edit(review.id, renderParadeState(first))).status).toBe('parsed');
-      expect(toMessageRows(await page.list()).map((row: any) => row.status)).toEqual([MESSAGE_STATUS.PARSED, MESSAGE_STATUS.PARSED]);
-      return review.id as number;
+      expect((await page.edit(id, renderParadeState(first))).status).toBe('parsed');
+      expect(toMessageRows(await page.list()).map((row) => row.status)).toEqual([MESSAGE_STATUS.PARSED, MESSAGE_STATUS.PARSED]);
+      return id;
     });
     expect((await dashboardOn(app.origin, SCENARIO_DATE)).shown).toEqual(expectedDashboard([first, second]));
 
@@ -210,7 +202,7 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     await withOrigin(app.origin, () => page.remove(reviewId));
     const after = await dashboardOn(app.origin, moved.date);
     expect(after.shown.accountable).toBe(0);
-    expect(after.data.submissions.map((row: any) => row.parade_response_id)).toEqual([expectedKey(second)]);
+    expect(after.data.submissions.map((row) => row.paradeResponseId)).toEqual([expectedKey(second)]);
   }, E2E_TIMEOUT_MS);
 
   test('FormSG webhook → database → report-sick records on the dashboard, without the NRIC', async () => {
@@ -222,8 +214,8 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     }
 
     const { data } = await dashboardOn(app.origin, SCENARIO_DATE);
-    expect(data.formSg.map((row: any) => row['[Myinfo] Name']).sort()).toEqual(SICK_SPECS.map((spec) => spec.name).sort());
-    expect(data.available.formSg).toBe(true);
+    expect(data.formSg.map((row) => row.name).sort()).toEqual(SICK_SPECS.map((spec) => spec.name).sort());
+    expect(data.notes.formSg).toBeUndefined();
     expect(JSON.stringify(data)).not.toContain(FAKE_NRIC);
   }, E2E_TIMEOUT_MS);
 
@@ -236,16 +228,16 @@ describe.skipIf(!hasTestDb)('end to end', () => {
     }
     const [wrong, extra] = [SFT_SPECS[0]!, SFT_SPECS[1]!];
     await withOrigin(app.origin, async () => {
-      const records: any[] = await listSftRecords();
+      const records = await listSftRecords();
       expect(records.map((record) => record.responseId).sort()).toEqual(SFT_SPECS.map((spec) => spec.submissionId).sort());
-      const stored = records.find((record) => record.responseId === wrong.submissionId);
+      const stored = records.find((record) => record.responseId === wrong.submissionId)!;
       // The soldier picked the wrong company and misspelt the place.
-      const answer: any = await updateSftRecord(wrong.submissionId, { ...toEditForm(stored), company: 'Cougar', location: 'Camp Track' });
+      const answer = await updateSftRecord(wrong.submissionId, { ...toEditForm(stored), company: 'Cougar', location: 'Camp Track' });
       expect(answer.status).toBe('updated');
       await deleteSftRecord(extra.submissionId);
     });
 
-    const shown: any[] = toSftRecords((await dashboardOn(app.origin, SCENARIO_DATE)).data.sft);
+    const shown = toSftSessions((await dashboardOn(app.origin, SCENARIO_DATE)).data.sft);
     expect(shown.length).toBe(SFT_SPECS.length - 1);
     expect(shown.map((record) => record.name)).not.toContain(extra.name);
     const moved = shown.filter((record) => record.company === 'Cougar');
@@ -263,7 +255,7 @@ describe.skipIf(!hasTestDb)('end to end', () => {
 
   test('Lock ends the session at the server: what it opened no longer reads', async () => {
     await unlock(app.origin);
-    expect((await withOrigin(app.origin, () => loadAll())) as any).toBeTruthy();
+    expect(await withOrigin(app.origin, () => loadAll())).toBeTruthy();
     await withOrigin(app.origin, () => endSession());
     await withOrigin(app.origin, async () => {
       await expect(loadAll()).rejects.toThrow('The session has ended. Enter the password again.');
@@ -284,7 +276,7 @@ describe.skipIf(!hasTestDb)('end to end', () => {
 
     forgetCookies(app.origin);
     await unlock(app.origin);
-    const data: any = await withOrigin(app.origin, () => loadAll());
+    const data = await withOrigin(app.origin, () => loadAll());
     expect(data.canEdit).toBe(false);
     expect(data.holidays).toEqual([{ date: '2026-08-09', name: 'National Day' }]);
   }, E2E_TIMEOUT_MS);

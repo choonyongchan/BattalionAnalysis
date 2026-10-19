@@ -44,11 +44,11 @@ export function identityKey(fourD: unknown, name: unknown): string {
   return normalised === '' ? '' : 'NAME:' + normalised;
 }
 
-/** Identity key of a row with `four_d` and `name`, and which field produced it. */
-export function identityOf(row: { four_d?: unknown; name?: unknown }): { key: string; source: 'four_d' | 'name' | 'none' } {
-  const key = identityKey(row.four_d, row.name);
+/** Identity key of a row with `fourD` and `name`, and which field produced it. */
+export function identityOf(row: { fourD?: unknown; name?: unknown }): { key: string; source: 'fourD' | 'name' | 'none' } {
+  const key = identityKey(row.fourD, row.name);
   if (key === '') return { key, source: 'none' };
-  return { key, source: key.startsWith('4D:') ? 'four_d' : 'name' };
+  return { key, source: key.startsWith('4D:') ? 'fourD' : 'name' };
 }
 
 /** Rank tokens that may survive into a name field and must not drive a match. */
@@ -68,13 +68,23 @@ export function nameTokens(name: unknown): string[] {
     .filter((token) => token.length > 1 && !RANKS.has(token) && !CONNECTORS.has(token));
 }
 
-/** Whether two names plausibly belong to one soldier: shorter name's 2+ tokens all shared, or 60% overlap. */
-export function namesMatch(a: unknown, b: unknown): boolean {
-  const setA = new Set(nameTokens(a));
-  const setB = new Set(nameTokens(b));
-  if (setA.size === 0 || setB.size === 0) return false;
-  const shared = [...setA].filter((token) => setB.has(token)).length;
-  const smaller = Math.min(setA.size, setB.size);
-  if (smaller >= 2 && shared === smaller) return true;
-  return shared / (setA.size + setB.size - shared) >= 0.6;
+/**
+ * Whether two names plausibly belong to one soldier: every token of the shorter name (2+) shared,
+ * or a 60% overlap. `same` decides when two tokens are one word (exact by default; SFT allows typos).
+ */
+export function namesMatch(a: unknown, b: unknown, same: (x: string, y: string) => boolean = (x, y) => x === y): boolean {
+  const tokensA = [...new Set(nameTokens(a))];
+  const unmatched = [...new Set(nameTokens(b))];
+  const sizeB = unmatched.length;
+  if (tokensA.length === 0 || sizeB === 0) return false;
+  let shared = 0;
+  for (const token of tokensA) {
+    const index = unmatched.findIndex((other) => same(token, other));
+    if (index >= 0) {
+      unmatched.splice(index, 1);
+      shared += 1;
+    }
+  }
+  const smaller = Math.min(tokensA.length, sizeB);
+  return (smaller >= 2 && shared === smaller) || shared / (tokensA.length + sizeB - shared) >= 0.6;
 }

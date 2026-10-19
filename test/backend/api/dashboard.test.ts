@@ -4,12 +4,13 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { resolveSettings } from '../../../shared/settings/resolve.ts';
+import type { DashboardData } from '../../../shared/dashboard.ts';
 import { handle, type Deps } from '../../../backend/api/dashboard.ts';
 import { SESSION_COOKIE, SESSION_TTL_MS, issueSession } from '../../../backend/lib/session.ts';
 
 const PASSWORD = 'dashboard-pw';
 const URL = 'https://example.vercel.app/api/dashboard';
-const TABS = { 'Strength Data': [['parade_response_id']] };
+const DATA: DashboardData = { strength: [], personnel: [], roster: [], formSg: [], submissions: [], sft: [], sectionCounts: [] };
 const SETTINGS = resolveSettings([]);
 
 /**
@@ -21,7 +22,7 @@ const SETTINGS = resolveSettings([]);
 function setup(overrides: Partial<Deps> = {}) {
   const calls = { load: 0 };
   const deps: Deps = {
-    loadTabs: async () => (calls.load++, TABS),
+    loadData: async () => (calls.load++, DATA),
     loadSettings: async () => SETTINGS,
     dashboardPassword: PASSWORD,
     hasDatabase: true,
@@ -73,7 +74,7 @@ describe('api/dashboard', () => {
     expect(calls.load).toBe(0);
   });
 
-  test('the right password reads every tab, uncached', async () => {
+  test('the right password reads every dataset, uncached', async () => {
     const { deps } = setup();
     const response = await handle(request('GET', PASSWORD), deps);
     expect(response.status).toBe(200);
@@ -81,7 +82,7 @@ describe('api/dashboard', () => {
     expect(await response.json()).toEqual({
       ok: true,
       generatedAt: '2026-09-22T01:00:00.000Z',
-      tabs: TABS,
+      data: DATA,
       settings: SETTINGS,
       canEdit: false,
     });
@@ -114,7 +115,7 @@ describe('api/dashboard', () => {
 
   test('a read failure answers 500 without its message', async () => {
     const { deps } = setup({
-      loadTabs: async () => {
+      loadData: async () => {
         throw new Error('column "TEST PERSON" does not exist');
       },
     });

@@ -10,7 +10,7 @@ import { handle as handleParade, type Deps as ParadeDeps } from '../../backend/a
 import { handle as handleSession } from '../../backend/api/session.ts';
 import { handle as handleSettings } from '../../backend/api/settings.ts';
 import type { Db } from '../../backend/db/index.ts';
-import { loadTabs } from '../../backend/lib/dashboard.ts';
+import { loadDashboard } from '../../backend/lib/dashboard.ts';
 import { readSettings, resetSection, saveSection } from '../../backend/lib/settings.ts';
 import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../backend/lib/sft.ts';
 import {
@@ -98,7 +98,7 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] & { p
       if (path === '/api/parade') return handleParade(request, paradeDeps(db, options));
       if (path === '/api/dashboard') {
         return handleDashboard(request, {
-          loadTabs: () => loadTabs(db),
+          loadData: () => loadDashboard(db),
           loadSettings: () => readSettings(db),
           dashboardPassword: DASHBOARD_PASSWORD,
           settingsPassword: SETTINGS_PASSWORD,
