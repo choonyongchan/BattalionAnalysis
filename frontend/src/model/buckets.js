@@ -12,8 +12,8 @@
  * Every function here is pure.
  */
 
-import { addDays, MONTH_NAMES, weekdayOf } from '../../../shared/dates.js';
-import { rotationOf } from '../../../shared/rotations.js';
+import { addDays, MONTH_NAMES, weekdayOf } from '../../../shared/dates.ts';
+import { rotationOf } from '../../../shared/rotations.ts';
 
 /**
  * The key a date with no rotation falls under.

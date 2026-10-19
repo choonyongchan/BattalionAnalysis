@@ -14,8 +14,8 @@ import { platoonOf } from './platoon.js';
 import { isPermanentStatus } from './statusBuckets.js';
 import { isDuty } from './classify.js';
 import { leaderboard } from './metrics.js';
-import { toText } from '../../../shared/values.js';
-import { settingOf } from './activeSettings.js';
+import { toText } from '../../../shared/values.ts';
+import { settingOf } from './activeSettings.ts';
 
 /**
  * Resolves a leaderboard row's platoon from its sub-header (`platoon.js`).

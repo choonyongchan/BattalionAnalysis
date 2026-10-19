@@ -17,8 +17,8 @@
  */
 
 import { keywords } from './classify.js';
-import { addDays } from '../../../shared/dates.js';
-import { toText } from '../../../shared/values.js';
+import { addDays } from '../../../shared/dates.ts';
+import { toText } from '../../../shared/values.ts';
 
 /**
  * The eight clinical categories, verbatim as FormSG stores them, most frequent first.

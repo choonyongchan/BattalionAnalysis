@@ -3,13 +3,14 @@
  * The reader is a fake; `lib/dashboard.ts` has its own tests.
  */
 import { describe, expect, test } from 'bun:test';
+import { resolveSettings } from '../../../shared/settings/resolve.ts';
 import { handle, type Deps } from '../../../backend/api/dashboard.ts';
 import { SESSION_COOKIE, SESSION_TTL_MS, issueSession } from '../../../backend/lib/session.ts';
 
 const PASSWORD = 'dashboard-pw';
 const URL = 'https://example.vercel.app/api/dashboard';
 const TABS = { 'Strength Data': [['parade_response_id']] };
-const SETTINGS = { values: {}, meta: {} };
+const SETTINGS = resolveSettings([]);
 
 /**
  * Builds deps over a reader that counts its calls.

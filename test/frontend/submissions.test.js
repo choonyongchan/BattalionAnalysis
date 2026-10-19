@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { filingTimes, filingsOn, latestFilingPerCompany, toFilings } from '../../frontend/src/model/submissions.js';
-import { COMPANIES } from '../../shared/domain.js';
+import { COMPANIES } from '../../shared/domain.ts';
 
 /**
  * A "Parade State Responses" row, as the feed projects it.

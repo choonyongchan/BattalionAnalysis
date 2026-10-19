@@ -13,7 +13,7 @@
  */
 
 import { company, dateFrom, dateTo } from '../app/state.js';
-import { COMPANIES } from '../../../shared/domain.js';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { ALL_COMPANIES } from '../model/scope.js';
 import { DateRangePicker } from './DateRangePicker.jsx';
 import { Segmented } from './Segmented.jsx';

@@ -20,7 +20,7 @@ import {
   REPORT_SICK_TYPES,
   ROLE_KINDS,
   SESSIONS,
-} from '../domain.ts';
+} from '../../../shared/domain.ts';
 
 /** A required string property. */
 const str = { type: 'string' } as const;

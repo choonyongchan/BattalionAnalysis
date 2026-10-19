@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS } from '../../shared/tabs.ts';
 import { buildEpisodes } from '../../frontend/src/model/episodes.js';
 import { toSubmissions } from '../../frontend/src/model/formsg.js';
 import { findSoldier, soldierIndex, soldierReport } from '../../frontend/src/model/soldier.js';

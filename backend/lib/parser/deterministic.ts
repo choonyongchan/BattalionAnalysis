@@ -2,7 +2,9 @@
  * Rule-based parser for the standard 40 SAR first-parade-state template.
  * Returns an `Extraction` plus the lines it could not read; any problem means "ask the model".
  */
-import { COMPANIES, REPORT_SICK_TYPES, cleanText } from '../domain.ts';
+import { COMPANIES, REPORT_SICK_TYPES } from '../../../shared/domain.ts';
+import { cleanText } from '../../../shared/identity.ts';
+import { isFirstParade, isLastParade } from '../../../shared/paradeHeader.ts';
 import type { ExtractedCommandMember, ExtractedPerson, ExtractedUnit, Extraction } from './extraction.ts';
 
 /** What the parser made of a message, and why it is unsure of it (empty when it is sure). */
@@ -94,7 +96,7 @@ export function parseParadeState(rawText: string, today: string): DeterministicR
   const start = lines.findIndex((line) => ROLE_LINE.test(line) || BLOCK_LINE.test(line));
   const head = (start < 0 ? lines.slice(0, 5) : lines.slice(0, start)).join('\n').toUpperCase();
 
-  if (/\bLAST PARADE STATE\b|\bLPS\b/.test(head)) {
+  if (isLastParade(head)) {
     return sure(rejection('This is a LAST PARADE STATE; only first parade states are ingested.', 'LPS'));
   }
   // The template's own sections may nest an S/N sub-form; only its absence marks the old layout.
@@ -102,7 +104,7 @@ export function parseParadeState(rawText: string, today: string): DeterministicR
     return sure(rejection('Parade state is in an older free-form layout, not the standard template.'));
   }
   if (start < 0) {
-    return /PARADE STATE|\bFPS\b/.test(head)
+    return /PARADE STATE/.test(head) || isFirstParade(head)
       ? { extraction: rejection('No strength blocks found.'), problems: ['Says parade state but has no strength blocks.'] }
       : sure(rejection('Not a parade state.'));
   }
@@ -146,7 +148,7 @@ function readHeader(
   if (!company) problems.push(`Company not identifiable from the header (named: ${named.join(', ') || 'none'}).`);
   if (!date) problems.push('No valid "DATE: DDMMYY" in the header.');
   if (stamp?.[2] && !parade_time) problems.push(`Invalid parade time ${stamp[2]}.`);
-  if (!/\bFIRST PARADE STATE\b|\bFPS\b/.test(head)) problems.push('Header does not say FIRST PARADE STATE.');
+  if (!isFirstParade(head)) problems.push('Header does not say FIRST PARADE STATE.');
   return { fields: { company, date, session: 'FPS', parade_time }, problems };
 }
 

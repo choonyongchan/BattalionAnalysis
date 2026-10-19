@@ -10,10 +10,10 @@
 
 import { describe, expect, test } from 'bun:test';
 import { activeWithin, buildEpisodes, startsByWeekday } from '../../frontend/src/model/episodes.js';
-import { identityOf } from '../../shared/identity.js';
+import { identityOf } from '../../shared/identity.ts';
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS, TABS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS, TABS } from '../../shared/tabs.ts';
 import { personnelValues } from './fixtures.js';
 
 /**

@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS } from '../../shared/tabs.ts';
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import { dutyTrend, presentTrend, tierPresence } from '../../frontend/src/model/strength.js';
 

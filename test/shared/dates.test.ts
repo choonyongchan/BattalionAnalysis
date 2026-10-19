@@ -13,7 +13,7 @@ import {
   inclusiveDaySpan,
   isWeekend,
   weekdayOf,
-} from '../../shared/dates.js';
+} from '../../shared/dates.ts';
 
 describe('day arithmetic', () => {
   test('a one-day absence spans one day, not zero', () => {

@@ -17,7 +17,7 @@ import { DataTable } from '../../components/Table.jsx';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../data/parade.js';
 import { fmtDate, fmtInt } from '../../format.js';
 import { MESSAGE_STATUS, describeOutcome, reasonsOf, toMessageRows } from '../../model/paradeMessages.js';
-import { settingOf } from '../../model/activeSettings.js';
+import { settingOf } from '../../model/activeSettings.ts';
 import { Outcome, RowActions, runBusy } from './shared.jsx';
 
 /** @type {!Object<string, string>} The status class suffix for each status. */

@@ -11,7 +11,7 @@ import { TableTwin } from './TableTwin.jsx';
 import { fmtDate, fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import { axisOption, baseOption } from './theme.js';
-import { MS_PER_DAY, isoToUtcMs } from '../../../shared/dates.js';
+import { MS_PER_DAY, isoToUtcMs } from '../../../shared/dates.ts';
 
 /**
  * Builds the ECharts option.

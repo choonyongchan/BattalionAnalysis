@@ -1,22 +1,59 @@
-/**
- * Tests for resolving a soldier to a stable key.
- *
- * The case worth having is the fallback: 14% of personnel rows carry no 4D, and if two
- * spellings of one commander's name produced two keys, his history would be split in half
- * on every leaderboard without anything looking wrong.
- */
+/** Tests for resolving a soldier to one stable key, by 4D or, failing that, by name. */
 
 import { describe, expect, test } from 'bun:test';
-import { identityKey, identityOf, namesMatch, nameTokens, normaliseName } from '../../shared/identity.js';
+import {
+  cleanText,
+  fourDOrNull,
+  identityKey,
+  identityOf,
+  namesMatch,
+  nameTokens,
+  normaliseFourD,
+  normaliseName,
+} from '../../shared/identity.ts';
+
+describe('cleanText', () => {
+  test('removes the word joiner seen before entry numbers in real messages', () => {
+    expect(cleanText('2. ⁠3SG NAME')).toBe('2. 3SG NAME');
+  });
+
+  test('turns non-breaking spaces into ordinary ones and strips a byte-order mark', () => {
+    expect(cleanText('PL 7')).toBe('PL 7');
+    expect(cleanText('﻿40 SAR')).toBe('40 SAR');
+  });
+
+  test('normalises CRLF and bare CR to LF', () => {
+    expect(cleanText('a\r\nb\rc')).toBe('a\nb\nc');
+  });
+});
 
 describe('normaliseName', () => {
   test('makes one soldier out of two spellings', () => {
-    expect(normaliseName('NG JUN WEI, CALEB')).toBe(normaliseName('Ng Jun Wei  Caleb'));
+    expect(normaliseName('NG JUN WEI, CALEB')).toBe(normaliseName('Ng Jun Wei  (Caleb)'));
   });
 
   test('a blank name normalises to an empty string, not to a key', () => {
     expect(normaliseName('')).toBe('');
     expect(normaliseName(null)).toBe('');
+    expect(normaliseName(undefined)).toBe('');
+  });
+
+  test('survives the invisible characters found in real messages', () => {
+    expect(normaliseName('TAN⁠ AH KOW')).toBe('TAN AH KOW');
+  });
+});
+
+describe('normaliseFourD', () => {
+  test('upper-cases and trims, keeping leading zeros', () => {
+    expect(normaliseFourD(' a1105 ')).toBe('A1105');
+    expect(normaliseFourD('0208')).toBe('0208');
+  });
+
+  test('treats the placeholders soldiers type as no 4D at all', () => {
+    for (const placeholder of ['NIL', 'nil', 'N/A', 'none', '-', 'Rec']) {
+      expect(normaliseFourD(placeholder)).toBe('');
+      expect(fourDOrNull(placeholder)).toBeNull();
+    }
   });
 });
 

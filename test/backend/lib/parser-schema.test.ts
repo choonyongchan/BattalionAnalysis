@@ -17,7 +17,7 @@ import {
   REPORT_SICK_TYPES,
   ROLE_KINDS,
   SESSIONS,
-} from '../../../backend/lib/domain.ts';
+} from '../../../shared/domain.ts';
 
 type Node = Record<string, any>;
 

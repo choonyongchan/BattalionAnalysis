@@ -313,6 +313,16 @@ describe('whole-message decisions', () => {
     expect(result).toMatchObject({ problems: [], extraction: { rejected: true, session: 'LPS' } });
   });
 
+  test('reads a bare LP or FP header as the runner does', () => {
+    expect(parseParadeState(ARCHER.replace('FIRST PARADE STATE', 'LP'), TODAY)).toMatchObject({
+      problems: [],
+      extraction: { rejected: true, session: 'LPS' },
+    });
+    expect(parseParadeState(ARCHER.replace('FIRST PARADE STATE', 'FP'), TODAY).problems).toEqual(
+      parseParadeState(ARCHER, TODAY).problems,
+    );
+  });
+
   test('rejects chat with confidence', () => {
     expect(parseParadeState('ok noted, thanks', TODAY)).toMatchObject({ problems: [], extraction: { rejected: true } });
   });

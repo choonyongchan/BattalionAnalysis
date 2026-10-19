@@ -9,7 +9,7 @@
  * can read settings without reaching into `model/`.
  */
 
-import { settingOf } from '../model/activeSettings.js';
+import { settingOf } from '../model/activeSettings.ts';
 
 /** @type {string} The write route, served by the same Vercel deployment as this page. */
 const API = '/api/settings';

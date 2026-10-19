@@ -9,9 +9,9 @@ import { DUTY_CLASS, extractSymptoms, isDuty, MC_MA } from '../model/classify.js
 import { startsByWeekday } from '../model/episodes.js';
 import { soldierLoad } from '../model/leaderboards.js';
 import { LENGTH_BANDS, lengthBySymptom } from '../model/symptoms.js';
-import { COMPANIES } from '../../../shared/domain.js';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { fmtInt } from '../format.js';
-import { WEEKDAY_NAMES } from '../../../shared/dates.js';
+import { WEEKDAY_NAMES } from '../../../shared/dates.ts';
 import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
 import { DutyTrend } from './shared/trends.jsx';
 import { EpisodeLeaderboard, LocationsCard, LongMcCard, SoldierLookup, UnitRankings } from './shared/rankings.jsx';

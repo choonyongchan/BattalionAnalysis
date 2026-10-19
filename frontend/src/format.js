@@ -14,7 +14,7 @@
  * should not render in whatever locale the reading machine happens to carry.
  */
 
-import { MONTH_NAMES } from '../../shared/dates.js';
+import { MONTH_NAMES } from '../../shared/dates.ts';
 
 /** @type {!Intl.NumberFormat} Whole numbers with thousands separators. */
 const COUNT = new Intl.NumberFormat('en-SG', { maximumFractionDigits: 0 });

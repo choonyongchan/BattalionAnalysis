@@ -5,7 +5,8 @@
  * long acknowledgement questions match on a prefix, so a small wording edit to
  * their tail does not unmap them.
  */
-import { companyFromUnitCoy, normaliseName } from '../domain.ts';
+import { companyFromUnitCoy } from '../../../shared/domain.ts';
+import { normaliseName } from '../../../shared/identity.ts';
 import { normaliseTitle, toSgtDate } from './fields.ts';
 import { answerText, type DecryptedSubmission, type MappedSubmission } from './map.ts';
 

@@ -6,7 +6,7 @@ import { useState } from 'preact/hooks';
 import { company } from '../../app/state.js';
 import { Segmented, SCOPE_OPTIONS } from '../../components/Segmented.jsx';
 import { ChartCard, Line } from '../../charts/index.js';
-import { COMPANIES } from '../../../../shared/domain.js';
+import { COMPANIES } from '../../../../shared/domain.ts';
 import { ALL_COMPANIES } from '../../model/scope.js';
 import { dutyTrend } from '../../model/strength.js';
 

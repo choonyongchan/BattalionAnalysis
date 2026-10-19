@@ -19,9 +19,9 @@ import {
   SUBMISSION_HEADERS,
   SECTION_COUNT_HEADERS,
   TABS,
-} from '../../../shared/tabs.js';
-import { setActiveSettings } from '../model/activeSettings.js';
-import { defaultSettings } from '../../../shared/settings/resolve.js';
+} from '../../../shared/tabs.ts';
+import { setActiveSettings } from '../model/activeSettings.ts';
+import { defaultSettings } from '../../../shared/settings/resolve.ts';
 
 /** @type {string} The read route, served by the same Vercel deployment as this page. */
 const API = '/api/dashboard';
@@ -147,11 +147,7 @@ export function datasetFromReply(body) {
   });
 
   data.holidays = settings.calendar.holidays.map((holiday) => ({ date: holiday.date, name: holiday.name }));
-  data.rotations = settings.calendar.rotations.map((rotation) => ({
-    name: rotation.name,
-    start_date: rotation.start,
-    end_date: rotation.end,
-  }));
+  data.rotations = settings.calendar.rotations;
   data.available.holidays = data.holidays.length > 0;
   data.available.rotations = data.rotations.length > 0;
   if (!data.available.holidays) notes['Public Holidays'] = EMPTY_CALENDAR_NOTES['Public Holidays'];

@@ -18,7 +18,7 @@ import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../frontend
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import { battalionStrength, dutyCountsOn } from '../../frontend/src/model/metrics.js';
 import { MESSAGE_STATUS, toMessageRows } from '../../frontend/src/model/paradeMessages.js';
-import { toEditForm } from '../../shared/sftEdit.js';
+import { toEditForm } from '../../shared/sftEdit.ts';
 import { toSftRecords } from '../../frontend/src/model/sft.js';
 import { loadConfig } from '../../runner/src/config.js';
 import { createMessageHandler } from '../../runner/src/index.js';

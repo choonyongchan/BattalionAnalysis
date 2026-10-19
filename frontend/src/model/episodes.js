@@ -18,11 +18,11 @@
  */
 
 import { classify, extractSymptoms, isDuty } from './classify.js';
-import { PERM_STATUS_NUM_DAYS } from '../../../shared/domain.js';
-import { identityOf } from '../../../shared/identity.js';
-import { addDays, inclusiveDaySpan, isoToUtcMs, weekdayOf } from '../../../shared/dates.js';
+import { PERM_STATUS_NUM_DAYS } from '../../../shared/domain.ts';
+import { identityOf } from '../../../shared/identity.ts';
+import { addDays, inclusiveDaySpan, isoToUtcMs, weekdayOf } from '../../../shared/dates.ts';
 import { withinRange } from './dateRange.js';
-import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.ts';
 
 /**
  * Groups rows that share a non-blank `start_date`, and runs of consecutive parade dates

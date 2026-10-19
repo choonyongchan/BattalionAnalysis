@@ -13,8 +13,8 @@
  * Every function here is pure.
  */
 
-import { COMPANIES, COMPANY_SUBUNITS, SUBUNIT_POSITIONS, UNASSIGNED, subunitPosition } from '../../../shared/domain.js';
-import { toText } from '../../../shared/values.js';
+import { COMPANIES, COMPANY_SUBUNITS, SUBUNIT_POSITIONS, UNASSIGNED, subunitPosition } from '../../../shared/domain.ts';
+import { toText } from '../../../shared/values.ts';
 
 /**
  * Whether a 4D digit may stand in for a missing sub-header.

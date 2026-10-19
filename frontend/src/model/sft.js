@@ -10,9 +10,9 @@
  */
 
 import Fuse from 'fuse.js';
-import { COMPANIES } from '../../../shared/domain.js';
-import { nameTokens, namesMatch, normaliseName } from '../../../shared/identity.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { COMPANIES } from '../../../shared/domain.ts';
+import { nameTokens, namesMatch, normaliseName } from '../../../shared/identity.ts';
+import { toIsoDate, toText } from '../../../shared/values.ts';
 import { bucketsFor } from './statusBuckets.js';
 
 /** @type {string} How the form joins a checkbox answer's selections. */

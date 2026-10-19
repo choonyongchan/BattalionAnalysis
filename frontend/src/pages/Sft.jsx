@@ -13,7 +13,7 @@ import { Card } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { Bar, ChartCard, Donut } from '../charts/index.js';
-import { COMPANIES } from '../../../shared/domain.js';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { fmtDecimal, fmtInt } from '../format.js';
 import { isoToday, withinRange } from '../model/dateRange.js';
 import { scopeSubmissions } from '../model/scope.js';

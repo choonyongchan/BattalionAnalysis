@@ -16,7 +16,7 @@ import {
   toSubmissions,
 } from '../../frontend/src/model/formsg.js';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { STRENGTH_HEADERS } from '../../shared/tabs.js';
+import { STRENGTH_HEADERS } from '../../shared/tabs.ts';
 
 /**
  * A FormSG response row, as `toSubmissions` reads it: an object keyed by header.

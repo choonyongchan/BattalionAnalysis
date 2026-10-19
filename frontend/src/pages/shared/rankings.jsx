@@ -13,9 +13,9 @@ import { longMcRoster, longMcTrend } from '../../model/metrics.js';
 import { withinRange } from '../../model/dateRange.js';
 import { topByCount, topByDays, topByStatusCount, rankUnits } from '../../model/leaderboards.js';
 import { locationCounts, locationCoverage } from '../../model/locations.js';
-import { toIsoDate, toText } from '../../../../shared/values.js';
+import { toIsoDate, toText } from '../../../../shared/values.ts';
 import { isDuty } from '../../model/classify.js';
-import { settingOf } from '../../model/activeSettings.js';
+import { settingOf } from '../../model/activeSettings.ts';
 
 /**
  * The leaderboard each metric draws: its card title, its ranking, and the column set

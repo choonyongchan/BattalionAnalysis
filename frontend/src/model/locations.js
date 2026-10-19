@@ -13,7 +13,7 @@
  * Every function here is pure.
  */
 
-import { toText } from '../../../shared/values.js';
+import { toText } from '../../../shared/values.ts';
 
 /**
  * Alias patterns, each matched against the upper-cased raw cell. Patterns are written to

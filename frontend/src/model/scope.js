@@ -19,8 +19,8 @@
  * Every function here is pure.
  */
 
-import { COMPANIES } from '../../../shared/domain.js';
-import { toText } from '../../../shared/values.js';
+import { COMPANIES } from '../../../shared/domain.ts';
+import { toText } from '../../../shared/values.ts';
 
 /** @type {string} The selector value meaning the whole battalion. */
 export const ALL_COMPANIES = 'ALL';

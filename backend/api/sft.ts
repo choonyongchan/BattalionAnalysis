@@ -20,7 +20,7 @@ import { handleWebhook, nricColumn, type Deps as WebhookDeps, type FormSpec } fr
 import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
 import { isDashboardCaller } from '../lib/session.ts';
 import { deleteSftRecord, listSftRecords, updateSftRecord, type SftEdit } from '../lib/sft.ts';
-import { validateSftEdit } from '../../shared/sftEdit.js';
+import { validateSftEdit } from '../../shared/sftEdit.ts';
 
 /** The record calls the dashboard makes, injected so tests need no database. */
 export interface SftStore {

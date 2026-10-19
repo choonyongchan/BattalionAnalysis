@@ -12,7 +12,7 @@
  * exists to avoid.
  */
 
-import { addDays, weekdayOf } from '../../../shared/dates.js';
+import { addDays, weekdayOf } from '../../../shared/dates.ts';
 
 /**
  * Today's date in the viewer's own timezone, as ISO 'yyyy-MM-dd'.

@@ -10,7 +10,7 @@
  * Every function here is pure.
  */
 
-import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.ts';
 import { platoonCoverage } from './platoon.js';
 
 /**

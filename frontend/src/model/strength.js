@@ -15,10 +15,10 @@
  */
 
 import { classify, isDuty } from './classify.js';
-import { COMPANIES, UNIT_TYPE_COMPANY } from '../../../shared/domain.js';
-import { identityOf } from '../../../shared/identity.js';
+import { COMPANIES, UNIT_TYPE_COMPANY } from '../../../shared/domain.ts';
+import { identityOf } from '../../../shared/identity.ts';
 import { battalionStrength, distinctDutyOn } from './metrics.js';
-import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.ts';
 
 
 /**

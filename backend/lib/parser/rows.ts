@@ -2,7 +2,8 @@
  * Validates an extraction and turns it into database rows, storing what the message says
  * without reconciling its arithmetic (disagreements surface as data-quality findings).
  */
-import { COMPANIES, REASON_CATEGORIES, normaliseFourD, normaliseName, unitTypeOf } from '../domain.ts';
+import { COMPANIES, REASON_CATEGORIES, unitTypeOf } from '../../../shared/domain.ts';
+import { fourDOrNull, normaliseName } from '../../../shared/identity.ts';
 import type { Extraction } from './extraction.ts';
 
 /** How far from the parade date a stated date may be before it is treated as a typo. */
@@ -149,7 +150,7 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
     unitLabel: person.unit_label,
     entryIndex: person.entry_index,
     reasonCategory: person.reason_category,
-    fourD: normaliseFourD(person.four_d),
+    fourD: fourDOrNull(person.four_d),
     rank: person.rank,
     name: person.name.trim(),
     nameKey: normaliseName(person.name),

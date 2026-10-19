@@ -7,7 +7,7 @@ import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { fmtDate, fmtInt, fmtPercent } from '../../format.js';
 import { Bar, ChartCard, Heatmap, Line } from '../../charts/index.js';
-import { COMPANIES } from '../../../../shared/domain.js';
+import { COMPANIES } from '../../../../shared/domain.ts';
 import { weekendBands } from '../../model/calendarMarks.js';
 import { otherDutiesOn } from '../../model/metrics.js';
 import { restrictionsOn } from '../../model/statusBuckets.js';

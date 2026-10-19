@@ -8,7 +8,6 @@
 
 import { describe, expect, test } from 'bun:test';
 import { GRANULARITIES, bucketOf } from '../../frontend/src/model/buckets.js';
-import { toRotations } from '../../shared/rotations.js';
 
 describe('GRANULARITIES', () => {
   test('lists the radio options in display order', () => {
@@ -50,10 +49,10 @@ describe('bucketOf monthly', () => {
 });
 
 describe('bucketOf rotational', () => {
-  const rotations = toRotations([
-    { name: 'TRADES', start_date: '2026-01-01', end_date: '2026-03-31' },
-    { name: 'Rot 1', start_date: '2026-04-01', end_date: '2026-06-30' },
-  ]);
+  const rotations = [
+    { name: 'TRADES', start: '2026-01-01', end: '2026-03-31' },
+    { name: 'Rot 1', start: '2026-04-01', end: '2026-06-30' },
+  ];
 
   test('keys on the rotation start date and labels it with the rotation name', () => {
     expect(bucketOf('2026-05-15', 'rotational', rotations)).toEqual({

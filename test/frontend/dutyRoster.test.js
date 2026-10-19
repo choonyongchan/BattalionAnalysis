@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { ROSTER_HEADERS } from '../../shared/tabs.js';
+import { ROSTER_HEADERS } from '../../shared/tabs.ts';
 import { dutyRosterCoverage, dutyRosterTree, rosterOn, vacanciesOn, rosterClashes, rosterLoad } from '../../frontend/src/model/dutyRoster.js';
 
 /**

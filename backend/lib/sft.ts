@@ -8,7 +8,8 @@
  */
 import { desc, eq } from 'drizzle-orm';
 import { sftFormsg } from '../db/schema.ts';
-import { companyFromUnitCoy, normaliseName, type Company } from './domain.ts';
+import { companyFromUnitCoy, type Company } from '../../shared/domain.ts';
+import { normaliseName } from '../../shared/identity.ts';
 import { toSgtDate } from './formsg/fields.ts';
 
 // neon-http's Drizzle handle; typed loosely so tests can pass a fake.

@@ -9,8 +9,8 @@
 import { Banner, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { fmtDate } from '../../format.js';
-import { weekdayOf } from '../../../../shared/dates.js';
-import { MAX_LOGO_CHARS, errorAt } from '../../../../shared/settings/validate.js';
+import { weekdayOf } from '../../../../shared/dates.ts';
+import { MAX_LOGO_CHARS, errorAt } from '../../../../shared/settings/validate.ts';
 
 /**
  * A labelled input with its error beneath.

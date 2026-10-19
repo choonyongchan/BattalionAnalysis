@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { platoonCoverage, platoonOf, toPositionCells } from '../../frontend/src/model/platoon.js';
-import { UNASSIGNED } from '../../shared/domain.js';
+import { UNASSIGNED } from '../../shared/domain.ts';
 
 describe('platoonOf', () => {
   test("a sub-header the company has is the platoon, named as the company names it", () => {

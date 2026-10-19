@@ -16,8 +16,8 @@
  * Every function here is pure.
  */
 
-import { COMPANIES } from '../../../shared/domain.js';
-import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.js';
+import { COMPANIES } from '../../../shared/domain.ts';
+import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.ts';
 
 /** @type {string} Session used when a caller does not name one. */
 const DEFAULT_SESSION = 'FPS';

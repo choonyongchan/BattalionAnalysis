@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS } from '../../shared/tabs.ts';
 import { recentlyReturned } from '../../frontend/src/model/recentReturns.js';
 
 const DAY = '2026-09-22';

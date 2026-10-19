@@ -12,13 +12,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/index.ts';
 import { settings } from '../db/schema.ts';
-import { resolveSettings } from '../../shared/settings/resolve.js';
-
-/** Every section's value in force, and per section its stored version and state. */
-export type ResolvedSettings = {
-  values: Record<string, Record<string, unknown>>;
-  meta: Record<string, { version: number; isDefault: boolean; invalid: boolean }>;
-};
+import { resolveSettings, type ResolvedSettings } from '../../shared/settings/resolve.ts';
 
 /** What a save or reset did. */
 export type SaveOutcome = { status: 'saved'; version: number } | { status: 'conflict' };
@@ -36,7 +30,7 @@ export async function readSettings(db: Db): Promise<ResolvedSettings> {
   const rows = await db
     .select({ section: settings.section, value: settings.value, version: settings.version })
     .from(settings);
-  const resolved = resolveSettings(rows) as ResolvedSettings;
+  const resolved = resolveSettings(rows);
   for (const [section, meta] of Object.entries(resolved.meta)) {
     if (meta.invalid) console.error(`settings: the stored "${section}" section is invalid; using its defaults.`);
   }

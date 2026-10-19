@@ -9,7 +9,7 @@ import {
   toEditForm,
   toSftRows,
   validateSftEdit,
-} from '../../shared/sftEdit.js';
+} from '../../shared/sftEdit.ts';
 
 /** 2026-09-20 12:00 SGT, after every date used below. */
 const NOW = Date.parse('2026-09-20T04:00:00.000Z');
@@ -46,11 +46,21 @@ const RECORD = {
   windowConfirmed: null,
 };
 
+/** The cleaned value of a correction expected to pass. */
+function valueOf(result: ReturnType<typeof validateSftEdit>) {
+  if (!result.ok) throw new Error('expected a valid edit: ' + JSON.stringify(result.errors));
+  return result.value;
+}
+
+/** The field errors of a correction expected to fail. */
+function errorsOf(result: ReturnType<typeof validateSftEdit>) {
+  if (result.ok) throw new Error('expected the edit to be refused');
+  return result.errors;
+}
+
 describe('validateSftEdit', () => {
   test('trims text, stores a blank as null, and reads the time as Singapore time', () => {
-    const result = validateSftEdit(FORM, NOW);
-    expect(result.ok).toBe(true);
-    expect(result.value).toEqual({
+    expect(valueOf(validateSftEdit(FORM, NOW))).toEqual({
       rank: 'PTE',
       name: 'ECHO TAN',
       company: 'Archer',
@@ -66,7 +76,7 @@ describe('validateSftEdit', () => {
   });
 
   test('a blank company is allowed and stored as null', () => {
-    expect(validateSftEdit({ ...FORM, company: '' }, NOW).value.company).toBeNull();
+    expect(valueOf(validateSftEdit({ ...FORM, company: '' }, NOW)).company).toBeNull();
   });
 
   test.each([
@@ -79,9 +89,7 @@ describe('validateSftEdit', () => {
     ['a time in the future', { submittedAt: '2026-09-21T09:00' }, 'submittedAt'],
     ['an acknowledgement that is not a tick', { windowConfirmed: 'yes' }, 'windowConfirmed'],
   ])('refuses %s', (_name, change, field) => {
-    const result = validateSftEdit({ ...FORM, ...change }, NOW);
-    expect(result.ok).toBe(false);
-    expect(Object.keys(result.errors)).toEqual([field]);
+    expect(Object.keys(errorsOf(validateSftEdit({ ...FORM, ...change }, NOW)))).toEqual([field]);
   });
 
   test('refuses something that is not a form at all', () => {
@@ -95,7 +103,7 @@ describe('toEditForm', () => {
     expect(form.submittedAt).toBe('2026-09-18T18:30');
     expect(form.sfabtType).toBe('');
     expect(form.windowConfirmed).toBe(false);
-    const { value } = validateSftEdit(form, NOW);
+    const value = valueOf(validateSftEdit(form, NOW));
     expect(value.timestamp).toBe(RECORD.timestamp);
     expect(value.name).toBe(RECORD.name);
   });

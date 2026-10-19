@@ -18,9 +18,9 @@
  */
 
 import { classify, DUTY_CLASS } from './classify.js';
-import { COMPANIES, PERM_STATUS_NUM_DAYS } from '../../../shared/domain.js';
-import { identityOf } from '../../../shared/identity.js';
-import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
+import { COMPANIES, PERM_STATUS_NUM_DAYS } from '../../../shared/domain.ts';
+import { identityOf } from '../../../shared/identity.ts';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.ts';
 
 /**
  * The ten Status buckets, in report order.

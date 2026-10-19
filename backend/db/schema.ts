@@ -24,30 +24,26 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import {
+  COMPANIES,
+  OUTCOMES,
+  REASON_CATEGORIES,
+  REPORT_SICK_TYPES,
+  ROLE_KINDS,
+  SESSIONS,
+  UNIT_TYPES,
+} from '../../shared/domain.ts';
 
 const tz = { withTimezone: true, mode: 'string' } as const;
 
-/** FormSG's `40 SAR / Hercules & Bn HQ` maps to `Hercules`. */
-export const companyEnum = pgEnum('company', ['Archer', 'Braves', 'Cougar', 'Stallion', 'Hercules']);
-/** Only FPS is ingested; LPS exists so a filed LPS is recorded as rejected. */
-export const sessionEnum = pgEnum('session', ['FPS', 'LPS']);
-/** `Company` is the roll-up row, so never sum across types. */
-export const unitTypeEnum = pgEnum('unit_type', ['Company', 'HQ', 'PLATOON', 'SUBUNIT']);
-/** The six fixed section headers of a parade state. */
-export const reasonCategoryEnum = pgEnum('reason_category', [
-  'Att C',
-  'Status',
-  'Report Sick',
-  'MA',
-  'Off/Leave',
-  'Others',
-]);
-/** Command appointment; a PDS's sub-unit lives in `unit_label`. */
-export const roleKindEnum = pgEnum('role_kind', ['CDO', 'CDS', 'COS', 'PDS']);
-/** Shared by parade states and FormSG; `PENDING` is parade-state only. */
-export const reportSickTypeEnum = pgEnum('report_sick_type', ['RSI', 'RSO', 'MR', 'FFI', 'PENDING']);
-/** FormSG doctor outcome. */
-export const outcomeEnum = pgEnum('outcome', ['MC', 'Status', 'Both', 'None']);
+/** Enum values live in `shared/domain.ts`, shared with the parser and the dashboard. */
+export const companyEnum = pgEnum('company', COMPANIES);
+export const sessionEnum = pgEnum('session', SESSIONS);
+export const unitTypeEnum = pgEnum('unit_type', UNIT_TYPES);
+export const reasonCategoryEnum = pgEnum('reason_category', REASON_CATEGORIES);
+export const roleKindEnum = pgEnum('role_kind', ROLE_KINDS);
+export const reportSickTypeEnum = pgEnum('report_sick_type', REPORT_SICK_TYPES);
+export const outcomeEnum = pgEnum('outcome', OUTCOMES);
 
 /**
  * One relayed WhatsApp message. `body` holds NRICs and diagnoses: never expose it.

@@ -13,7 +13,7 @@ import { refresh } from '../../app/auth.js';
 import { canEdit } from '../../app/state.js';
 import { Banner, Card } from '../../components/Card.jsx';
 import { resetSection, saveSection } from '../../data/settings.js';
-import { validateSection } from '../../../../shared/settings/validate.js';
+import { validateSection } from '../../../../shared/settings/validate.ts';
 
 /**
  * A section card.

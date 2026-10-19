@@ -32,7 +32,7 @@ import {
   SFT_HEADERS,
   STRENGTH_HEADERS,
   TABS as SHEET_TABS,
-} from '../../../shared/tabs.js';
+} from '../../../shared/tabs.ts';
 import { sftDeps } from '../../support/app.ts';
 import { DB_TIMEOUT_MS, hasTestDb, readOnlyTestDb, resetTestDb, TEST_DASHBOARD_DATABASE_URL } from '../../support/db.ts';
 import {

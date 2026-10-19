@@ -15,7 +15,8 @@ import {
   sectionCounts,
   strengthRows,
 } from '../db/schema.ts';
-import { cleanText, paradeResponseId } from './domain.ts';
+import { paradeResponseId } from '../../shared/domain.ts';
+import { cleanText } from '../../shared/identity.ts';
 import { parseParadeState } from './parser/deterministic.ts';
 import type { Extraction } from './parser/extraction.ts';
 import type { OpenAiParser } from './parser/llm.ts';

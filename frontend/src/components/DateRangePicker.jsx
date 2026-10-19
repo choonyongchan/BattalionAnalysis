@@ -19,7 +19,7 @@ import {
   PRESETS,
   resolvePreset,
 } from '../model/dateRange.js';
-import { weekdayOf } from '../../../shared/dates.js';
+import { weekdayOf } from '../../../shared/dates.ts';
 import { fmtDate } from '../format.js';
 
 /** @type {string[]} Month names for the popover header. */

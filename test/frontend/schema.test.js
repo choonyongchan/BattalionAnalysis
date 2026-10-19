@@ -12,7 +12,7 @@ import {
   FORMSG_HEADERS,
   SFT_HEADERS,
   SUBMISSION_HEADERS,
-} from '../../shared/tabs.js';
+} from '../../shared/tabs.ts';
 
 describe('sensitive columns are never requested', () => {
   test('no NRIC column appears in the FormSG request', () => {

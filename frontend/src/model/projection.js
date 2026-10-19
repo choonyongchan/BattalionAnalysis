@@ -20,9 +20,9 @@
  */
 
 import { classify, DUTY_CLASS } from './classify.js';
-import { addDays } from '../../../shared/dates.js';
-import { identityOf } from '../../../shared/identity.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { addDays } from '../../../shared/dates.ts';
+import { identityOf } from '../../../shared/identity.ts';
+import { toIsoDate, toText } from '../../../shared/values.ts';
 
 /** @type {number} Days ahead the forward-looking section names when the caller names none. */
 export const DEFAULT_PROJECTION_DAYS = 7;

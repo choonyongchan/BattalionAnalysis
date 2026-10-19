@@ -11,8 +11,8 @@ import { useState } from 'preact/hooks';
 import { canEdit, dataset } from '../app/state.js';
 import { Banner } from '../components/Card.jsx';
 import { Segmented } from '../components/Segmented.jsx';
-import { rotationIssues, toRotations } from '../../../shared/rotations.js';
-import { SECTIONS } from '../../../shared/settings/defaults.js';
+import { rotationIssues } from '../../../shared/rotations.ts';
+import { SECTIONS } from '../../../shared/settings/defaults.ts';
 import { SectionCard } from './settings/SectionCard.jsx';
 import {
   CalendarEditor,
@@ -54,7 +54,7 @@ export function Settings() {
     return null;
   }
   const sections = SECTIONS.filter((section) => section.tier === tier && EDITORS[section.name]);
-  const calendarIssues = rotationIssues(toRotations(data.rotations));
+  const calendarIssues = rotationIssues(data.rotations);
 
   return (
     <div class="page">

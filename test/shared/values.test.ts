@@ -1,25 +1,11 @@
-/**
- * Tests for cell coercion.
- *
- * The cases worth having are the ones that would otherwise fail silently: a date read a
- * day out because the viewer is west of Singapore, and a blank strength cell summed as
- * zero rather than reported as unstated.
- */
+/** Tests for value coercion: a blank is null, never zero, and dates are read as written. */
 
 import { describe, expect, test } from 'bun:test';
-import { toIsoDate, toNumber, toText, toTimeOfDay } from '../../shared/values.js';
+import { toIsoDate, toNumber, toText, toTimeOfDay } from '../../shared/values.ts';
 
 describe('dates', () => {
   test('an ISO string is read as written', () => {
     expect(toIsoDate('2026-06-22')).toBe('2026-06-22');
-  });
-
-  test('a Sheets serial number is read as the same calendar date', () => {
-    expect(toIsoDate(46195)).toBe('2026-06-22');
-  });
-
-  test('a serial with a time fraction keeps its date', () => {
-    expect(toIsoDate(46195.75)).toBe('2026-06-22');
   });
 
   test('an ISO date-time keeps its leading date', () => {
@@ -39,10 +25,6 @@ describe('time of day', () => {
 
   test('a space-separated date-time reads the same as the T form', () => {
     expect(toTimeOfDay('2026-06-22 09:05:00')).toEqual({ hour: 9, minute: 5, minutes: 545 });
-  });
-
-  test("a serial's fraction is the time of day", () => {
-    expect(toTimeOfDay(46195.5)).toEqual({ hour: 12, minute: 0, minutes: 720 });
   });
 
   test('a date with no time is null, not midnight', () => {

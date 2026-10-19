@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS } from '../../shared/tabs.ts';
 import { buildEpisodes } from '../../frontend/src/model/episodes.js';
 import { DUTY_CLASS } from '../../frontend/src/model/classify.js';
 import {

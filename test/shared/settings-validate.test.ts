@@ -6,16 +6,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { DEFAULTS, SECTIONS, defaultOf, isSection } from '../../shared/settings/defaults.js';
-import { MAX_LOGO_CHARS, errorAt, validateSection } from '../../shared/settings/validate.js';
+import { DEFAULTS, SECTIONS, defaultOf, isSection, type SectionName } from '../../shared/settings/defaults.ts';
+import { MAX_LOGO_CHARS, errorAt, validateSection } from '../../shared/settings/validate.ts';
 
-/**
- * Validates a section built from its defaults with some fields replaced.
- * @param {string} section The section.
- * @param {!Object} patch Fields to replace.
- * @returns {!Object} The validation result.
- */
-function withPatch(section, patch) {
+/** Validates a section built from its defaults with some fields replaced. */
+function withPatch<S extends SectionName>(section: S, patch: Record<string, unknown>) {
   return validateSection(section, { ...defaultOf(section), ...patch });
 }
 
@@ -51,7 +46,7 @@ describe('defaults', () => {
 
 describe('validateSection', () => {
   test('an unknown section, or a value that is not an object, is refused', () => {
-    expect(validateSection('nope', {}).errors[0].message).toContain('Unknown');
+    expect(validateSection('nope', {}).errors[0]?.message).toContain('Unknown');
     expect(validateSection('unit', null).errors).toEqual([{ path: '', message: 'Must be an object.' }]);
     expect(validateSection('unit', []).errors).toEqual([{ path: '', message: 'Must be an object.' }]);
   });
@@ -59,7 +54,7 @@ describe('validateSection', () => {
   test('unit: a blank name or page title is refused; text is trimmed', () => {
     expect(errorAt(withPatch('unit', { name: '  ' }).errors, 'name')).not.toBe('');
     expect(errorAt(withPatch('unit', { pageTitle: '' }).errors, 'pageTitle')).not.toBe('');
-    expect(withPatch('unit', { name: ' 41 SAR ' }).value.name).toBe('41 SAR');
+    expect(withPatch('unit', { name: ' 41 SAR ' }).value?.name).toBe('41 SAR');
   });
 
   test('unit: a logo must be an image data URL within the size limit', () => {
@@ -98,7 +93,7 @@ describe('validateSection', () => {
       ],
       rotations: [],
     });
-    expect(sorted.value.holidays.map((h) => h.date)).toEqual(['2026-01-01', '2026-12-25']);
+    expect(sorted.value?.holidays.map((h) => h.date)).toEqual(['2026-01-01', '2026-12-25']);
   });
 
   test('calendar: a rotation that ends before it starts is an error; gaps and overlaps only warn', () => {
@@ -117,7 +112,7 @@ describe('validateSection', () => {
     });
     expect(overlapping.errors).toEqual([]);
     expect(overlapping.warnings.map((w) => w.path)).toEqual(['rotations']);
-    expect(overlapping.warnings[0].message).toContain('overlap');
+    expect(overlapping.warnings[0]?.message).toContain('overlap');
   });
 
   test('calendar: a missing list is an error, not a silent empty list', () => {

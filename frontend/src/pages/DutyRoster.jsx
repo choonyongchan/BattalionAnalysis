@@ -25,14 +25,14 @@ import { useMemo, useState } from 'preact/hooks';
 import { company, dataset } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { PageControls } from '../components/PageControls.jsx';
-import { COMPANIES } from '../../../shared/domain.js';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { ALL_COMPANIES } from '../model/scope.js';
 import { datesPresent } from '../model/metrics.js';
 import { dutyRosterCoverage, dutyRosterTree, rosterClashes, rosterLoad, vacanciesOn } from '../model/dutyRoster.js';
 import { DataTable } from '../components/Table.jsx';
 import { scopeDataset } from '../model/scope.js';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { settingOf } from '../model/activeSettings.js';
+import { settingOf } from '../model/activeSettings.ts';
 
 /**
  * One role and, indented beneath it, the roles that report to it.

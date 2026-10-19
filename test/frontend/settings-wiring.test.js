@@ -6,8 +6,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { topByCount } from '../../frontend/src/model/leaderboards.js';
 import { dutyRosterTree } from '../../frontend/src/model/dutyRoster.js';
-import { resetActiveSettings, setActiveSettings } from '../../frontend/src/model/activeSettings.js';
-import { defaultSettings } from '../../shared/settings/resolve.js';
+import { resetActiveSettings, setActiveSettings } from '../../frontend/src/model/activeSettings.ts';
+import { defaultSettings } from '../../shared/settings/resolve.ts';
 
 /**
  * Makes `count` single-day Att C episodes, one soldier each.

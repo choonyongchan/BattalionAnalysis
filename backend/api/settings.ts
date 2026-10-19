@@ -20,8 +20,8 @@ import { getDb } from '../db/index.ts';
 import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
 import { editSecret, hasSettingsSession, isSameOrigin } from '../lib/session.ts';
 import { resetSection, saveSection, type SaveOutcome } from '../lib/settings.ts';
-import { isSection } from '../../shared/settings/defaults.js';
-import { validateSection } from '../../shared/settings/validate.js';
+import { isSection } from '../../shared/settings/defaults.ts';
+import { validateSection } from '../../shared/settings/validate.ts';
 
 /** The settings writes, injected so tests need no database. */
 interface SettingsStore {

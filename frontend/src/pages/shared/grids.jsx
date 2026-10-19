@@ -6,12 +6,12 @@ import { useMemo, useState } from 'preact/hooks';
 import { Segmented } from '../../components/Segmented.jsx';
 import { fmtInt } from '../../format.js';
 import { ChartCard, Heatmap } from '../../charts/index.js';
-import { COMPANIES, SUBUNIT_POSITIONS, UNASSIGNED } from '../../../../shared/domain.js';
+import { COMPANIES, SUBUNIT_POSITIONS, UNASSIGNED } from '../../../../shared/domain.ts';
 import { toPositionCells } from '../../model/platoon.js';
 import { GRANULARITIES } from '../../model/buckets.js';
 import { withinRange } from '../../model/dateRange.js';
 import { topLabelsOverTime } from '../../model/reasonTrend.js';
-import { toText } from '../../../../shared/values.js';
+import { toText } from '../../../../shared/values.ts';
 import { isDuty } from '../../model/classify.js';
 
 /**

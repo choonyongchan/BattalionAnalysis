@@ -21,6 +21,8 @@
  * state is stored anyway, and its raw_messages row carries the reason in `error`.
  */
 
+import { isFirstParade, isLastParade } from '../../shared/paradeHeader.ts';
+
 /** @type {number} Minimum non-empty lines a parade state must have. */
 const MIN_LINES = 8;
 
@@ -33,16 +35,6 @@ const MIN_CHARS = 200;
  * only here keeps a stray "FP" or "LP" in the body out of the session check.
  */
 const HEADER_LINES = 5;
-
-/**
- * @type {RegExp} A first-parade marker as a whole token: "FIRST PARADE" /
- * "FIRST PARADE STATE", "FPS", or a bare "FP". Deliberately does not match a
- * bare "PS" or "PARADE STATE" alone.
- */
-const FIRST_PARADE_PATTERN = /first\s*parade|\bFPS\b|\bFP\b/i;
-
-/** @type {RegExp} A last-parade marker as a whole token: "LAST PARADE", "LPS", or a bare "LP". */
-const LAST_PARADE_PATTERN = /last\s*parade|\bLPS\b|\bLP\b/i;
 
 /**
  * @type {RegExp} A present/strength line such as "COMPANY: 197/210" or
@@ -82,10 +74,10 @@ export function isParadeState(text) {
     return { accepted: false, rejectReason: 'empty message' };
   }
   const header = extractHeader(text);
-  if (LAST_PARADE_PATTERN.test(header)) {
+  if (isLastParade(header)) {
     return { accepted: false, rejectReason: 'a last parade state (LAST PARADE / LPS / LP in the header)' };
   }
-  if (!FIRST_PARADE_PATTERN.test(header)) {
+  if (!isFirstParade(header)) {
     return { accepted: false, rejectReason: 'not a first parade state (no FIRST PARADE / FPS / FP in the header)' };
   }
 

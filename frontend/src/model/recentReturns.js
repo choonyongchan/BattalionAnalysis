@@ -17,10 +17,10 @@
  */
 
 import { classify, DUTY_CLASS } from './classify.js';
-import { inclusiveDaySpan, isoToUtcMs } from '../../../shared/dates.js';
-import { identityOf } from '../../../shared/identity.js';
+import { inclusiveDaySpan, isoToUtcMs } from '../../../shared/dates.ts';
+import { identityOf } from '../../../shared/identity.ts';
 import { bucketsFor } from './statusBuckets.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { toIsoDate, toText } from '../../../shared/values.ts';
 
 /**
  * The kinds the list covers, each with the most days after its end date it stays listed.

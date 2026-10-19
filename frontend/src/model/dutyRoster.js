@@ -16,11 +16,11 @@
  * Every function here is pure.
  */
 
-import { COMMAND_ROLES, COMPANIES, commandRolesOf } from '../../../shared/domain.js';
-import { isWeekend } from '../../../shared/dates.js';
-import { namesMatch, normaliseName } from '../../../shared/identity.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
-import { settingOf } from './activeSettings.js';
+import { COMMAND_ROLES, COMPANIES, commandRolesOf } from '../../../shared/domain.ts';
+import { isWeekend } from '../../../shared/dates.ts';
+import { namesMatch, normaliseName } from '../../../shared/identity.ts';
+import { toIsoDate, toText } from '../../../shared/values.ts';
+import { settingOf } from './activeSettings.ts';
 import { classify, DUTY_CLASS } from './classify.js';
 
 /** @type {string} What an unfilled role's node reads. */

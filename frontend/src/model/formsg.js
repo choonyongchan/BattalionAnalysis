@@ -14,12 +14,12 @@
  */
 
 import { extractSymptoms, keywords } from './classify.js';
-import { identityKey, normaliseFourD } from '../../../shared/identity.js';
-import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.js';
-import { weekdayOf } from '../../../shared/dates.js';
-import { COMPANIES } from '../../../shared/domain.js';
+import { identityKey, normaliseFourD } from '../../../shared/identity.ts';
+import { toIsoDate, toText, toTimeOfDay } from '../../../shared/values.ts';
+import { weekdayOf } from '../../../shared/dates.ts';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { battalionStrength } from './metrics.js';
-import { settingOf } from './activeSettings.js';
+import { settingOf } from './activeSettings.ts';
 
 /**
  * Finds the company named in a free-text unit answer.

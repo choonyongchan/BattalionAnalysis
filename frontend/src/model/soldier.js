@@ -13,10 +13,10 @@
 
 import Fuse from 'fuse.js';
 import { classify, DUTY_CLASS } from './classify.js';
-import { identityKey, identityOf } from '../../../shared/identity.js';
+import { identityKey, identityOf } from '../../../shared/identity.ts';
 import { platoonOf } from './platoon.js';
 import { bucketsFor } from './statusBuckets.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { toIsoDate, toText } from '../../../shared/values.ts';
 
 /**
  * Picks the later of two values for a "latest wins" field, skipping blanks.

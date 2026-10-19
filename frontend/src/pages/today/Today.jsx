@@ -19,7 +19,7 @@ import { PageControls } from '../../components/PageControls.jsx';
 import { FilingChips } from '../../components/FilingChips.jsx';
 import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../../format.js';
 import { ChartCard, Donut } from '../../charts/index.js';
-import { COMPANIES } from '../../../../shared/domain.js';
+import { COMPANIES } from '../../../../shared/domain.ts';
 import { DUTY_CLASS, MC_MA } from '../../model/classify.js';
 import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../../model/scope.js';
 import { absenceParts, datesPresent, battalionStrength, dutyCountsOn, distinctDutyOn } from '../../model/metrics.js';

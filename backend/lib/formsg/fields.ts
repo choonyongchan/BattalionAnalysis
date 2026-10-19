@@ -1,5 +1,5 @@
 /** Maps FormSG answers (by question title) onto `report_sick_formsg` columns. */
-import { SGT_OFFSET_MS } from '../../../shared/dates.js';
+import { SGT_OFFSET_MS } from '../../../shared/dates.ts';
 
 /** Columns filled straight from an answer; `discard` marks titles dropped on purpose. */
 export type Column =

@@ -28,7 +28,7 @@ import {
 import { episodeCounts } from '../model/metrics.js';
 import { CLUSTER_CASES, CLUSTER_DAYS, clinicalBucketOf, infectiousByPlatoon, reasonKeywords } from '../model/symptoms.js';
 import { platoonOf } from '../model/platoon.js';
-import { WEEKDAY_NAMES } from '../../../shared/dates.js';
+import { WEEKDAY_NAMES } from '../../../shared/dates.ts';
 import { withinRange } from '../model/dateRange.js';
 import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.jsx';
 import { DutyTrend, TrendSection } from './shared/trends.jsx';

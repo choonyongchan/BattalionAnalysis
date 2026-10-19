@@ -12,8 +12,8 @@
 import { describe, expect, test } from 'bun:test';
 import { bucketsFor, isPermanentStatus, restrictionsOn, STATUS_BUCKETS } from '../../frontend/src/model/statusBuckets.js';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS } from '../../shared/tabs.js';
-import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.js';
+import { PERSONNEL_HEADERS } from '../../shared/tabs.ts';
+import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.ts';
 
 describe('STATUS_BUCKETS', () => {
   test('lists exactly the ten buckets in the documented order', () => {

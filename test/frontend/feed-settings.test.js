@@ -6,10 +6,10 @@
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { datasetFromReply } from '../../frontend/src/data/feed.js';
-import { DEFAULTS } from '../../shared/settings/defaults.js';
-import { resetActiveSettings, settingOf } from '../../frontend/src/model/activeSettings.js';
-import { defaultSettings } from '../../shared/settings/resolve.js';
-import { TABS, STRENGTH_HEADERS, PERSONNEL_HEADERS, ROSTER_HEADERS } from '../../shared/tabs.js';
+import { DEFAULTS } from '../../shared/settings/defaults.ts';
+import { resetActiveSettings, settingOf } from '../../frontend/src/model/activeSettings.ts';
+import { defaultSettings } from '../../shared/settings/resolve.ts';
+import { TABS, STRENGTH_HEADERS, PERSONNEL_HEADERS, ROSTER_HEADERS } from '../../shared/tabs.ts';
 
 /**
  * A minimal reply with the required tabs empty and the given settings.
@@ -36,7 +36,7 @@ describe('datasetFromReply', () => {
     };
     const data = datasetFromReply(reply({ values, meta: {} }));
     expect(data.holidays).toEqual([{ date: '2026-08-09', name: 'National Day' }]);
-    expect(data.rotations).toEqual([{ name: 'Rot 1', start_date: '2026-07-01', end_date: '2026-09-30' }]);
+    expect(data.rotations).toEqual([{ name: 'Rot 1', start: '2026-07-01', end: '2026-09-30' }]);
     expect(data.available.holidays).toBe(true);
   });
 

@@ -118,7 +118,7 @@ function route(request: Request): Promise<Response> {
     settingsPassword: process.env.SETTINGS_PASSWORD,
     sessionTtlMs: hasDatabase
       ? async () =>
-          Number((await readSettings(getDb('DASHBOARD_DATABASE_URL'))).values.session!.ttlHours) * 60 * 60 * 1000
+          (await readSettings(getDb('DASHBOARD_DATABASE_URL'))).values.session.ttlHours * 60 * 60 * 1000
       : undefined,
   });
 }

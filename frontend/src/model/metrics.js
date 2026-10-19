@@ -17,10 +17,10 @@
  */
 
 import { classify, DUTY_CLASS, isAbsent, isDuty, isRestricted } from './classify.js';
-import { identityOf } from '../../../shared/identity.js';
-import { COMPANIES, UNASSIGNED, UNIT_TYPE_COMPANY } from '../../../shared/domain.js';
-import { inclusiveDaySpan } from '../../../shared/dates.js';
-import { toIsoDate, toNumber, toText } from '../../../shared/values.js';
+import { identityOf } from '../../../shared/identity.ts';
+import { COMPANIES, UNASSIGNED, UNIT_TYPE_COMPANY } from '../../../shared/domain.ts';
+import { inclusiveDaySpan } from '../../../shared/dates.ts';
+import { toIsoDate, toNumber, toText } from '../../../shared/values.ts';
 import { eachDay, withinRange } from './dateRange.js';
 
 /**

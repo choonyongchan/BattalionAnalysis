@@ -1,5 +1,6 @@
 /** Turns a decrypted FormSG submission into one `report_sick_formsg` row; NRIC answers are discarded. */
-import { companyFromUnitCoy, normaliseName } from '../domain.ts';
+import { companyFromUnitCoy } from '../../../shared/domain.ts';
+import { normaliseName } from '../../../shared/identity.ts';
 import {
   resolveField,
   splitOtherOption,

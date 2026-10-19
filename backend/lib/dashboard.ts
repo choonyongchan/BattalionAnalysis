@@ -23,8 +23,8 @@ import {
   sftFormsg,
   strengthRows,
 } from '../db/schema.ts';
-import { SGT_OFFSET_MS } from '../../shared/dates.js';
-import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.js';
+import { SGT_OFFSET_MS } from '../../shared/dates.ts';
+import { PERM_STATUS_NUM_DAYS } from '../../shared/domain.ts';
 import {
   FORMSG_HEADERS,
   FORMSG_STATUS_HEADERS,
@@ -35,8 +35,9 @@ import {
   STRENGTH_HEADERS,
   SUBMISSION_HEADERS,
   TABS as SHEET_TABS,
-} from '../../shared/tabs.js';
-import { HQ_LABEL, PLATOON_LABEL, cleanText } from './domain.ts';
+} from '../../shared/tabs.ts';
+import { HQ_LABEL, PLATOON_LABEL } from '../../shared/domain.ts';
+import { cleanText } from '../../shared/identity.ts';
 
 /** One record keyed by Sheet header. */
 export type Row = Record<string, unknown>;

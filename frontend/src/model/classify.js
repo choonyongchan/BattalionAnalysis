@@ -20,7 +20,7 @@
  * Every function here is pure.
  */
 
-import { toText } from '../../../shared/values.js';
+import { toText } from '../../../shared/values.ts';
 
 /**
  * The duty classes the dashboard reports, keyed by `reason_category`.

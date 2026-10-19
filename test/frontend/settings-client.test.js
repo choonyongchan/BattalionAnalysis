@@ -5,8 +5,8 @@
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { refreshMs, resetSection, saveSection, unitSettings } from '../../frontend/src/data/settings.js';
-import { resetActiveSettings, setActiveSettings } from '../../frontend/src/model/activeSettings.js';
-import { defaultSettings } from '../../shared/settings/resolve.js';
+import { resetActiveSettings, setActiveSettings } from '../../frontend/src/model/activeSettings.ts';
+import { defaultSettings } from '../../shared/settings/resolve.ts';
 
 const realFetch = globalThis.fetch;
 

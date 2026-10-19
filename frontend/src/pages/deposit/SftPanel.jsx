@@ -15,7 +15,7 @@ import { Banner, Card, EmptyState } from '../../components/Card.jsx';
 import { DataTable } from '../../components/Table.jsx';
 import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../data/sft.js';
 import { fmtDate, fmtInt } from '../../format.js';
-import { COMPANIES } from '../../../../shared/domain.js';
+import { COMPANIES } from '../../../../shared/domain.ts';
 import {
   ACKNOWLEDGEMENTS,
   TEXT_FIELDS,
@@ -23,7 +23,7 @@ import {
   toEditForm,
   toSftRows,
   validateSftEdit,
-} from '../../../../shared/sftEdit.js';
+} from '../../../../shared/sftEdit.ts';
 import { Field } from '../settings/editors.jsx';
 import { Outcome, RowActions, runBusy } from './shared.jsx';
 

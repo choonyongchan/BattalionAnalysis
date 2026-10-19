@@ -7,7 +7,7 @@
  * error is a rejection (a last parade state, or not a parade state at all).
  */
 
-import { receivedInSgt } from '../../../shared/dates.js';
+import { receivedInSgt } from '../../../shared/dates.ts';
 
 /** @type {string} The prefix `api/parade.ts` gives messages typed into the dashboard. */
 const MANUAL_PREFIX = 'manual:';

@@ -8,7 +8,7 @@ import { company } from '../app/state.js';
 import { Banner, Card } from '../components/Card.jsx';
 import { ChartCard, Heatmap } from '../charts/index.js';
 import { fmtDate, fmtFraction, fmtInt } from '../format.js';
-import { COMPANIES } from '../../../shared/domain.js';
+import { COMPANIES } from '../../../shared/domain.ts';
 import { withinRange } from '../model/dateRange.js';
 import { countMismatches, dataQuality } from '../model/quality.js';
 import { ALL_COMPANIES } from '../model/scope.js';

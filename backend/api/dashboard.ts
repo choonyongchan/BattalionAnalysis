@@ -11,7 +11,8 @@
 import { getDb } from '../db/index.ts';
 import { loadTabs, type Tabs } from '../lib/dashboard.ts';
 import { bearerToken, json, methodNotAllowed, sameSecret, serverError } from '../lib/http.ts';
-import { readSettings, type ResolvedSettings } from '../lib/settings.ts';
+import { readSettings } from '../lib/settings.ts';
+import type { ResolvedSettings } from '../../shared/settings/resolve.ts';
 import { editSecret, hasSession, hasSettingsSession } from '../lib/session.ts';
 
 /** What `handle` needs. */

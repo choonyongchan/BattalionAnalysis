@@ -20,10 +20,10 @@ import {
   otherDutiesOn,
 } from '../../frontend/src/model/metrics.js';
 import { DUTY_CLASS, MC_MA } from '../../frontend/src/model/classify.js';
-import { UNASSIGNED } from '../../shared/domain.js';
+import { UNASSIGNED } from '../../shared/domain.ts';
 import { buildEpisodes } from '../../frontend/src/model/episodes.js';
 import { toRecords } from '../../frontend/src/data/records.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../shared/tabs.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../shared/tabs.ts';
 import { personnelValues, strengthValues } from './fixtures.js';
 
 describe('battalion strength', () => {

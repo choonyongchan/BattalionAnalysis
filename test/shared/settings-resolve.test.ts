@@ -5,9 +5,9 @@
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
-import { DEFAULTS } from '../../shared/settings/defaults.js';
-import { defaultSettings, resolveSettings } from '../../shared/settings/resolve.js';
-import { resetActiveSettings, setActiveSettings, settingOf } from '../../frontend/src/model/activeSettings.js';
+import { DEFAULTS } from '../../shared/settings/defaults.ts';
+import { defaultSettings, resolveSettings } from '../../shared/settings/resolve.ts';
+import { resetActiveSettings, setActiveSettings, settingOf } from '../../frontend/src/model/activeSettings.ts';
 
 describe('resolveSettings', () => {
   test('no rows: every section is its default, at version 0', () => {

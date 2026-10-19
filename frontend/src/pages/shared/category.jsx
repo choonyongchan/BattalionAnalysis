@@ -20,7 +20,6 @@ import { PageControls } from '../../components/PageControls.jsx';
 import { fmtDate, fmtInt } from '../../format.js';
 import { scopeDataset, scopeSubmissions } from '../../model/scope.js';
 import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
-import { toRotations } from '../../../../shared/rotations.js';
 import { buildEpisodes } from '../../model/episodes.js';
 import { toSubmissions } from '../../model/formsg.js';
 import { soldierIndex } from '../../model/soldier.js';
@@ -49,7 +48,7 @@ export function useCategory() {
   );
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
   const holidays = useMemo(() => toHolidays(data.holidays), [data.holidays]);
-  const rotations = useMemo(() => toRotations(data.rotations), [data.rotations]);
+  const rotations = data.rotations;
 
   const min = paradeDates[0] || isoToday();
   const max = paradeDates[paradeDates.length - 1] || isoToday();

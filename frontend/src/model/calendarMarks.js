@@ -14,9 +14,9 @@
  * Every function here is pure.
  */
 
-import { isWeekend } from '../../../shared/dates.js';
+import { isWeekend } from '../../../shared/dates.ts';
 import { eachDay, withinRange } from './dateRange.js';
-import { toIsoDate, toText } from '../../../shared/values.js';
+import { toIsoDate, toText } from '../../../shared/values.ts';
 
 /**
  * Parses raw "Public Holidays" rows into sorted date/name pairs.
