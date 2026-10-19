@@ -14,7 +14,7 @@ import {
   sftFormsg,
   strengthRows,
 } from '../db/schema.ts';
-import { SGT_OFFSET_MS } from '../../shared/dates.ts';
+import { sgtDateTime } from '../../shared/dates.ts';
 import { HQ_LABEL, PERM_STATUS_NUM_DAYS, PLATOON_LABEL, companyFromUnitCoy } from '../../shared/domain.ts';
 import { cleanText } from '../../shared/identity.ts';
 import type {
@@ -62,14 +62,6 @@ export function personnelReason(row: {
 /** The stated day count, or the permanent-status sentinel. */
 export function personnelNumDays(row: { numDays: number | null; isPermanent: boolean; reasonCategory: string }): number | null {
   return row.isPermanent && row.reasonCategory === 'Status' ? PERM_STATUS_NUM_DAYS : row.numDays;
-}
-
-/** A driver timestamp (`2026-09-18 00:15:23.5+00`) as Singapore-local `yyyy-MM-ddTHH:mm:ss`, or ''. */
-export function sgtDateTime(value: string | null | undefined): string {
-  if (!value) return '';
-  const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? '' : new Date(ms + SGT_OFFSET_MS).toISOString().slice(0, 19);
 }
 
 /** Every strength block of every parade state. */

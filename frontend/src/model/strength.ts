@@ -7,7 +7,7 @@ import { classify, isDuty } from './classify.ts';
 import { COMPANIES, UNIT_TYPE_COMPANY } from '../../../shared/domain.ts';
 import type { PersonnelRow, StrengthRow } from '../../../shared/dashboard.ts';
 import { identityOf } from '../../../shared/identity.ts';
-import { battalionStrength, distinctDutyOn, type DutyFilter } from './metrics.ts';
+import { battalionStrength, distinctDutyOn, onParade, type DutyFilter } from './metrics.ts';
 import type { Trend } from './formsg.ts';
 import { toNumber } from '../../../shared/values.ts';
 
@@ -28,7 +28,7 @@ export interface GappyTrend {
 
 /** The company roll-up rows of one parade. */
 function companyRowsOn(strengthRows: StrengthRow[], isoDate: string, session: string): StrengthRow[] {
-  return strengthRows.filter((row) => row.date === isoDate && row.session === session && row.unitType === UNIT_TYPE_COMPANY);
+  return strengthRows.filter((row) => onParade(row, isoDate, session) && row.unitType === UNIT_TYPE_COMPANY);
 }
 
 /** The three rank tiers a parade state splits strength into, in command order, with their columns. */

@@ -34,7 +34,7 @@ function sum(values: (number | null)[]): number {
 }
 
 /** Whether a row is on the given parade (null session = either). */
-function onParade(row: { date: string; session: string }, isoDate: string, session: string | null | undefined): boolean {
+export function onParade(row: { date: string; session: string }, isoDate: string, session: string | null | undefined): boolean {
   return row.date === isoDate && (!session || row.session === session);
 }
 

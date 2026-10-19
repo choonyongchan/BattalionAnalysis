@@ -4,7 +4,7 @@
  */
 
 import { classify, DUTY_CLASS } from './classify.ts';
-import type { Cell } from './metrics.ts';
+import { onParade, type Cell } from './metrics.ts';
 import { COMPANIES, PERM_STATUS_NUM_DAYS } from '../../../shared/domain.ts';
 import type { PersonnelRow } from '../../../shared/dashboard.ts';
 import { identityOf } from '../../../shared/identity.ts';
@@ -62,10 +62,8 @@ export function restrictionsOn(
   session: string | null,
 ): { rows: string[]; cells: RestrictionCell[] } {
   const byCell = new Map<string, Map<string, string>>();
-  const onParade = personnelRows.filter(
-    (row) => row.date === isoDate && (!session || row.session === session) && classify(row) === DUTY_CLASS.STATUS,
-  );
-  for (const row of onParade) {
+  const statusRows = personnelRows.filter((row) => onParade(row, isoDate, session) && classify(row) === DUTY_CLASS.STATUS);
+  for (const row of statusRows) {
     const key = identityOf(row).key;
     if (key === '') continue;
     for (const bucket of bucketsFor(row.reason).filter((name) => name !== 'Other')) {

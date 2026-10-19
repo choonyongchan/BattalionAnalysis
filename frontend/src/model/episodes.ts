@@ -46,8 +46,9 @@ function groupIntoEpisodes(rows: PersonnelRow[]): PersonnelRow[][] {
   const undated: PersonnelRow[] = [];
   for (const row of rows) {
     const start = toIsoDate(row.startDate);
-    if (start) dated.set(start, [...(dated.get(start) ?? []), row]);
-    else undated.push(row);
+    if (!start) undated.push(row);
+    else if (dated.has(start)) dated.get(start)!.push(row);
+    else dated.set(start, [row]);
   }
 
   const groups = Array.from(dated.values());

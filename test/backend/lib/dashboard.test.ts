@@ -8,13 +8,13 @@ import { handle as handleFormsg } from '../../../backend/api/reportsick.ts';
 import { handle as handleSft } from '../../../backend/api/sft.ts';
 import type { Db } from '../../../backend/db/index.ts';
 import { commandRosterRows } from '../../../backend/db/schema.ts';
+import { sgtDateTime } from '../../../shared/dates.ts';
 import {
   loadDashboard,
   personnelNumDays,
   personnelReason,
   platoonFromLabel,
   rosterRole,
-  sgtDateTime,
 } from '../../../backend/lib/dashboard.ts';
 import { ingestMessage } from '../../../backend/lib/pipeline.ts';
 import type { DashboardData } from '../../../shared/dashboard.ts';

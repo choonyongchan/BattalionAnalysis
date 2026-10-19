@@ -35,10 +35,12 @@ describe('scripts', () => {
   });
 
   test('kills only bridge bun processes', () => {
-    const pattern = String.raw`runner[\\/]src[\\/](supervisor|index)\.ts`;
+    const pattern = String.raw`runner[\\/]src[\\/](supervisor|index)\.[jt]s`;
     expect(all.stop).toContain(pattern);
     const re = new RegExp(pattern);
     expect(re.test(String.raw`bun.exe --env-file=.env.whatsapp runner\src\supervisor.ts`)).toBe(true);
+    // A bridge started before the TypeScript move must still be stopped.
+    expect(re.test(String.raw`bun.exe --env-file=.env.whatsapp runner\src\supervisor.js`)).toBe(true);
     expect(re.test('bun.exe C:/repo/runner/src/index.ts')).toBe(true);
     expect(re.test('bun.exe run dev')).toBe(false);
   });

@@ -1,5 +1,5 @@
 /** Maps FormSG answers (by question title) onto `report_sick_formsg` columns. */
-import { SGT_OFFSET_MS } from '../../../shared/dates.ts';
+import { sgtDateTime } from '../../../shared/dates.ts';
 
 /** Columns filled straight from an answer; `discard` marks titles dropped on purpose. */
 export type Column =
@@ -133,5 +133,5 @@ export function toTime(answer: string | null | undefined): string | null {
 
 /** Gives the Singapore-local calendar date of an instant. */
 export function toSgtDate(iso: string): string {
-  return new Date(Date.parse(iso) + SGT_OFFSET_MS).toISOString().slice(0, 10);
+  return sgtDateTime(iso).slice(0, 10);
 }

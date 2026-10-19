@@ -14,9 +14,9 @@ const REPO_ROOT = join(import.meta.dir, '..', '..');
 /** Append-only log of the supervisor's output. */
 const LOG_PATH = join(REPO_ROOT, 'runner', 'data', 'bridge.log');
 
-/** PowerShell that kills only this bridge's bun processes, not every bun on the machine. */
+/** PowerShell that kills only this bridge's bun processes (old `.js` entry points too), not every bun. */
 const KILL_BRIDGE = `Get-CimInstance Win32_Process -Filter "Name='bun.exe'" |
-  Where-Object { $_.CommandLine -match 'runner[\\\\/]src[\\\\/](supervisor|index)\\.ts' } |
+  Where-Object { $_.CommandLine -match 'runner[\\\\/]src[\\\\/](supervisor|index)\\.[jt]s' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`;
 
 /** A PowerShell single-quoted string literal. */

@@ -14,10 +14,15 @@ export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Au
 
 /** An ISO timestamp as a Singapore date and `HH:mm`, or null when unreadable. */
 export function receivedInSgt(timestamp: string | null | undefined): { date: string; time: string } | null {
-  const time = new Date(timestamp ?? '').getTime();
-  if (Number.isNaN(time)) return null;
-  const iso = new Date(time + SGT_OFFSET_MS).toISOString();
-  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+  const iso = sgtDateTime(timestamp);
+  return iso ? { date: iso.slice(0, 10), time: iso.slice(11, 16) } : null;
+}
+
+/** An instant (ISO, or the driver's `2026-09-18 00:15:23.5+00`) as Singapore-local `yyyy-MM-ddTHH:mm:ss`, or ''. */
+export function sgtDateTime(value: string | null | undefined): string {
+  if (!value) return '';
+  const ms = Date.parse(value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00'));
+  return Number.isNaN(ms) ? '' : new Date(ms + SGT_OFFSET_MS).toISOString().slice(0, 19);
 }
 
 /** UTC milliseconds as `yyyy-MM-dd`. */

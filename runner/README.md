@@ -104,6 +104,10 @@ bun run runner:service restart   # e.g. after editing .env.whatsapp
 bun run runner:service uninstall
 ```
 
+**After a pull that renames the runner's entry files** (such as the move from `src/supervisor.js` to
+`src/supervisor.ts`), run `bun run runner:service install` again. The registered task still names the old
+file and will fail to start until it is re-registered. `install` stops a bridge started from either name.
+
 `stop`, `restart` and `uninstall` kill only this bridge's bun processes (`runner/src/supervisor.ts` and
 `index.ts`), never other bun processes such as the Vite dev server.
 

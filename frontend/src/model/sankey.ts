@@ -17,11 +17,12 @@ const NODE_REPORTED = 'Reported sick';
 const NODE_NO_FORMSG = 'No FormSG submission';
 
 /** Outcome nodes in column order; `None` is last and also takes a blank or unknown outcome. */
+const NO_OUTCOME_NODE = { outcome: 'None', name: 'Outcome: No MC or Status' } as const;
 const OUTCOME_NODES = [
   { outcome: 'MC', name: 'Outcome: MC' },
   { outcome: 'Status', name: 'Outcome: Status' },
   { outcome: 'Both', name: 'Outcome: MC and Status' },
-  { outcome: 'None', name: 'Outcome: No MC or Status' },
+  NO_OUTCOME_NODE,
 ] as const;
 
 /** Outcomes carrying a Status, which flow on to a bucket. */
@@ -84,7 +85,7 @@ function typeNodeOf(submission: Submission): string {
 
 /** A submission's outcome node; blank or unknown reads as none. */
 function outcomeNodeOf(submission: Submission): string {
-  return (OUTCOME_NODES.find((entry) => entry.outcome === submission.outcome) ?? OUTCOME_NODES[3]).name;
+  return (OUTCOME_NODES.find((entry) => entry.outcome === submission.outcome) ?? NO_OUTCOME_NODE).name;
 }
 
 /** The bucket of a submission's first Status answer, so it is carried once. */
