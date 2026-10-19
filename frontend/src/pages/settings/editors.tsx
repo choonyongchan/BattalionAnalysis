@@ -10,10 +10,29 @@ import { Banner, EmptyState } from '../../components/Card.tsx';
 import { DataTable } from '../../components/Table.tsx';
 import { fmtDate } from '../../format.ts';
 import { weekdayOf } from '../../../../shared/dates.ts';
-import { MAX_LOGO_CHARS, errorAt } from '../../../../shared/settings/validate.ts';
+import { MAX_LOGO_CHARS, errorAt, type FieldMessage } from '../../../../shared/settings/validate.ts';
+import type { ComponentChildren } from 'preact';
+import type { SectionName, SettingsValues } from '../../../../shared/settings/defaults.ts';
+
+/** A section's value while edited: a number field may hold raw text until the validator refuses it. */
+export type Draft<S extends SectionName> = {
+  [K in keyof SettingsValues[S]]: SettingsValues[S][K] extends number ? number | string : SettingsValues[S][K];
+};
+
+/** What every section view receives. */
+export interface ViewProps<S extends SectionName> {
+  value: SettingsValues[S];
+}
+
+/** What every section editor receives. */
+export interface EditorProps<S extends SectionName> {
+  draft: Draft<S>;
+  setDraft: (draft: Draft<S>) => void;
+  errors: FieldMessage[];
+}
 
 /** A labelled input with its error beneath. */
-export function Field({ label, error, children }) {
+export function Field({ label, error, children }: { label: string; error?: string; children: ComponentChildren }) {
   return (
     <label class="settings-field">
       <span class="field__label">{label}</span>
@@ -24,18 +43,18 @@ export function Field({ label, error, children }) {
 }
 
 /** Reads a number input: a whole number, or the raw text so the validator can refuse it. */
-function numberFrom(event) {
+function numberFrom(event: { currentTarget: HTMLInputElement }): number | string {
   const text = event.currentTarget.value;
   return text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text) : text;
 }
 
 /** Replaces one item of a list field. */
-function patchAt(list, index, patch) {
+function patchAt<T>(list: T[], index: number, patch: Partial<T>): T[] {
   return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
 }
 
 /** Shows the unit settings. */
-export function UnitView({ value }) {
+export function UnitView({ value }: ViewProps<'unit'>) {
   return (
     <dl class="settings-list">
       <dt>Unit name</dt>
@@ -49,10 +68,10 @@ export function UnitView({ value }) {
 }
 
 /** Edits the unit settings, including a logo upload. */
-export function UnitEditor({ draft, setDraft, errors }) {
+export function UnitEditor({ draft, setDraft, errors }: EditorProps<'unit'>) {
   /** Reads the chosen file into a data URL. */
-  function onLogo(event) {
-    const file = event.currentTarget.files && event.currentTarget.files[0];
+  function onLogo(event: { currentTarget: HTMLInputElement }) {
+    const file = event.currentTarget.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setDraft({ ...draft, logo: String(reader.result) });
@@ -83,7 +102,7 @@ export function UnitEditor({ draft, setDraft, errors }) {
 }
 
 /** Shows the calendar: holidays with their weekday, and rotations. */
-export function CalendarView({ value }) {
+export function CalendarView({ value }: ViewProps<'calendar'>) {
   return (
     <>
       <h4 class="settings-subhead">Public holidays</h4>
@@ -96,7 +115,7 @@ export function CalendarView({ value }) {
             { key: 'weekday', label: 'Weekday' },
             { key: 'name', label: 'Name' },
           ]}
-          rows={value.holidays.map((h) => ({ date: fmtDate(h.date), weekday: weekdayOf(h.date).name, name: h.name }))}
+          rows={value.holidays.map((holiday) => ({ date: fmtDate(holiday.date), weekday: weekdayOf(holiday.date).name, name: holiday.name }))}
           rowKey={(row) => row.date}
         />
       )}
@@ -110,7 +129,7 @@ export function CalendarView({ value }) {
             { key: 'start', label: 'Start' },
             { key: 'end', label: 'End' },
           ]}
-          rows={value.rotations.map((r) => ({ name: r.name, start: fmtDate(r.start), end: fmtDate(r.end) }))}
+          rows={value.rotations.map((rotation) => ({ name: rotation.name, start: fmtDate(rotation.start), end: fmtDate(rotation.end) }))}
           rowKey={(row) => row.name + row.start}
         />
       )}
@@ -119,7 +138,7 @@ export function CalendarView({ value }) {
 }
 
 /** Edits holidays and rotations as lists of rows. */
-export function CalendarEditor({ draft, setDraft, errors }) {
+export function CalendarEditor({ draft, setDraft, errors }: EditorProps<'calendar'>) {
   const holidays = draft.holidays;
   const rotations = draft.rotations;
   return (
@@ -169,7 +188,7 @@ export function CalendarEditor({ draft, setDraft, errors }) {
 }
 
 /** Shows the thresholds. */
-export function ThresholdsView({ value }) {
+export function ThresholdsView({ value }: ViewProps<'thresholds'>) {
   return (
     <dl class="settings-list">
       <dt>Long-term MC</dt>
@@ -181,7 +200,7 @@ export function ThresholdsView({ value }) {
 }
 
 /** Edits the thresholds. */
-export function ThresholdsEditor({ draft, setDraft, errors }) {
+export function ThresholdsEditor({ draft, setDraft, errors }: EditorProps<'thresholds'>) {
   return (
     <>
       <Field label="Long-term MC: days or longer" error={errorAt(errors, 'longMcDays')}>
@@ -195,7 +214,7 @@ export function ThresholdsEditor({ draft, setDraft, errors }) {
 }
 
 /** Shows the session settings. */
-export function SessionView({ value }) {
+export function SessionView({ value }: ViewProps<'session'>) {
   return (
     <dl class="settings-list">
       <dt>Login lasts</dt>
@@ -207,7 +226,7 @@ export function SessionView({ value }) {
 }
 
 /** Edits the session settings. */
-export function SessionEditor({ draft, setDraft, errors }) {
+export function SessionEditor({ draft, setDraft, errors }: EditorProps<'session'>) {
   return (
     <>
       <Field label="Login lasts (hours)" error={errorAt(errors, 'ttlHours')}>

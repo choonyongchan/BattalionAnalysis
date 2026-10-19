@@ -8,50 +8,69 @@
  * page picks up the new value.
  */
 
+import type { ComponentType } from 'preact';
 import { useState } from 'preact/hooks';
 import { refresh } from '../../app/auth.ts';
 import { canEdit } from '../../app/state.ts';
 import { Banner, Card } from '../../components/Card.tsx';
 import { resetSection, saveSection } from '../../data/settings.ts';
-import { validateSection } from '../../../../shared/settings/validate.ts';
+import { validateSection, type FieldMessage } from '../../../../shared/settings/validate.ts';
+import type { SectionName, SettingsValues } from '../../../../shared/settings/defaults.ts';
+import type { SectionMeta } from '../../../../shared/settings/resolve.ts';
+import { ApiError } from '../../data/api.ts';
+import type { Draft, EditorProps, ViewProps } from './editors.tsx';
 
 /** A section card. */
-export function SectionCard({ section, title, value, meta, View, Editor }) {
-  const [draft, setDraft] = useState(null);
-  const [errors, setErrors] = useState([]);
-  const [warnings, setWarnings] = useState([]);
+export function SectionCard<S extends SectionName>({
+  section,
+  title,
+  value,
+  meta,
+  View,
+  Editor,
+}: {
+  section: S;
+  title: string;
+  value: SettingsValues[S];
+  meta: SectionMeta | undefined;
+  View: ComponentType<ViewProps<S>>;
+  Editor: ComponentType<EditorProps<S>>;
+}) {
+  const [draft, setDraft] = useState<Draft<S> | null>(null);
+  const [errors, setErrors] = useState<FieldMessage[]>([]);
+  const [warnings, setWarnings] = useState<FieldMessage[]>([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const version = (meta && meta.version) || 0;
-  const note = meta && meta.invalid ? 'Stored value invalid, showing defaults' : meta && meta.isDefault ? 'Default' : '';
+  const version = meta?.version ?? 0;
+  const note = meta?.invalid ? 'Stored value invalid, showing defaults' : meta?.isDefault ? 'Default' : '';
 
   /** Opens the form on a copy of the value in force. */
   function edit() {
-    setDraft(structuredClone(value));
+    setDraft(structuredClone(value) as Draft<S>);
     setErrors([]);
     setWarnings([]);
     setMessage('');
   }
 
   /** Runs a write, then re-reads the dashboard; shows a refusal on the card. */
-  async function run(write) {
+  async function run(write: () => Promise<{ warnings?: FieldMessage[] } | void>) {
     setBusy(true);
     setMessage('');
     try {
       const result = await write();
-      setWarnings((result && result.warnings) || []);
+      setWarnings(result?.warnings ?? []);
       setDraft(null);
       await refresh();
     } catch (error) {
-      setErrors(error.errors || []);
-      setMessage(error.message);
+      setErrors(error instanceof ApiError ? error.errors : []);
+      setMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
   }
 
   /** Validates the draft locally, then saves it. */
-  function onSave(event) {
+  function onSave(event: Event) {
     event.preventDefault();
     const checked = validateSection(section, draft);
     setErrors(checked.errors);
@@ -60,12 +79,12 @@ export function SectionCard({ section, title, value, meta, View, Editor }) {
       setMessage('Some fields need fixing.');
       return;
     }
-    run(() => saveSection(section, checked.value, version));
+    void run(() => saveSection(section, checked.value, version));
   }
 
   return (
     <Card title={title} note={note}>
-      {meta && meta.invalid ? (
+      {meta?.invalid ? (
         <Banner tone="error">
           The stored {title} settings could not be read, so the defaults are in use. Save this section to replace them.
         </Banner>

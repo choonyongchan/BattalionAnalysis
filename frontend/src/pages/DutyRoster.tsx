@@ -22,21 +22,21 @@
  */
 
 import { useMemo, useState } from 'preact/hooks';
-import { company, dataset } from '../app/state.ts';
+import { company, loadedData } from '../app/state.ts';
 import { Card, Coverage, EmptyState } from '../components/Card.tsx';
 import { PageControls } from '../components/PageControls.tsx';
-import { COMPANIES } from '../../../shared/domain.ts';
-import { ALL_COMPANIES } from '../model/scope.ts';
+import { COMPANIES, isCompany } from '../../../shared/domain.ts';
 import { datesPresent } from '../model/metrics.ts';
-import { dutyRosterCoverage, dutyRosterTree, rosterClashes, rosterLoad, vacanciesOn } from '../model/dutyRoster.ts';
+import { dutyRosterCoverage, dutyRosterTree, rosterClashes, rosterLoad, vacanciesOn, type TreeNode } from '../model/dutyRoster.ts';
+import type { PersonnelRow, RosterRow } from '../../../shared/dashboard.ts';
 import { DataTable } from '../components/Table.tsx';
-import { scopeDataset } from '../model/scope.ts';
+import { onlyCompany, scopeDataset } from '../model/scope.ts';
 import { fmtDate, fmtFraction, fmtInt } from '../format.ts';
 import { settingOf } from '../model/activeSettings.ts';
 
 /** One role and, indented beneath it, the roles that report to it. */
-function RoleItem({ node }) {
-  const children = node.children || [];
+function RoleItem({ node }: { node: TreeNode }) {
+  const children = node.children;
   return (
     <li class="duty-roster__item">
       <div class={'duty-roster__role' + (node.vacant ? ' duty-roster__role--vacant' : node.filed ? '' : ' duty-roster__role--unfiled')}>
@@ -55,8 +55,8 @@ function RoleItem({ node }) {
 }
 
 /** One company's card: its name in the company's colour, then its chain of command. */
-function CompanyRoster({ node }) {
-  const [top] = node.children || [];
+function CompanyRoster({ node }: { node: TreeNode }) {
+  const [top] = node.children;
   return (
     <section class={'duty-roster__company duty-roster__company--' + node.name.toLowerCase()}>
       <h3 class="duty-roster__heading">{node.name}</h3>
@@ -78,7 +78,7 @@ const LOAD_ROWS = 15;
  * Who has done the most duties since the roster began, weekends counted apart, and every duty filed for
  * someone the same parade lists on MC or leave.
  */
-function DutyFairness({ roster, personnel, since }) {
+function DutyFairness({ roster, personnel, since }: { roster: RosterRow[]; personnel: PersonnelRow[]; since: string | null }) {
   const load = useMemo(() => rosterLoad(roster).slice(0, LOAD_ROWS), [roster]);
   const clashes = useMemo(() => rosterClashes(roster, personnel), [roster, personnel]);
   return (
@@ -120,10 +120,10 @@ function DutyFairness({ roster, personnel, since }) {
 
 /** The Duty Roster page. */
 export function DutyRoster() {
-  const data = dataset.value;
+  const data = loadedData();
   const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);
-  const [date, setDate] = useState(paradeDates[paradeDates.length - 1] || null);
-  const whole = company.value === ALL_COMPANIES;
+  const [date, setDate] = useState(paradeDates[paradeDates.length - 1] ?? null);
+  const whole = !isCompany(company.value);
   const scoped = useMemo(() => scopeDataset(data, company.value), [data, company.value]);
 
   if (!date) {
@@ -140,7 +140,7 @@ export function DutyRoster() {
   const tree = dutyRosterTree(data.roster, date, whole ? undefined : { company: company.value });
   const companies = whole ? tree.children : [tree];
   const coverage = dutyRosterCoverage(data.roster, date);
-  const vacancies = vacanciesOn(data.roster, date).filter((entry) => whole || entry.company === company.value);
+  const vacancies = onlyCompany(vacanciesOn(data.roster, date), company.value);
 
   return (
     <div class="page">
@@ -161,9 +161,9 @@ export function DutyRoster() {
           {paradeDates
             .slice()
             .reverse()
-            .map((d) => (
-              <option key={d} value={d}>
-                {fmtDate(d)}
+            .map((day) => (
+              <option key={day} value={day}>
+                {fmtDate(day)}
               </option>
             ))}
         </select>
@@ -183,7 +183,7 @@ export function DutyRoster() {
         </Coverage>
       </Card>
 
-      <DutyFairness roster={scoped.roster} personnel={scoped.personnel} since={paradeDates[0] || null} />
+      <DutyFairness roster={scoped.roster} personnel={scoped.personnel} since={paradeDates[0] ?? null} />
     </div>
   );
 }

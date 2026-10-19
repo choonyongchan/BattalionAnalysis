@@ -13,7 +13,7 @@
  */
 
 import { useMemo, useState } from 'preact/hooks';
-import { dataset } from '../app/state.ts';
+import { loadedData } from '../app/state.ts';
 import { Card, Coverage, EmptyState } from '../components/Card.tsx';
 import { DataTable } from '../components/Table.tsx';
 import { Tile, TileRow } from '../components/Tile.tsx';
@@ -25,7 +25,7 @@ import { toSubmissions } from '../model/formsg.ts';
 import { soldierIndex, soldierReport } from '../model/soldier.ts';
 
 /** A ranked reason table, used for the MC / report-sick / status reason breakdowns. */
-function ReasonTable({ title, rows }) {
+function ReasonTable({ title, rows }: { title: string; rows: { reason: string; count: number }[] }) {
   return (
     <Card title={title}>
       {rows.length === 0 ? (
@@ -46,8 +46,8 @@ function ReasonTable({ title, rows }) {
 
 /** The Soldier page. */
 export function Soldier() {
-  const data = dataset.value;
-  const [selectedKey, setSelectedKey] = useState(null);
+  const data = loadedData();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
@@ -90,15 +90,11 @@ export function Soldier() {
           >
             <Timeline
               lanes={['MC', 'Off/Leave']}
-              spans={report.absences
-                .filter((absence) => absence.startDate && absence.endDate)
-                .map((absence) => ({
-                  lane: absence.dutyClass === 'Att C' ? 'MC' : 'Off/Leave',
-                  start: absence.startDate,
-                  end: absence.endDate,
-                  days: absence.days,
-                  label: absence.reason,
-                }))}
+              spans={report.absences.flatMap(({ dutyClass, startDate, endDate, days, reason }) =>
+                startDate && endDate
+                  ? [{ lane: dutyClass === 'Att C' ? 'MC' : 'Off/Leave', start: startDate, end: endDate, days, label: reason }]
+                  : [],
+              )}
             />
           </ChartCard>
 

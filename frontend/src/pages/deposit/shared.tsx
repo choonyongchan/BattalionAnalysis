@@ -2,8 +2,12 @@
  * The pieces both Deposit panels (parade states and SFT) are built from.
  */
 
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { dataset } from '../../app/state.ts';
+import type { OutcomeNote } from '../../model/paradeMessages.ts';
+
 /** What the server said about the last save or delete. */
-export function Outcome({ result }) {
+export function Outcome({ result }: { result: OutcomeNote | null }) {
   if (!result) return null;
   return (
     <div class={'banner banner--' + result.tone} role="status">
@@ -22,7 +26,23 @@ export function Outcome({ result }) {
 /**
  * The Edit / Delete controls for one row. Delete asks once more inline rather than through a browser dialog.
  */
-export function RowActions({ label, confirming, busy, onEdit, onDelete, onConfirm, onKeep }) {
+export function RowActions({
+  label,
+  confirming,
+  busy,
+  onEdit,
+  onDelete,
+  onConfirm,
+  onKeep,
+}: {
+  label: string;
+  confirming: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onConfirm: () => void;
+  onKeep: () => void;
+}) {
   if (confirming) {
     return (
       <span class="rowactions">
@@ -48,13 +68,38 @@ export function RowActions({ label, confirming, busy, onEdit, onDelete, onConfir
 }
 
 /** Runs one server call with the panel marked busy, showing a thrown error as the outcome. */
-export async function runBusy(setBusy, setResult, action) {
+export async function runBusy(
+  setBusy: (busy: boolean) => void,
+  setResult: (result: OutcomeNote) => void,
+  action: () => Promise<void>,
+): Promise<void> {
   setBusy(true);
   try {
     await action();
   } catch (error) {
-    setResult({ tone: 'error', text: error.message, reasons: [] });
+    setResult({ tone: 'error', text: error instanceof Error ? error.message : String(error), reasons: [] });
   } finally {
     setBusy(false);
   }
+}
+
+/** A stored list (null while loading), re-read on every background refresh; `reload` reads it now. */
+export function useStoredList<T>(load: () => Promise<T[]>): { items: T[] | null; error: string; reload: () => Promise<void> } {
+  const [items, setItems] = useState<T[] | null>(null);
+  const [error, setError] = useState('');
+  const reload = useCallback(
+    () =>
+      load()
+        .then((list) => {
+          setItems(list);
+          setError('');
+        })
+        .catch((failure: Error) => setError(failure.message)),
+    [],
+  );
+  const refreshedAt = dataset.value?.generatedAt;
+  useEffect(() => {
+    void reload();
+  }, [reload, refreshedAt]);
+  return { items, error, reload };
 }

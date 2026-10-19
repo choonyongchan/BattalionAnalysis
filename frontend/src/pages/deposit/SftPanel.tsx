@@ -8,9 +8,8 @@
  * the list reloads with every background refresh so a record FormSG sends meanwhile appears.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { refresh } from '../../app/auth.ts';
-import { dataset } from '../../app/state.ts';
 import { Banner, Card, EmptyState } from '../../components/Card.tsx';
 import { DataTable } from '../../components/Table.tsx';
 import { deleteSftRecord, listSftRecords, updateSftRecord } from '../../data/sft.ts';
@@ -23,13 +22,31 @@ import {
   toEditForm,
   toSftRows,
   validateSftEdit,
+  type SftEditForm,
+  type SftRecord,
 } from '../../../../shared/sftEdit.ts';
+import type { OutcomeNote } from '../../model/paradeMessages.ts';
 import { Field } from '../settings/editors.tsx';
-import { Outcome, RowActions, runBusy } from './shared.tsx';
+import { Outcome, RowActions, runBusy, useStoredList } from './shared.tsx';
 
 /** The correction form for one record. */
-function SftForm({ form, setForm, errors, busy, onSubmit, onCancel }) {
-  const set = (key) => (event) => setForm({ ...form, [key]: event.currentTarget.value });
+function SftForm({
+  form,
+  setForm,
+  errors,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  form: SftEditForm;
+  setForm: (form: SftEditForm) => void;
+  errors: Record<string, string>;
+  busy: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const set = (key: keyof SftEditForm) => (event: { currentTarget: HTMLInputElement | HTMLSelectElement }) =>
+    setForm({ ...form, [key]: event.currentTarget.value });
   return (
     <form
       class="deposit"
@@ -84,33 +101,17 @@ function SftForm({ form, setForm, errors, busy, onSubmit, onCancel }) {
 
 /** The SFT panel. */
 export function SftPanel() {
-  const [records, setRecords] = useState(null);
-  const [listError, setListError] = useState('');
+  const { items: records, error: listError, reload } = useStoredList(listSftRecords);
   const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [confirming, setConfirming] = useState(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<SftEditForm | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
-  const cardRef = useRef(null);
+  const [result, setResult] = useState<OutcomeNote | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const reload = useCallback(() => {
-    return listSftRecords()
-      .then((list) => {
-        setRecords(list);
-        setListError('');
-      })
-      .catch((error) => setListError(error.message));
-  }, []);
-
-  // `dataset` changes on every background refresh; the list follows it.
-  const refreshedAt = dataset.value && dataset.value.generatedAt;
-  useEffect(() => {
-    reload();
-  }, [reload, refreshedAt]);
-
-  const run = (action) => runBusy(setBusy, setResult, action);
+  const run = (action: () => Promise<void>) => runBusy(setBusy, setResult, action);
 
   const stopEditing = () => {
     setEditing(null);
@@ -118,23 +119,24 @@ export function SftPanel() {
     setErrors({});
   };
 
-  const startEdit = (record) => {
+  const startEdit = (record: SftRecord) => {
     setEditing(record.responseId);
     setForm(toEditForm(record));
     setErrors({});
     setResult(null);
     setConfirming(null);
-    if (cardRef.current) cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const save = () => {
+    if (!form || !editing) return;
     const checked = validateSftEdit(form, Date.now());
     setErrors(checked.ok ? {} : checked.errors);
     if (!checked.ok) {
       setResult({ tone: 'error', text: 'Not saved. Correct the marked fields.', reasons: [] });
       return;
     }
-    return run(async () => {
+    void run(async () => {
       const answer = await updateSftRecord(editing, form);
       if (answer.errors) {
         setErrors(answer.errors);
@@ -144,22 +146,22 @@ export function SftPanel() {
       stopEditing();
       setResult({ tone: 'good', text: 'Saved the correction.', reasons: [] });
       await reload();
-      refresh();
+      void refresh();
     });
   };
 
-  const confirmDelete = (id) =>
+  const confirmDelete = (id: string) =>
     run(async () => {
       await deleteSftRecord(id);
       setConfirming(null);
       if (editing === id) stopEditing();
       setResult({ tone: 'good', text: 'Deleted the SFT record.', reasons: [] });
       await reload();
-      refresh();
+      void refresh();
     });
 
-  const byId = new Map((records || []).map((record) => [record.responseId, record]));
-  const allRows = toSftRows(records || []);
+  const byId = new Map((records ?? []).map((record) => [record.responseId, record]));
+  const allRows = toSftRows(records ?? []);
   const rows = filterSftRows(allRows, query).map((row) => ({
     ...row,
     dateLabel: fmtDate(row.date),
@@ -168,7 +170,7 @@ export function SftPanel() {
         label="it"
         confirming={confirming === row.id}
         busy={busy}
-        onEdit={() => startEdit(byId.get(row.id))}
+        onEdit={() => startEdit(byId.get(row.id)!)}
         onDelete={() => setConfirming(row.id)}
         onConfirm={() => confirmDelete(row.id)}
         onKeep={() => setConfirming(null)}
@@ -214,7 +216,7 @@ export function SftPanel() {
             ) : (
               <DataTable
                 columns={[
-                  { key: 'dateLabel', label: 'Date', sortable: true, defaultDir: 'desc', sortValue: (row) => row.date + ' ' + row.time },
+                  { key: 'dateLabel', label: 'Date', sortable: true, defaultDir: 'desc', sortValue: (row: { date: string | null; time: string }) => row.date + ' ' + row.time },
                   { key: 'time', label: 'Time' },
                   { key: 'who', label: 'Name', sortable: true },
                   { key: 'company', label: 'Company', sortable: true },

@@ -12,16 +12,16 @@
  */
 
 import { useEffect, useMemo, useRef } from 'preact/hooks';
-import { company, dataset, selectedDate } from '../../app/state.ts';
+import { company, loadedData, selectedDate } from '../../app/state.ts';
 import { Card, Coverage, EmptyState } from '../../components/Card.tsx';
 import { Tile, TileRow } from '../../components/Tile.tsx';
 import { PageControls } from '../../components/PageControls.tsx';
 import { FilingChips } from '../../components/FilingChips.tsx';
 import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../../format.ts';
 import { ChartCard, Donut } from '../../charts/index.ts';
-import { COMPANIES } from '../../../../shared/domain.ts';
+import { COMPANIES, isCompany } from '../../../../shared/domain.ts';
 import { DUTY_CLASS, MC_MA } from '../../model/classify.ts';
-import { ALL_COMPANIES, scopeDataset, scopeFilings, scopeSubmissions } from '../../model/scope.ts';
+import { onlyCompany, scopeDataset } from '../../model/scope.ts';
 import { absenceParts, datesPresent, battalionStrength, dutyCountsOn, distinctDutyOn } from '../../model/metrics.ts';
 import { toSubmissions } from '../../model/formsg.ts';
 import { filingsOn, toFilings } from '../../model/submissions.ts';
@@ -30,17 +30,13 @@ import { AwayAheadCard, OtherDutiesCard, RecentReturnsCard, RestrictionsCard, Re
 /** Session every "today" figure and trend describes. */
 const SESSION = 'FPS';
 
-
 /** The Today page. */
 export function Today() {
-  const full = dataset.value;
+  const full = loadedData();
   const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
-  const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
+  const scopedCompany = isCompany(company.value) ? company.value : null;
 
-  const submissions = useMemo(
-    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
-    [data.formSg, company.value]
-  );
+  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
   const filings = useMemo(() => toFilings(data.submissions), [data.submissions]);
   // The selectable dates come from the full, unscoped strength so they
   // do not shrink when a company that filed on fewer days is picked.
@@ -48,16 +44,16 @@ export function Today() {
 
   // Follow the newest parade: on first open, and when a background refresh brings a new
   // day while the viewer was looking at the latest one. A date picked by hand stays put.
-  const latestSeen = useRef(null);
+  const latestSeen = useRef<string | null>(null);
   useEffect(() => {
-    const latest = paradeDates[paradeDates.length - 1] || null;
+    const latest = paradeDates[paradeDates.length - 1] ?? null;
     if (!selectedDate.value || selectedDate.value === latestSeen.current) {
       selectedDate.value = latest;
     }
     latestSeen.current = latest;
   }, [paradeDates]);
 
-  const today = selectedDate.value || paradeDates[paradeDates.length - 1] || null;
+  const today = selectedDate.value ?? paradeDates[paradeDates.length - 1] ?? null;
 
   if (!today) {
     return (
@@ -74,15 +70,11 @@ export function Today() {
   const hasParadeState = strength.companiesReporting.length > 0;
   const duty = hasParadeState ? dutyCountsOn(data.personnel, today, SESSION) : null;
   const reportedSickToday = submissions.filter((submission) => submission.date === today).length;
-  const filingEntries = scopeFilings(filingsOn(filings, today, SESSION), company.value);
+  const filingEntries = onlyCompany(filingsOn(filings, today, SESSION), company.value);
 
   const coverageLine = scopedCompany
     ? scopedCompany + ' only: parade state for ' + fmtDate(today) + (hasParadeState ? ' filed.' : ' not filed.')
-    : 'Accurate to the parade states filed for ' +
-      fmtDate(today) +
-      ', ' +
-      fmtFraction(strength.companiesReporting.length, COMPANIES.length) +
-      ' companies.';
+    : `Accurate to the parade states filed for ${fmtDate(today)}, ${fmtFraction(strength.companiesReporting.length, COMPANIES.length)} companies.`;
 
   return (
     <div class="page">
@@ -93,7 +85,7 @@ export function Today() {
         </div>
       </header>
 
-      <PageControls min={paradeDates[0] || today} max={paradeDates[paradeDates.length - 1] || today} />
+      <PageControls min={paradeDates[0] ?? today} max={paradeDates[paradeDates.length - 1] ?? today} />
 
       <Card
         title="Today's First Parade State"
@@ -105,7 +97,7 @@ export function Today() {
       <TileRow>
         <Tile label="Total soldiers" value={fmtInt(strength.accountable)} />
         <Tile label="Present soldiers" value={fmtInt(hasParadeState ? strength.present : 0)} />
-        <Tile label="% present" value={fmtPercent(strength.percentPresent / 100)} />
+        <Tile label="% present" value={fmtPercent(strength.percentPresent === null ? null : strength.percentPresent / 100)} />
         <Tile label="Reporting sick" value={fmtInt(duty ? duty.counts[DUTY_CLASS.REPORT_SICK] || 0 : 0)} foot="Parade state" />
         <Tile label="Reported sick" value={fmtInt(reportedSickToday)} foot="FormSG" />
         <Tile label="MC / MA" value={fmtInt(duty ? distinctDutyOn(data.personnel, today, SESSION, MC_MA) : 0)} />
@@ -130,7 +122,6 @@ export function Today() {
       <AwayAheadCard data={data} date={today} />
       <ReturnsCard data={data} date={today} />
       <RecentReturnsCard data={data} date={today} />
-
     </div>
   );
 }

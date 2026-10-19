@@ -7,27 +7,17 @@ import { useMemo } from 'preact/hooks';
 import { company } from '../app/state.ts';
 import { Banner, Card } from '../components/Card.tsx';
 import { ChartCard, Heatmap } from '../charts/index.ts';
-import { fmtDate, fmtFraction, fmtInt } from '../format.ts';
+import { fmtClock, fmtDate, fmtFraction, fmtInt } from '../format.ts';
 import { COMPANIES } from '../../../shared/domain.ts';
 import { withinRange } from '../model/dateRange.ts';
-import { countMismatches, dataQuality } from '../model/quality.ts';
-import { ALL_COMPANIES } from '../model/scope.ts';
-import { FILING_CUTOFF_MINUTES, filingTimes, toFilings } from '../model/submissions.ts';
-import { CategoryPage, useCategory } from './shared/category.tsx';
+import { countMismatches, dataQuality, type DataQuality } from '../model/quality.ts';
+import { onlyCompany } from '../model/scope.ts';
+import { FILING_CUTOFF_MINUTES, filingTimes, toFilings, type Filing as FilingRecord } from '../model/submissions.ts';
+import type { PersonnelRow, SectionCountRow } from '../../../shared/dashboard.ts';
+import { CategoryPage, useCategory, type CategoryRange } from './shared/category.tsx';
 
-/** A count of minutes after midnight as a clock time. */
-function fmtClock(minutes) {
-  return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
-}
-
-/**
- * The data-quality panel: row counts, tab availability, date spans, and the named
- * findings from `model/quality.js`.
-
- * @param {!Object} quality The result of `dataQuality`.
- * @returns {!preact.VNode} The panel.
- */
-function DataQualityPanel({ quality }) {
+/** The data-quality panel: row counts, date spans and the findings from `model/quality.ts`. */
+function DataQualityPanel({ quality }: { quality: DataQuality }) {
   const rows = [
     { label: 'Strength Data rows', value: fmtInt(quality.rowCounts.strength) },
     { label: 'Personnel Data rows', value: fmtInt(quality.rowCounts.personnel) },
@@ -52,7 +42,7 @@ function DataQualityPanel({ quality }) {
     },
   ];
 
-  const optionalTabNotes = Object.entries(quality.optionalTabs);
+  const notes = Object.entries(quality.notes);
 
   return (
     <Card title="Data Quality">
@@ -85,10 +75,10 @@ function DataQualityPanel({ quality }) {
         </Banner>
       ) : null}
 
-      {optionalTabNotes.length > 0 ? (
+      {notes.length > 0 ? (
         <div class="band">
-          {optionalTabNotes.map(([tab, note]) => (
-            <Banner tone="warning" key={tab}>
+          {notes.map(([key, note]) => (
+            <Banner tone="warning" key={key}>
               {note}
             </Banner>
           ))}
@@ -99,15 +89,15 @@ function DataQualityPanel({ quality }) {
 }
 
 /** How late each company's first parade state arrived, day by day. */
-function TimelinessCard({ filings, range }) {
+function TimelinessCard({ filings, range }: { filings: FilingRecord[]; range: CategoryRange }) {
   const { cells, onTime, filed, nextDay } = filingTimes(filings, range.days);
-  const companies = COMPANIES.filter((company) => filed[company] > 0);
+  const companies = COMPANIES.filter((company) => (filed[company] ?? 0) > 0);
   return (
     <ChartCard
       title="First Parade State, Minutes Late"
       note={
         'Minutes past ' + fmtClock(FILING_CUTOFF_MINUTES) + ' the first parade state arrived; 0 is on time. On time: ' +
-        companies.map((company) => company + ' ' + fmtFraction(onTime[company], filed[company])).join(', ') + '.'
+        companies.map((company) => company + ' ' + fmtFraction(onTime[company] ?? 0, filed[company] ?? 0)).join(', ') + '.'
       }
       coverage={
         'A blank cell is a day with no filing' +
@@ -129,7 +119,7 @@ function TimelinessCard({ filings, range }) {
 }
 
 /** Sections whose stated count differs from the names listed under them, by company and day. */
-function AccuracyCard({ sectionCounts, personnel, range }) {
+function AccuracyCard({ sectionCounts, personnel, range }: { sectionCounts: SectionCountRow[]; personnel: PersonnelRow[]; range: CategoryRange }) {
   const inRange = sectionCounts.filter((row) => withinRange(row.date, range.from, range.to));
   const { cells, checked, mismatched } = countMismatches(inRange, personnel);
   const companies = COMPANIES.filter((company) => cells.some((cell) => cell.row === company));
@@ -156,18 +146,12 @@ function AccuracyCard({ sectionCounts, personnel, range }) {
 /** The Filing & Accuracy page. */
 export function Filing() {
   const { data, range } = useCategory();
-  const filings = useMemo(
-    () => toFilings(data.submissions).filter((filing) => company.value === ALL_COMPANIES || filing.company === company.value),
-    [data.submissions, company.value]
-  );
-  const sectionCounts = useMemo(
-    () => (data.sectionCounts || []).filter((row) => company.value === ALL_COMPANIES || row.company === company.value),
-    [data.sectionCounts, company.value]
-  );
+  // Filing rows carry no company column; the id names it.
+  const filings = useMemo(() => onlyCompany(toFilings(data.submissions), company.value), [data.submissions, company.value]);
   return (
     <CategoryPage title="Filing & Accuracy" range={range}>
       <TimelinessCard filings={filings} range={range} />
-      <AccuracyCard sectionCounts={sectionCounts} personnel={data.personnel} range={range} />
+      <AccuracyCard sectionCounts={data.sectionCounts} personnel={data.personnel} range={range} />
       <DataQualityPanel quality={dataQuality(data)} />
     </CategoryPage>
   );

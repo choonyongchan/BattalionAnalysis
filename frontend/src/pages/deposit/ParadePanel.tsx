@@ -9,19 +9,20 @@
  * every background refresh so a message the relay stores meanwhile appears.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import type { RefObject } from 'preact';
+import { useRef, useState } from 'preact/hooks';
 import { refresh } from '../../app/auth.ts';
-import { dataset } from '../../app/state.ts';
 import { Banner, Card, EmptyState } from '../../components/Card.tsx';
 import { DataTable } from '../../components/Table.tsx';
 import { deleteMessage, depositMessage, editMessage, getMessage, listMessages } from '../../data/parade.ts';
 import { fmtDate, fmtInt } from '../../format.ts';
-import { MESSAGE_STATUS, describeOutcome, reasonsOf, toMessageRows } from '../../model/paradeMessages.ts';
+import { MESSAGE_STATUS, describeOutcome, toMessageRows, type MessageStatus, type OutcomeNote } from '../../model/paradeMessages.ts';
+import { reasonsOf } from '../../../../shared/paradeMessage.ts';
 import { settingOf } from '../../model/activeSettings.ts';
-import { Outcome, RowActions, runBusy } from './shared.tsx';
+import { Outcome, RowActions, runBusy, useStoredList } from './shared.tsx';
 
 /** The status class suffix for each status. */
-const STATUS_CLASS = {
+const STATUS_CLASS: Record<MessageStatus, string> = {
   [MESSAGE_STATUS.PARSED]: 'good',
   [MESSAGE_STATUS.NEEDS_REVIEW]: 'critical',
   [MESSAGE_STATUS.REJECTED]: 'muted',
@@ -29,7 +30,26 @@ const STATUS_CLASS = {
 };
 
 /** The deposit form, which doubles as the editor for a stored message. */
-function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, formRef }) {
+function DepositForm({
+  text,
+  onText,
+  editing,
+  busy,
+  result,
+  onSubmit,
+  onCancel,
+  formRef,
+}: {
+  text: string;
+  onText: (text: string) => void;
+  /** The id of the message being edited, or null for a new deposit. */
+  editing: number | null;
+  busy: boolean;
+  result: OutcomeNote | null;
+  onSubmit: () => void;
+  onCancel: () => void;
+  formRef: RefObject<HTMLFormElement>;
+}) {
   return (
     <Card
       title={editing ? `Editing #${editing}` : 'Deposit a parade state'}
@@ -75,7 +95,7 @@ function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, 
  * The status cell: the label, and beneath it how many lines stopped the message parsing. The lines themselves
  * show only once the message is opened for editing.
  */
-function StatusCell({ status, problems }) {
+function StatusCell({ status, problems }: { status: MessageStatus; problems: number }) {
   return (
     <span class="msgstatus">
       <span class={'msgstatus__label msgstatus__label--' + STATUS_CLASS[status]}>{status}</span>
@@ -90,31 +110,15 @@ function StatusCell({ status, problems }) {
 
 /** The parade-state panel. */
 export function ParadePanel() {
-  const [messages, setMessages] = useState(null);
-  const [listError, setListError] = useState('');
+  const { items: messages, error: listError, reload } = useStoredList(listMessages);
   const [text, setText] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [confirming, setConfirming] = useState(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
-  const formRef = useRef(null);
+  const [result, setResult] = useState<OutcomeNote | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const reload = useCallback(() => {
-    return listMessages()
-      .then((list) => {
-        setMessages(list);
-        setListError('');
-      })
-      .catch((error) => setListError(error.message));
-  }, []);
-
-  // `dataset` changes on every background refresh; the list follows it.
-  const refreshedAt = dataset.value && dataset.value.generatedAt;
-  useEffect(() => {
-    reload();
-  }, [reload, refreshedAt]);
-
-  const run = (action) => runBusy(setBusy, setResult, action);
+  const run = (action: () => Promise<void>) => runBusy(setBusy, setResult, action);
 
   const resetForm = () => {
     setEditing(null);
@@ -128,10 +132,10 @@ export function ParadePanel() {
       setResult(said);
       if (said.tone === 'good') resetForm();
       await reload();
-      refresh();
+      void refresh();
     });
 
-  const startEdit = (id) =>
+  const startEdit = (id: number) =>
     run(async () => {
       const message = await getMessage(id);
       setEditing(id);
@@ -139,20 +143,20 @@ export function ParadePanel() {
       const reasons = reasonsOf(message.error);
       setResult(reasons.length ? { tone: 'error', text: 'Correct these lines and save:', reasons } : null);
       setConfirming(null);
-      if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-  const confirmDelete = (id) =>
+  const confirmDelete = (id: number) =>
     run(async () => {
       await deleteMessage(id);
       setConfirming(null);
       if (editing === id) resetForm();
       setResult({ tone: 'good', text: `Deleted #${id} and everything parsed from it.`, reasons: [] });
       await reload();
-      refresh();
+      void refresh();
     });
 
-  const rows = toMessageRows(messages || []).map((row) => ({
+  const rows = toMessageRows(messages ?? []).map((row) => ({
     ...row,
     idLabel: '#' + row.id,
     receivedLabel: row.received ? fmtDate(row.received.date) + ', ' + row.received.time : '—',

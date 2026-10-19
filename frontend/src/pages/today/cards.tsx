@@ -11,7 +11,10 @@ import { COMPANIES } from '../../../../shared/domain.ts';
 import { weekendBands } from '../../model/calendarMarks.ts';
 import { otherDutiesOn } from '../../model/metrics.ts';
 import { restrictionsOn } from '../../model/statusBuckets.ts';
-import { tierPresence } from '../../model/strength.ts';
+import { tierPresence, type TierTotal } from '../../model/strength.ts';
+import type { RestrictionCell } from '../../model/statusBuckets.ts';
+import type { Dataset } from '../../data/feed.ts';
+import type { StrengthRow } from '../../../../shared/dashboard.ts';
 import { awayAhead, returnsToDuty } from '../../model/projection.ts';
 import { recentlyReturned } from '../../model/recentReturns.ts';
 
@@ -24,8 +27,11 @@ const AHEAD_DAYS = 14;
 /** Names a restriction cell's tooltip lists before "and N more". */
 const TOOLTIP_NAMES = 10;
 
+/** What every card on the page reads: the scoped dataset and the parade date. */
+type ParadeProps = { data: Dataset; date: string };
+
 /** Other duties on one parade, by duty: the largest absence slice, broken open. */
-export function OtherDutiesCard({ data, date }) {
+export function OtherDutiesCard({ data, date }: ParadeProps) {
   const duties = otherDutiesOn(data.personnel, date, SESSION).slice(0, 8);
   return (
     <ChartCard
@@ -33,7 +39,7 @@ export function OtherDutiesCard({ data, date }) {
       note={'The commonest duties under Others on the ' + fmtDate(date) + ' parade state'}
       empty="Nobody is listed under other duties."
     >
-      <Bar categories={duties.map((d) => d.name)} values={duties.map((d) => d.value)} valueName="soldiers" />
+      <Bar categories={duties.map((duty) => duty.name)} values={duties.map((duty) => duty.value)} valueName="soldiers" />
     </ChartCard>
   );
 }
@@ -42,9 +48,9 @@ export function OtherDutiesCard({ data, date }) {
  * The restrictions in force on one parade, by company, with names in the tooltip: what a training plan has to
  * work around.
  */
-export function RestrictionsCard({ data, date }) {
+export function RestrictionsCard({ data, date }: ParadeProps) {
   const { rows, cells } = restrictionsOn(data.personnel, date, SESSION);
-  const detail = (cell) =>
+  const detail = (cell: RestrictionCell) =>
     cell.names.length > TOOLTIP_NAMES
       ? [...cell.names.slice(0, TOOLTIP_NAMES), 'and ' + (cell.names.length - TOOLTIP_NAMES) + ' more']
       : cell.names;
@@ -56,7 +62,7 @@ export function RestrictionsCard({ data, date }) {
     >
       <Heatmap
         rows={rows}
-        columns={COMPANIES}
+        columns={[...COMPANIES]}
         cells={cells}
         rowName="Restriction"
         valueName="soldiers"
@@ -69,13 +75,13 @@ export function RestrictionsCard({ data, date }) {
 }
 
 /** Soldiers already on MC or leave who are still away on each of the next days. */
-export function AwayAheadCard({ data, date }) {
+export function AwayAheadCard({ data, date }: ParadeProps) {
   const { days, away } = awayAhead(returnsToDuty(data.personnel, date, SESSION), date, AHEAD_DAYS);
   return (
     <ChartCard
       title={'Known Away, Next ' + AHEAD_DAYS + ' Days'}
       coverage="A floor: only MC and leave on this parade with a stated end date. New MCs and open-ended absences add to it."
-      empty={away.every((n) => n === 0) ? 'Nobody on this parade is away with a stated end date.' : undefined}
+      empty={away.every((count) => count === 0) ? 'Nobody on this parade is away with a stated end date.' : undefined}
     >
       <Line
         categories={days}
@@ -88,15 +94,13 @@ export function AwayAheadCard({ data, date }) {
 }
 
 /** Formats one tier cell: the percentage present, then present over strength. */
-function tierCell(tier) {
-  if (tier.strength === null) {
-    return '—';
-  }
-  return fmtPercent(tier.percent / 100) + ' (' + fmtInt(tier.present) + '/' + fmtInt(tier.strength) + ')';
+function tierCell(tier: TierTotal): string {
+  if (tier.strength === null) return '—';
+  return `${fmtPercent(tier.percent === null ? null : tier.percent / 100)} (${fmtInt(tier.present)}/${fmtInt(tier.strength)})`;
 }
 
 /** Presence by rank tier on one parade: a row per company that filed, under a battalion row. */
-export function TierCard({ strength, date, scoped }) {
+export function TierCard({ strength, date, scoped }: { strength: StrengthRow[]; date: string; scoped: boolean }) {
   const tiers = tierPresence(strength, date, SESSION);
   const rows = [
     ...(scoped ? [] : [{ unit: 'Battalion', tiers: tiers.battalion }]),
@@ -130,7 +134,7 @@ export function TierCard({ strength, date, scoped }) {
 }
 
 /** The forward view: who is due back when, from the dates each MC and leave line states. */
-export function ReturnsCard({ data, date }) {
+export function ReturnsCard({ data, date }: ParadeProps) {
   const returns = returnsToDuty(data.personnel, date, SESSION);
 
   return (
@@ -161,7 +165,7 @@ export function ReturnsCard({ data, date }) {
 }
 
 /** The backward twin of `ReturnsCard`: who came off MC or Light Duty just before this parade. */
-export function RecentReturnsCard({ data, date }) {
+export function RecentReturnsCard({ data, date }: ParadeProps) {
   const returns = recentlyReturned(data.personnel, date);
 
   return (

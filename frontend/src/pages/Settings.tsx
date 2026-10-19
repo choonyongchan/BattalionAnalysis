@@ -8,11 +8,14 @@
  */
 
 import { useState } from 'preact/hooks';
-import { canEdit, dataset } from '../app/state.ts';
+import { canEdit, loadedData } from '../app/state.ts';
+import type { Dataset } from '../data/feed.ts';
 import { Banner } from '../components/Card.tsx';
 import { Segmented } from '../components/Segmented.tsx';
 import { rotationIssues } from '../../../shared/rotations.ts';
-import { SECTIONS } from '../../../shared/settings/defaults.ts';
+import { SECTIONS, type SectionName } from '../../../shared/settings/defaults.ts';
+import type { ComponentType } from 'preact';
+import type { EditorProps, ViewProps } from './settings/editors.tsx';
 import { SectionCard } from './settings/SectionCard.tsx';
 import {
   CalendarEditor,
@@ -27,27 +30,30 @@ import {
 import { UnlockPanel } from './settings/UnlockPanel.tsx';
 
 /** The view and editor for each section; a section without an entry is not shown yet. */
-const EDITORS = {
+const EDITORS: { [S in SectionName]: { View: ComponentType<ViewProps<S>>; Editor: ComponentType<EditorProps<S>> } } = {
   unit: { View: UnitView, Editor: UnitEditor },
   calendar: { View: CalendarView, Editor: CalendarEditor },
   thresholds: { View: ThresholdsView, Editor: ThresholdsEditor },
   session: { View: SessionView, Editor: SessionEditor },
 };
 
-/** @type {!Array<{name: string, label: string}>} The two tabs. */
+/** The two tabs. */
 const TIERS = [
   { name: 'basic', label: 'Basic' },
   { name: 'advanced', label: 'Advanced' },
-];
+] as const;
+
+/** One section's card, with that section's view and editor. */
+function sectionCard<S extends SectionName>(name: S, label: string, data: Dataset) {
+  const { View, Editor } = EDITORS[name];
+  return <SectionCard key={name} section={name} title={label} value={data.settings[name]} meta={data.settingsMeta[name]} View={View} Editor={Editor} />;
+}
 
 /** The Settings page. */
 export function Settings() {
-  const [tier, setTier] = useState('basic');
-  const data = dataset.value;
-  if (!data) {
-    return null;
-  }
-  const sections = SECTIONS.filter((section) => section.tier === tier && EDITORS[section.name]);
+  const [tier, setTier] = useState<'basic' | 'advanced'>('basic');
+  const data = loadedData();
+  const sections = SECTIONS.filter((section) => section.tier === tier);
   const calendarIssues = rotationIssues(data.rotations);
 
   return (
@@ -69,17 +75,7 @@ export function Settings() {
       ) : null}
 
       <div class="grid-2">
-        {sections.map(({ name, label }) => (
-          <SectionCard
-            key={name}
-            section={name}
-            title={label}
-            value={data.settings[name]}
-            meta={data.settingsMeta[name]}
-            View={EDITORS[name].View}
-            Editor={EDITORS[name].Editor}
-          />
-        ))}
+        {sections.map(({ name, label }) => sectionCard(name, label, data))}
       </div>
 
       {tier === 'basic' && calendarIssues.length > 0 ? (
@@ -91,7 +87,6 @@ export function Settings() {
           ))}
         </div>
       ) : null}
-
     </div>
   );
 }

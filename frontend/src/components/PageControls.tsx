@@ -26,8 +26,8 @@ export function PageControls({
   showRange = true,
   children,
 }: {
-  min: string;
-  max: string;
+  min?: string;
+  max?: string;
   showRange?: boolean;
   children?: ComponentChildren;
 }) {
@@ -45,7 +45,7 @@ export function PageControls({
         />
       </div>
 
-      {showRange ? (
+      {showRange && min && max ? (
         <DateRangePicker
           min={min}
           max={max}
