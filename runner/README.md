@@ -5,7 +5,7 @@ the Vercel intake, which stores and parses it.
 
 ```
 WhatsApp group ─► first-parade check ─► POST /api/parade ─► recordMessage ─► parseBody ─► parade_submissions, ...
-   (Baileys)         (signature.js)       (ingest.js)          (backend/lib/pipeline.ts, on Vercel)
+   (Baileys)         (signature.ts)       (ingest.ts)          (backend/lib/pipeline.ts, on Vercel)
 ```
 
 The runner holds no database credentials and no API key: only the intake URL and `PARADE_INGEST_SECRET`. A
@@ -70,8 +70,8 @@ background with `bun run runner:service install` — see [Task Scheduler](#task-
 
 ## Running it permanently on Windows
 
-`bun run runner` launches a supervisor (`src/supervisor.js`), not the bridge directly. The supervisor spawns
-`src/index.js` as a child, forwards its output, and restarts it on a crash **up to 3 consecutive times** with a
+`bun run runner` launches a supervisor (`src/supervisor.ts`), not the bridge directly. The supervisor spawns
+`src/index.ts` as a child, forwards its output, and restarts it on a crash **up to 3 consecutive times** with a
 growing backoff (3s, 15s, 60s). A child that stayed up for 5 minutes before crashing is treated as a fresh
 incident and the counter resets, so an occasional crash after hours of healthy running still gets the full
 three attempts. After the 3rd consecutive restart the supervisor prints a fatal banner and exits non-zero.
@@ -104,10 +104,10 @@ bun run runner:service restart   # e.g. after editing .env.whatsapp
 bun run runner:service uninstall
 ```
 
-`stop`, `restart` and `uninstall` kill only this bridge's bun processes (`runner/src/supervisor.js` and
-`index.js`), never other bun processes such as the Vite dev server.
+`stop`, `restart` and `uninstall` kill only this bridge's bun processes (`runner/src/supervisor.ts` and
+`index.ts`), never other bun processes such as the Vite dev server.
 
-`install` (`scripts/service.js`) registers the `WhatsAppBridge` scheduled task and disables sleep on AC power
+`install` (`scripts/service.ts`) registers the `WhatsAppBridge` scheduled task and disables sleep on AC power
 (a sleeping PC receives nothing). What each piece buys:
 
 - **Runs as SYSTEM** — starts at boot (e.g. after Windows Update) with nobody logged in, and needs no stored
@@ -121,7 +121,7 @@ bun run runner:service uninstall
   Ctrl+C), `bun run runner:service start`.
 
 `runner\data\bridge.log` is never rotated; truncate it by hand when it grows. It holds message ids and status
-lines only: Baileys' own warnings are logged without their payloads (`src/listener.js#baileysLogger`).
+lines only: Baileys' own warnings are logged without their payloads (`src/listener.ts#baileysLogger`).
 
 ## Self-healing reconnect
 
@@ -168,7 +168,7 @@ not a score: it is one yes/no signal that every parade state has. A message that
 parade state is still stored in `raw_messages`, with the reason in that row's `error` column, so a person can
 review it.
 
-To retune, edit the constants at the top of `src/signature.js`, then run `bun test ./test/runner/`.
+To retune, edit the constants at the top of `src/signature.ts`, then run `bun test ./test/runner/`.
 
 ## Idempotency
 
@@ -183,15 +183,15 @@ failed to parse is parsed again, which picks up any rule the parser has learnt s
 
 | File | Role |
 |---|---|
-| `src/supervisor.js` | Spawns and restarts the runner process (this is what `bun run runner` runs) |
-| `src/index.js` | Wiring and the message handler |
-| `src/signature.js` | First-parade-state detection |
-| `src/listener.js` | Baileys socket, single-socket reconnect, envelope filtering |
-| `src/ingest.js` | Relays a message to `backend/api/parade.ts`, retrying network failures and 5xx |
-| `src/config.js` | `.env.whatsapp` validation |
-| `src/logger.js` | pino logger factory |
-| `scripts/service.js` | Installs and controls the background scheduled task (`bun run runner:service`) |
-| `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run runner:reset-auth`) |
+| `src/supervisor.ts` | Spawns and restarts the runner process (this is what `bun run runner` runs) |
+| `src/index.ts` | Wiring and the message handler |
+| `src/signature.ts` | First-parade-state detection |
+| `src/listener.ts` | Baileys socket, single-socket reconnect, envelope filtering |
+| `src/ingest.ts` | Relays a message to `backend/api/parade.ts`, retrying network failures and 5xx |
+| `src/config.ts` | `.env.whatsapp` validation |
+| `src/logger.ts` | pino logger factory |
+| `scripts/service.ts` | Installs and controls the background scheduled task (`bun run runner:service`) |
+| `scripts/reset-auth.ts` | Wipes `auth/` for a clean re-pair (`bun run runner:reset-auth`) |
 | `../test/runner/` | `bun test ./test/runner/` — signature suite plus the non-network modules |
 
 `auth/` and the root `.env.whatsapp` hold live credentials and are git-ignored. `auth/` is a full WhatsApp account

@@ -22,6 +22,7 @@
 - Simplicity first: make the smallest change that correctly solves the problem.
 - Minimal impact: touch only the files needed for the task.
 - Prefer many small helper functions over large functions. When logic is shared or repeated, extract the common logic behind a clear helper instead of duplicating it.
-- Use Google-style docstrings for all functions, methods, classes, and public attributes. Document Args, Returns, Raises, and Attributes where applicable.
+- Use Google-style docstrings for all functions, methods, classes, and public attributes, kept to one or two lines. Types live in TypeScript, so skip Args/Returns blocks; put a longer "why" in `docs/architecture_patterns.md`.
+- Everything is strict TypeScript (except `frontend/public/theme.js`); `bun run typecheck` must stay clean.
 - Senior-developer standards: inspect failures, logs, and tests until the root cause is clear.
 - Challenge non-trivial solutions before presenting them; if something feels hacky, look for the cleaner path.

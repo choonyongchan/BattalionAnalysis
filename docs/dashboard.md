@@ -18,12 +18,12 @@ The pages, in the order a commander reads them:
 | **Deposit** · **Settings** | Deposit or correct a parade state or SFT record; change what the dashboard is set up for. |
 
 Old links still work: `#/overview` opens Today and `#/status` opens Status & Restrictions
-(`ROUTE_ALIASES` in `frontend/src/app/routes.js`).
+(`ROUTE_ALIASES` in `frontend/src/app/routes.ts`).
 
 The three medical pages are one layout asked three times. That is deliberate: the layout
 is learned once and read three times, and the three categories become comparable because
 they are presented identically. They are built from one set of sections
-([`frontend/src/pages/shared/category.jsx`](frontend/src/pages/shared/category.jsx)) so they cannot
+([`frontend/src/pages/shared/category.tsx`](frontend/src/pages/shared/category.tsx)) so they cannot
 drift apart; each page lists the sections it shows, in order.
 
 **Every comparison is a count of soldiers, never a rate.** Commanders read whole soldiers,
@@ -45,7 +45,7 @@ all six companies, and the two sources cover different spans — parade state fr
 cards. Each panel prints its own coverage as a fraction with both parts, and the Filing &
 Accuracy page collects them all in one place.
 
-**A platoon is the sub-header a line sits under.** `frontend/src/model/platoon.js` keeps the
+**A platoon is the sub-header a line sits under.** `frontend/src/model/platoon.ts` keeps the
 sub-header only when the soldier's company has that sub-unit (`COMPANY_SUBUNITS`: Cougar has
 `8`, Hercules `SIG`); anything else is Unassigned. The 4D number also encodes a platoon, and
 that reading is supported but switched off (`USE_FOURD_PLATOON`) until the 4D scheme is
@@ -73,9 +73,9 @@ public, so anyone could read past the check.
 
 The route connects as `dashboard_read` ([`backend/db/grants-dashboard.sql`](../backend/db/grants-dashboard.sql)),
 a role that can only `SELECT` the tables the dashboard charts and cannot read
-`raw_messages.body` at all. [`backend/lib/dashboard.ts`](../backend/lib/dashboard.ts) answers with the tabs the
-retired Google Sheet held, under the same names and headers, so everything in `model/`
-reads it unchanged.
+`raw_messages.body` at all. [`backend/lib/dashboard.ts`](../backend/lib/dashboard.ts) answers with one typed array
+per dataset (`strength`, `personnel`, `roster`, `formSg`, …), each row shaped by
+[`shared/dashboard.ts`](../shared/dashboard.ts), so `model/` and the server agree on every field.
 
 **Anyone who knows the password can see everything.** There is no per-person identity, no
 record of who looked, and no way to revoke one viewer: removing someone means changing the
@@ -158,7 +158,7 @@ Vercel builds from GitHub with the project's Root Directory set to `backend`.
 `backend/public`, and sets the security headers. Pushing a branch gives a preview deployment;
 merging to `main` deploys production.
 
-`frontend/vite.config.js` sets no `base`: Vercel serves from the domain root, so the default
+`frontend/vite.config.ts` sets no `base`: Vercel serves from the domain root, so the default
 absolute asset URLs are correct. Routing uses the URL hash, so no SPA rewrites are needed.
 
 ## How it is put together
@@ -168,17 +168,16 @@ Five layers, and the dependency direction runs strictly downward through them.
 ```
 index.html            the mount point, and a theme-boot script that runs before first paint
 src/
-  main.jsx            stylesheet order, then mount
+  main.tsx            stylesheet order, then mount
   app/                the frame: Shell, Sidebar, Router, routes, Logo, icons
-    state.js          every signal the pages read
-    auth.js           the password's whole life, from typed to forgotten
+    state.ts          every signal the pages read
+    auth.ts           the password's whole life, from typed to forgotten
   theme/              tokens.css (both themes) · base · controls · shell · components
-    useTheme.js       light / dark / system, persisted, and the charts' re-tint trigger
-  data/               feed.js (the one GET to /api/dashboard) · parade.js (/api/parade)
-    tabs.js           what the dashboard asks each tab for
-    records.js        raw values -> typed records, resolved by header name
+    useTheme.ts       light / dark / system, persisted, and the charts' re-tint trigger
+  data/               feed.ts (the one GET to /api/dashboard) · parade.ts (/api/parade) · sft.ts
+    api.ts            send / callJson: every fetch, with the session cookie and ApiError
   model/              every number and every rule. Pure, no DOM, no network, all tested
-  charts/             ECharts wrappers; theme.js reads the tokens off the document
+  charts/             ECharts wrappers; theme.ts reads the tokens off the document
   components/         tiles, cards, tables, the date picker, the toggles, the search box
   pages/              one file per page; pages/shared/ for what the medical pages share
 ```
@@ -233,7 +232,7 @@ start, which is later than the parade date for an absence booked ahead. Only MC 
 parade; counting MA and Others put 51 soldiers off parade on 22 Sep 26 against the 28 the
 strength figures reported, while MC and leave gave 23. A soldier listed twice is one row, back
 only when both absences end, and an absence with no end date reads `Not stated` rather than a
-guessed day. The rules are in `frontend/src/model/projection.js`.
+guessed day. The rules are in `frontend/src/model/projection.ts`.
 
 **Presence by Rank** splits the day's presence into officers, WOSpecs and enlistees from the
 strength block's own split, so a company at 90% missing half its officers shows it.
@@ -283,28 +282,28 @@ strength block's own split, so a company at 90% missing half its officers shows 
 
 ## Deposit
 
-`frontend/src/pages/Deposit.jsx`, at `#/deposit`. A **Parade State / SFT** toggle in the header
+`frontend/src/pages/Deposit.tsx`, at `#/deposit`. A **Parade State / SFT** toggle in the header
 picks the panel (`frontend/src/pages/deposit/`); it opens on Parade State.
 
 ### Parade State
 
-`ParadePanel.jsx`. A clerk pastes a parade state WhatsApp
+`ParadePanel.tsx`. A clerk pastes a parade state WhatsApp
 missed and presses Deposit; below it, every stored message (WhatsApp or manual) is listed
 newest first with its key, status, source and receipt time, and can be edited or deleted.
 
-- **Where it writes.** `/api/parade` on the same Vercel deployment (`frontend/src/data/parade.js`), with
+- **Where it writes.** `/api/parade` on the same Vercel deployment (`frontend/src/data/parade.ts`), with
   the session cookie from `/api/session`. A cookie-authorised write must be same-origin, so
   a forged cross-site form cannot deposit or delete.
 - **Statuses.** Parsed (rows exist), Needs review (the parser doubted some lines; the list
   says how many, and Edit shows which, since the reasons quote personnel lines), Rejected (a last parade state, or not a parade state), Pending
-  (stored, never parsed). Rules in `frontend/src/model/paradeMessages.js`.
+  (stored, never parsed). Rules in `frontend/src/model/paradeMessages.ts`.
 - **Edit** loads the stored text into the form. Saving re-parses it; if it parses, the text
   and every row derived from it are replaced together, and if not, nothing changes and the
   reasons are shown. **Delete** asks once more inline, then removes the message and its rows.
 - **Charts.** They read the same tables, so a deposit reaches them on the next refresh.
 ### SFT
 
-`SftPanel.jsx`, over `/api/sft` (`frontend/src/data/sft.js`). FormSG is the only way an SFT record is
+`SftPanel.tsx`, over `/api/sft` (`frontend/src/data/sft.ts`). FormSG is the only way an SFT record is
 created, so nothing is deposited here: every stored record is listed (newest first, sortable,
 with a filter on name, company, Group IC or location), and each can be edited or deleted.
 
@@ -313,7 +312,7 @@ with a filter on name, company, Group IC or location), and each can be edited or
   (Singapore), and both acknowledgements. The server re-derives the name key, `unit_coy` (the
   soldier's own answer is kept when it already names the chosen company) and the SFT date,
   as it does when FormSG inserts the record. The page and the server check the correction
-  with the same rules (`shared/sftEdit.js`): a name is required, the company must be a
+  with the same rules (`shared/sftEdit.ts`): a name is required, the company must be a
   known one or blank, and the time may not be in the future. An NRIC-shaped value is refused.
 - **Delete** asks once more inline, then removes the record.
 - **Charts.** The SFT page reads the same table, so a correction reaches it on the refresh
@@ -326,8 +325,8 @@ with a filter on name, company, Group IC or location), and each can be edited or
 
 ## SFT
 
-`frontend/src/pages/Sft.jsx`, at `#/sft`, over the SFT FormSG form (`sft_formsg`, written by
-`backend/api/sft.ts`). Numbers come from `frontend/src/model/sft.js`.
+`frontend/src/pages/Sft.tsx`, at `#/sft`, over the SFT FormSG form (`sft_formsg`, written by
+`backend/api/sft.ts`). Numbers come from `frontend/src/model/sft.ts`.
 
 - **Tiles.** Soldiers who did SFT in the range (unique by normalised name — the form has no
   4D), sessions in the range, soldiers who did SFT today (ignores the range), and the average
@@ -338,13 +337,13 @@ with a filter on name, company, Group IC or location), and each can be edited or
 - **Group size.** A group is everyone naming the same Group IC on one day, and its size counts
   the IC too (once, if the IC also filed). IC names are typed by hand, so they are
   consolidated first: ranks and punctuation are stripped and word order ignored
-  (`shared/identity.js#namesMatch`), then each word is compared with `fuse.js`, so a one-letter
+  (`shared/identity.ts#namesMatch`), then each word is compared with `fuse.js`, so a one-letter
   slip ("LIM"/"LIMM") merges while a different given name ("MING"/"LIANG") does not. A
   session with no IC belongs to no group. A group's company is its members' most common one.
 - **Locations and exercises.** Ranked by sessions; case and spacing variants merge, and a
   session doing three exercises counts once for each. Exercise spellings fold into one label
   (Run, Running, ER, Endurance run, Jogging are `Run`; Gym, Weights, Strength are
-  `Gym / Weights`) by a short list in `model/sft.js#topExercises`.
+  `Gym / Weights`) by a short list in `model/sft.ts#topExercises`.
 
 ## Figures and why they exist
 
@@ -356,17 +355,17 @@ existing chart, except one new chart type (`Scatter`). Every one is a count, nev
 
 | Figure (page) | Question, and who asks it | Source | Why this chart | Caveats |
 |---|---|---|---|---|
-| **Other Duties, by Duty** (Today) | What are the soldiers under "Others" actually doing? (CO, S1) | `metrics.js#otherDutiesOn`: the reason text before any bracket, distinct soldiers | Sorted bar: a ranking of named duties. The absence donut keeps its four parts; splitting Others inside it would pass six slices | Free text: `COURSE` and `COURSES` are two bars until clerks write them alike |
-| **Restrictions in Force** (Today) | Who cannot do tomorrow's training, by company? (OC, S3) | `statusBuckets.js#restrictionsOn`: Status lines on the parade, folded by `bucketsFor`; `Other` left out | Heatmap restriction × company: two dimensions of counts; names in the tooltip | One soldier with two restrictions counts under each |
-| **Known Away, Next 14 Days** (Today) | How many will I be missing on the exercise next week? (S1, OC) | `projection.js#awayAhead`, from `returnsToDuty` | Line over coming days, weekends banded: a quantity over time | A floor: only MC and leave with a stated end date |
-| **Outbreak Watch** (Report Sick) | Is an illness spreading in a platoon? (MO, OC) | `symptoms.js#infectiousByPlatoon`: new report-sick, MC, MA or Status lines whose reason names fever, flu, cough, cold, a stomach bug or conjunctivitis, by platoon sub-header, last 14 days of the range | Heatmap platoon × day, with clusters (3 cases in 3 days) named in the note: where and when at once | A word list over free text; a line that says only "MC" is not counted |
-| **When MCs Start** (MC / MA) | Do MCs bunch next to weekends and holidays? (CO, RSM) | `episodes.js#startsByWeekday`: MC (Att C) episodes starting in range | Column per weekday in calendar order (not ranked: the order is the point); the note compares Monday, Friday and holiday-adjacent starts with the 2 in 7 expected by chance | Needs the holidays set under Settings → Calendar |
-| **MC Pattern, by Soldier** (MC / MA) | Who needs a welfare conversation, and who an injury plan? (OC, MO) | `leaderboards.js#soldierLoad`: MCs and days lost per soldier; days held by the top 10 | Scatter: two measures per soldier separate many-short from few-long, which a ranking of either alone hides | Describes what was recorded, not why; see "No inference about intent" |
-| **MC Length, by Symptom** (MC / MA) | Which conditions keep soldiers away longest? (MO) | `symptoms.js#lengthBySymptom`: episode `daysLost` in bands 1, 2–3, 4–7, 8+ days, by symptom from the reason | Heatmap symptom × band: a distribution per category without a box plot | Duration as stated, else dated, else observed (`episodes.js`) |
-| **SFT While Restricted** (Status & Restrictions) | Is anyone training against their status? (S3, MO) | `sft.js#sftAgainstStatus`: SFT sessions on a day the soldier held Light Duty or an RMJ, heavy-load, upper-limb or kneeling excuse | A table: each line is a case to check, not a quantity | Names matched loosely (`namesMatch`); some sessions may be allowed |
-| **Duty Load** and **On Duty While Away** (Duty Roster) | Is duty spread fairly? Was anyone rostered while away? (RSM) | `dutyRoster.js#rosterLoad`, `#rosterClashes` | Tables: names with counts, and cases to check | A battalion CDO on five rosters is one duty; clashes need names to match loosely and stated ranks to agree |
-| **First Parade State, Minutes Late** (Filing & Accuracy) | Do companies file on time? (RSM, S1) | `submissions.js#filingTimes`: the first FPS filing per company per day, minutes past 08:00 | Heatmap company × day: a habit shows as a row, a bad day as a column | The 08:00 cut-off is a constant (`FILING_CUTOFF_MINUTES`); next-day filings are counted in the note, not drawn |
-| **Sections That Do Not Add Up** (Filing & Accuracy) | Does each section header's count match the names under it? (S1) | `quality.js#countMismatches` over the `Section Counts` tab (`section_counts`, granted to `dashboard_read` by migration 0008) | Heatmap company × day, mismatched sections in the tooltip | Compares per sub-header and section, as the parser stored them |
+| **Other Duties, by Duty** (Today) | What are the soldiers under "Others" actually doing? (CO, S1) | `metrics.ts#otherDutiesOn`: the reason text before any bracket, distinct soldiers | Sorted bar: a ranking of named duties. The absence donut keeps its four parts; splitting Others inside it would pass six slices | Free text: `COURSE` and `COURSES` are two bars until clerks write them alike |
+| **Restrictions in Force** (Today) | Who cannot do tomorrow's training, by company? (OC, S3) | `statusBuckets.ts#restrictionsOn`: Status lines on the parade, folded by `bucketsFor`; `Other` left out | Heatmap restriction × company: two dimensions of counts; names in the tooltip | One soldier with two restrictions counts under each |
+| **Known Away, Next 14 Days** (Today) | How many will I be missing on the exercise next week? (S1, OC) | `projection.ts#awayAhead`, from `returnsToDuty` | Line over coming days, weekends banded: a quantity over time | A floor: only MC and leave with a stated end date |
+| **Outbreak Watch** (Report Sick) | Is an illness spreading in a platoon? (MO, OC) | `symptoms.ts#infectiousByPlatoon`: new report-sick, MC, MA or Status lines whose reason names fever, flu, cough, cold, a stomach bug or conjunctivitis, by platoon sub-header, last 14 days of the range | Heatmap platoon × day, with clusters (3 cases in 3 days) named in the note: where and when at once | A word list over free text; a line that says only "MC" is not counted |
+| **When MCs Start** (MC / MA) | Do MCs bunch next to weekends and holidays? (CO, RSM) | `episodes.ts#startsByWeekday`: MC (Att C) episodes starting in range | Column per weekday in calendar order (not ranked: the order is the point); the note compares Monday, Friday and holiday-adjacent starts with the 2 in 7 expected by chance | Needs the holidays set under Settings → Calendar |
+| **MC Pattern, by Soldier** (MC / MA) | Who needs a welfare conversation, and who an injury plan? (OC, MO) | `leaderboards.ts#soldierLoad`: MCs and days lost per soldier; days held by the top 10 | Scatter: two measures per soldier separate many-short from few-long, which a ranking of either alone hides | Describes what was recorded, not why; see "No inference about intent" |
+| **MC Length, by Symptom** (MC / MA) | Which conditions keep soldiers away longest? (MO) | `symptoms.ts#lengthBySymptom`: episode `daysLost` in bands 1, 2–3, 4–7, 8+ days, by symptom from the reason | Heatmap symptom × band: a distribution per category without a box plot | Duration as stated, else dated, else observed (`episodes.ts`) |
+| **SFT While Restricted** (Status & Restrictions) | Is anyone training against their status? (S3, MO) | `sft.ts#sftAgainstStatus`: SFT sessions on a day the soldier held Light Duty or an RMJ, heavy-load, upper-limb or kneeling excuse | A table: each line is a case to check, not a quantity | Names matched loosely (`namesMatch`); some sessions may be allowed |
+| **Duty Load** and **On Duty While Away** (Duty Roster) | Is duty spread fairly? Was anyone rostered while away? (RSM) | `dutyRoster.ts#rosterLoad`, `#rosterClashes` | Tables: names with counts, and cases to check | A battalion CDO on five rosters is one duty; clashes need names to match loosely and stated ranks to agree |
+| **First Parade State, Minutes Late** (Filing & Accuracy) | Do companies file on time? (RSM, S1) | `submissions.ts#filingTimes`: the first FPS filing per company per day, minutes past 08:00 | Heatmap company × day: a habit shows as a row, a bad day as a column | The 08:00 cut-off is a constant (`FILING_CUTOFF_MINUTES`); next-day filings are counted in the note, not drawn |
+| **Sections That Do Not Add Up** (Filing & Accuracy) | Does each section header's count match the names under it? (S1) | `quality.ts#countMismatches` over the `sectionCounts` dataset (`section_counts`, granted to `dashboard_read` by migration 0008) | Heatmap company × day, mismatched sections in the tooltip | Compares per sub-header and section, as the parser stored them |
 
 Considered and left out: a rotation-aligned report-sick curve and control bands on the trends
 need about three months of history (it starts 14 Sep 26); FormSG `mc_days` would duplicate

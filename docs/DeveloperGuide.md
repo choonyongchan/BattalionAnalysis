@@ -19,13 +19,14 @@ Dashboard (frontend/, browser) ◄── backend/api/dashboard.ts ◄┘  (read-
 | `frontend/` | The Preact + Vite dashboard | The browser, served by Vercel |
 | `backend/` | Vercel Functions (`api/`), shared server code (`lib/`), schema and migrations (`db/`), maintenance scripts (`scripts/`) | Vercel; scripts on your machine |
 | `runner/` | The WhatsApp listener that relays parade states to the intake | The ops laptop, as a scheduled task |
-| `shared/` | Pure JavaScript used by both browser and server: vocabulary, dates, identity, settings rules | Both |
+| `shared/` | Pure TypeScript used by browser, server and runner: vocabulary and enums (`domain.ts`), the dashboard's row types (`dashboard.ts`), dates, identity, parade-message rules, settings | Both |
 | `test/` | Every test suite, mirroring the folders above | Your machine and CI |
 | `docs/` | This guide, architecture, dashboard design notes, security, `DESIGN.md` (visual reference) | — |
 
 ## Set up
 
-You need [Bun](https://bun.sh) 1.3+. Use `bun`, never `npm` or `npx`.
+You need [Bun](https://bun.sh) 1.3+. Use `bun`, never `npm` or `npx`. Everything is TypeScript
+(`.ts`, `.tsx` for components) except `frontend/public/theme.js`, which the page loads before the bundle.
 
 ```sh
 bun install                         # all workspaces, one lockfile
@@ -52,7 +53,7 @@ Open http://localhost:5173 and log in with `DASHBOARD_PASSWORD` or `SETTINGS_PAS
 ```sh
 bun test               # everything; DB and end-to-end suites skip when TEST_DATABASE_URL is unset
 bun run test:coverage  # what CI runs; writes coverage/lcov.info
-bun run typecheck      # tsc over backend/ and test/
+bun run typecheck      # tsc over the whole repo; CI runs it before the tests
 ```
 
 - The model layer (`frontend/src/model/`, `shared/`) holds every number on screen and is where
@@ -63,7 +64,8 @@ bun run typecheck      # tsc over backend/ and test/
 - `test/backend/lib/parser-llm-live.test.ts` calls OpenAI when `OPENAI_API_KEY` is in `.env.test`;
   remove the key to skip it.
 
-CI (`.github/workflows/ci.yml`) runs the coverage suite on every push and pull request to `main`.
+CI (`.github/workflows/ci.yml`) runs `typecheck` and then the coverage suite on every push and pull request
+to `main`.
 
 ## Deploy
 
@@ -116,16 +118,22 @@ bun run runner:service install    # (re)register and start; use this to restart
 - **Add a chart.** Compute the numbers in `frontend/src/model/` with a test. Pick the chart by the
   question (see "Each chart type answers one kind of question" in `docs/dashboard.md`), wrap it in
   `ChartCard`, and give it a title, a coverage line and an empty-state sentence. A new ECharts series
-  type is registered once in `frontend/src/charts/echarts.js`.
-- **Add a dashboard column.** Add the header to `shared/tabs.js`; `backend/lib/dashboard.ts` builds
-  every tab from those arrays. A column with personal data needs a reason in the pull request.
-- **Add a settings section.** Default in `shared/settings/defaults.js`, validation in
-  `shared/settings/validate.js` (run by both the form and `backend/api/settings.ts`), editor in
-  `frontend/src/pages/settings/`.
+  type is registered once in `frontend/src/charts/echarts.ts`.
+- **Add a dashboard field.** Add it to the row type in `shared/dashboard.ts`, then select it in
+  `backend/lib/dashboard.ts`; the compiler shows every place that must change. Only selected columns leave
+  the database. A field with personal data needs a reason in the pull request.
+- **Add a fixed value (a company, a section).** Edit the list in `shared/domain.ts`: the database enums,
+  the parser's schema and the dashboard all read it, then `bun run db:generate` for the enum migration.
+- **Add a settings section.** Type and default in `shared/settings/defaults.ts`, validation in
+  `shared/settings/validate.ts` (run by both the form and `backend/api/settings.ts`), view and editor in
+  `frontend/src/pages/settings/editors.tsx`.
 
 ## Conventions
 
 - Smallest change that works; delete code rather than leave it unused.
-- Google-style docstrings (JSDoc in JavaScript) on every function and module.
+- A one- or two-line docstring on every module, function, type and exported constant: what it is or
+  does, plus the one non-obvious reason when there is one. Types live in TypeScript, so no
+  `@param`/`@returns` tags. Longer rationale belongs in `docs/architecture_patterns.md`.
+- Strict TypeScript (`noUncheckedIndexedAccess` on); no `any`.
 - Colours only as tokens in `frontend/src/theme/tokens.css`, in both themes.
 - Never log a message body, a parser problem, a rejection reason or a FormSG answer.

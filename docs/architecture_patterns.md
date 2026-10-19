@@ -8,22 +8,26 @@ The Apps Script + Google Sheets implementation is retired and deleted; read it f
 history if you need it. Nothing reads the Sheet any more: its history was imported once in
 September 2026 by a script since deleted. Submissions it imported carry `model = 'sheet'`.
 
+Everything is strict TypeScript (`bun run typecheck` covers the whole repo and runs in CI) except
+`frontend/public/theme.js`, which loads before the bundle. Docstrings are one or two lines; the
+longer reasons live here.
+
 ## Layout
 
 | Path | Runtime | Owns |
 |---|---|---|
 | `backend/db/` | Bun / Vercel | Drizzle schema (`schema.ts`), Neon connections (`index.ts`, one handle per connection-string variable), migrations, and `grants-dashboard.sql` (the read-only `dashboard_read` role). `settings` holds one JSONB row per Settings-page section. `backend/scripts/apply-migrations.ts` records each migration by the SHA-256 of its LF-normalised text, so a CRLF checkout hashes the same |
-| `backend/lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/` (`webhook.ts` the shared FormSG route, `sdk.ts`, `decrypt.ts`, one mapper per form: `map.ts` report sick, `sft.ts` SFT), `dashboard.ts` (the dashboard's read, shaped as the old Sheet tabs), `sft.ts` (list, correct and delete stored SFT records, for `backend/api/sft.ts`), `http.ts` (JSON helpers, constant-time bearer check), `session.ts` (the dashboard's signed session cookies, and `isDashboardCaller`, the check `backend/api/parade.ts` and `backend/api/sft.ts` both authorise the dashboard with), `settings.ts` (read, save and reset settings sections), `domain.ts` |
+| `backend/lib/` | Bun / Vercel | Shared domain: `pipeline.ts` (record → parse → validate → replace, plus edit and delete), `parser/`, `formsg/` (`webhook.ts` the shared FormSG route, `sdk.ts`, `decrypt.ts`, one mapper per form: `map.ts` report sick, `sft.ts` SFT), `dashboard.ts` (the dashboard's read: one typed array per dataset, `shared/dashboard.ts`), `sft.ts` (list, correct and delete stored SFT records, for `backend/api/sft.ts`), `http.ts` (JSON helpers, `noStore` replies, constant-time bearer check), `session.ts` (the dashboard's signed session cookies, and `isDashboardCaller`, the check `backend/api/parade.ts` and `backend/api/sft.ts` both authorise the dashboard with), `settings.ts` (read, save and reset settings sections) |
 | `backend/api/reportsick.ts` | Vercel Function | FormSG report-sick webhook (`FORMSG_SECRET_KEY`, `FORMSG_POST_URI`): insert one flat row into `report_sick_formsg` (sheet column order, plus derived `company`, `report_sick_date` (SGT), `received_at`, `symptom_category`, `symptom_other_text`) |
-| `backend/api/sft.ts` | Vercel Function | FormSG Self-Regulated Fitness Training webhook, a separate form with its own key (`FORMSG_SFT_SECRET_KEY`, `FORMSG_SFT_POST_URI`): POST inserts one row into `sft_formsg` (mapped by `backend/lib/formsg/sft.ts`, plus derived `company`, `sft_date` (SGT)). GET/PUT/DELETE list, correct and delete records for the Deposit page (`DASHBOARD_PASSWORD` session, same-origin writes; `backend/lib/sft.ts`). A correction is checked by `shared/sftEdit.js#validateSftEdit` (the page runs it too) and the NRIC-shape refusal, and re-derives `name_key`, `unit_coy`/`company` and `sft_date` as the insert does. FormSG is the only way a record is created |
-| `backend/api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every tab from `backend/lib/dashboard.ts#loadTabs` and the settings in force from `backend/lib/settings.ts#readSettings`, plus `canEdit` |
-| `backend/api/settings.ts` | Vercel Function | Saves and resets one settings section: PUT/DELETE, the `settings_session` cookie (from `SETTINGS_PASSWORD`) and a same-origin request; validates with `shared/settings/validate.js` |
+| `backend/api/sft.ts` | Vercel Function | FormSG Self-Regulated Fitness Training webhook, a separate form with its own key (`FORMSG_SFT_SECRET_KEY`, `FORMSG_SFT_POST_URI`): POST inserts one row into `sft_formsg` (mapped by `backend/lib/formsg/sft.ts`, plus derived `company`, `sft_date` (SGT)). GET/PUT/DELETE list, correct and delete records for the Deposit page (`DASHBOARD_PASSWORD` session, same-origin writes; `backend/lib/sft.ts`). A correction is checked by `shared/sftEdit.ts#validateSftEdit` (the page runs it too) and the NRIC-shape refusal, and re-derives `name_key`, `unit_coy`/`company` and `sft_date` as the insert does. FormSG is the only way a record is created |
+| `backend/api/dashboard.ts` | Vercel Function | The dashboard's read: GET, a session cookie or bearer `DASHBOARD_PASSWORD`, connects as `dashboard_read` (`DASHBOARD_DATABASE_URL`) and answers every dataset from `backend/lib/dashboard.ts#loadDashboard` and the settings in force from `backend/lib/settings.ts#readSettings`, plus `canEdit` |
+| `backend/api/settings.ts` | Vercel Function | Saves and resets one settings section: PUT/DELETE, the `settings_session` cookie (from `SETTINGS_PASSWORD`) and a same-origin request; validates with `shared/settings/validate.ts` |
 | `backend/api/session.ts` | Vercel Function | The dashboard's login: POST accepts `DASHBOARD_PASSWORD` (read) or `SETTINGS_PASSWORD` (read-write, which also sets `settings_session`); the session's length comes from the Session settings (`backend/lib/session.ts`); DELETE ends it. The only route a password is sent to |
 | `backend/api/parade.ts` | Vercel Function | The parade-state intake: POST stores and parses one message (WhatsApp relay or dashboard deposit); GET/PUT/DELETE list, read, edit and delete stored messages for the dashboard (see below) |
-| `runner/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run runner` (env from the root `.env.whatsapp`), or in the background via `bun run runner:service install` (a SYSTEM scheduled task) | Baileys listener under `supervisor.js`. `ingest.js` relays each accepted message to `backend/api/parade.ts`; it holds no database credentials. Baileys' own warnings are logged without their payloads (`listener.js#baileysLogger`) |
+| `runner/` | Long-running Bun process on the ops laptop, started from the repo root with `bun run runner` (env from the root `.env.whatsapp`), or in the background via `bun run runner:service install` (a SYSTEM scheduled task) | Baileys listener under `supervisor.ts`. `signature.ts` keeps only first parade states (by `shared/paradeMessage.ts`, the rule the parser uses too) and `ingest.ts` relays each to `backend/api/parade.ts`; it holds no database credentials. Baileys' own warnings are logged without their payloads (`listener.ts#baileysLogger`) |
 | `frontend/src/`, `frontend/index.html` | Browser (Preact + Vite, deployed by Vercel) | The dashboard: reads through `backend/api/dashboard.ts`; the Deposit page writes parade states through `backend/api/parade.ts` and SFT corrections through `backend/api/sft.ts`. See `docs/dashboard.md` |
 | `backend/scripts/` | Bun | `apply-migrations.ts`, `apply-grants.ts` (runs `backend/db/grants*.sql` without psql and writes the role's URL to `.env.<role>`, never the terminal) |
-| `shared/` | Browser and server | Pure JavaScript both sides import: the vocabulary (`domain.js`), dates and Singapore time (`dates.js`), cell readers (`values.js`), name and 4D normalisation (`identity.js`), rotations, the SFT correction check (`sftEdit.js`), the settings model (`settings/`) and the column headers the dashboard asks for (`tabs.js`). Nothing here imports from `frontend/` or `backend/` |
+| `shared/` | Browser, server and runner | Pure TypeScript all sides import: the vocabulary and every enum (`domain.ts`: `backend/db/schema.ts` builds its `pgEnum`s from it), the dashboard's row types (`dashboard.ts`), the stored-message rules (`paradeMessage.ts`: first/last-parade markers, the `manual:` id and the `Needs review:` error format), dates and Singapore time (`dates.ts`), value coercion (`values.ts`), name and 4D normalisation (`identity.ts`), rotations, the SFT correction check (`sftEdit.ts`) and the settings model (`settings/`). Nothing here imports from `frontend/`, `backend/` or `runner/` |
 | `test/` | Bun | Every suite, mirroring the tree: `frontend/`, `backend/`, `runner/`, `shared/`, plus `e2e/` and `support/`. `test/setup.ts` is preloaded (`bunfig.toml`) |
 
 Bun workspaces (`frontend`, `backend`, `runner`) each own their dependencies; `bunfig.toml` sets the hoisted linker so the root test suite resolves all of them. Vercel's Root Directory is `backend/`: `backend/vercel.json` installs from the repo root and builds the frontend into `backend/public`, and also sets the security headers (CSP `script-src 'self'`, so `frontend/index.html` loads `public/theme.js` instead of an inline script).
@@ -75,8 +79,12 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
   insert is `backend/lib/formsg/webhook.ts#handleWebhook`, and each route supplies only its table,
   mapper and env vars. Callers never re-implement any of these.
 - **One write path for settings.** `settings` rows are written only by `backend/api/settings.ts`.
-  Shared settings code (`shared/settings/`) is pure JavaScript used by both the browser
-  and the server; the server passes settings as values and never uses `active.js`.
+  Shared settings code (`shared/settings/`) is used by both the browser and the server; the
+  server passes settings as values and never uses `frontend/src/model/activeSettings.ts`.
+- **One definition per fact.** A fixed list (companies, sections, report-sick types) lives in
+  `shared/domain.ts`; a rule both the runner and the server apply (the parade header, the stored
+  error format) lives in `shared/paradeMessage.ts`; the dashboard's row shapes live in
+  `shared/dashboard.ts`. Change it there and the compiler finds every reader.
 - **Idempotency lives in the database.** Unique constraints (`wa_message_id`, FormSG
   submission id) settle duplicate deliveries in one statement; there are no app-level locks.
 - **`neon-http` has no interactive transactions.** Atomic writes go through `db.batch([...])`,
@@ -94,11 +102,10 @@ message it still cannot deliver is logged for a clerk to deposit by hand.
   column names, never answers. Text sent to the model provider has NRIC shapes masked and
   `store: false` set (`backend/lib/parser/llm.ts`).
   The dashboard's read connects as `dashboard_read`, which cannot select `body`, and
-  `backend/lib/dashboard.ts` builds every tab from the header arrays in `shared/tabs.js`, so a column
-  leaves the database only if the dashboard asks for it; `test/frontend/schema.test.js` and
-  `test/backend/lib/dashboard.test.ts` guard that no NRIC or body header is asked for.
-  `dashboard_read` reads `section_counts` (migration 0008) for the Section Counts tab, which
-  carries no names.
+  `backend/lib/dashboard.ts` selects exactly the fields of `shared/dashboard.ts`'s row types, so a
+  column leaves the database only if a type names it; `test/backend/lib/dashboard.test.ts` guards that
+  no NRIC or body field leaves. `dashboard_read` reads `section_counts` (migration 0008) for the
+  stated-count check, which carries no names.
 - **Read what the message says; derive nothing.** The parser records only stated values; the
   one sanctioned exception is the permanent-status `num_days` sentinel. See `backend/lib/parser/rows.ts`.
 - **Fail closed on missing configuration.** A route with an unset secret refuses every request
@@ -124,22 +131,21 @@ Layers, dependency direction strictly downward:
 
 | Layer | Holds | May import |
 |---|---|---|
-| `pages/` | one file per page, routed by `app/routes.js` (Today, Duty Roster, Report Sick, MC / MA, Status & Restrictions, Trends, SFT, Soldier, Filing & Accuracy, Deposit, Settings; `ROUTE_ALIASES` keeps old hashes working); `pages/today/` for Today's cards; `pages/shared/` for the range-bound pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
+| `pages/` | one file per page, routed by `app/routes.ts` (Today, Duty Roster, Report Sick, MC / MA, Status & Restrictions, Trends, SFT, Soldier, Filing & Accuracy, Deposit, Settings; `ROUTE_ALIASES` keeps old hashes working); `pages/today/` for Today's cards; `pages/shared/` for the range-bound pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
-| `app/` | shell, router, signals (`state.js`), session lifecycle and the background refresh (`auth.js`), Vercel Web Analytics and Speed Insights (`telemetry.js`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
-| `data/` | the `/api/dashboard` fetch and the headers asked of each tab (`feed.js`, `tabs.js`); the Deposit page's `/api/parade` and `/api/sft` calls (`parade.js`, `sft.js`), both through `api.js#callJson`, carrying the session cookie | `model/` |
+| `app/` | shell, router, signals (`state.ts`, with `loadedData()` for pages), session lifecycle and the background refresh (`auth.ts`), Vercel Web Analytics and Speed Insights (`telemetry.ts`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
+| `data/` | the `/api/dashboard` fetch (`feed.ts`, which builds the `Dataset` every page reads); login (`session.ts`), settings writes (`settings.ts`) and the Deposit page's `/api/parade` and `/api/sft` calls (`parade.ts`, `sft.ts`), all through `api.ts#send`, carrying the session cookie and raising `ApiError` | `model/` |
 | `model/` | every number and rule; pure functions, no DOM, no network | other `model/` files |
 
 `model/` is the only layer under test and the only place a wrong number can come from. Every
-colour is a token in `frontend/src/theme/tokens.css` (both themes), read by `frontend/src/charts/theme.js` at
+colour is a token in `frontend/src/theme/tokens.css` (both themes), read by `frontend/src/charts/theme.ts` at
 paint time. `docs/DESIGN.md` is the visual reference.
 
-`model/settings/` holds the settings model: `defaults.js` (each section's default value and the
-set of section names), `validate.js` (per-section validation, run both in the Settings page's
-form and again in `backend/api/settings.ts` before a save), `resolve.js` (merges a stored section over
-its default, and is what `backend/lib/settings.ts#readSettings` uses on the server), and `active.js`
-(the settings in force for the currently loaded dashboard, which `frontend/src/data/feed.js` sets from
-each `/api/dashboard` reply and `frontend/src/data/settings.js#unitSettings`/`refreshMs` read).
+The settings model is in `shared/settings/`: `defaults.ts` (each section's type, default and the
+set of section names), `validate.ts` (per-section validation, run both in the Settings page's form and
+again in `backend/api/settings.ts` before a save) and `resolve.ts` (merges a stored section over its
+default; `backend/lib/settings.ts#readSettings` uses it on the server). The browser's settings in force
+are `frontend/src/model/activeSettings.ts`, set by `data/feed.ts` from each `/api/dashboard` reply.
 
 Every parse, successful or not, records its parser (`deterministic` or the model id) and
 duration on `raw_messages.parser` / `parse_ms`; `backend/api/parade.ts` also returns them in a
