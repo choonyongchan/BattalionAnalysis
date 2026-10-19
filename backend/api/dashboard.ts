@@ -5,7 +5,7 @@
 import { getDb } from '../db/index.ts';
 import { loadDashboard } from '../lib/dashboard.ts';
 import type { DashboardData } from '../../shared/dashboard.ts';
-import { bearerToken, json, methodNotAllowed, sameSecret, serverError } from '../lib/http.ts';
+import { bearerToken, methodNotAllowed, noStore, sameSecret, serverError } from '../lib/http.ts';
 import { readSettings } from '../lib/settings.ts';
 import type { ResolvedSettings } from '../../shared/settings/resolve.ts';
 import { editSecret, hasSession, hasSettingsSession } from '../lib/session.ts';
@@ -23,20 +23,6 @@ export interface Deps {
   hasDatabase: boolean;
   /** The clock, injected so tests can pin `generatedAt` and a session's expiry. */
   now?: () => Date;
-}
-
-/** Every response carries personnel data, so none may be cached. */
-const NO_STORE = { 'Cache-Control': 'no-store' };
-
-/**
- * Builds a JSON response that is never cached.
- *
- * @param status The HTTP status code.
- * @param body Anything JSON-serialisable.
- * @returns The response.
- */
-function reply(status: number, body: unknown): Response {
-  return json(status, body, NO_STORE);
 }
 
 /**
@@ -71,16 +57,16 @@ function authorised(request: Request, deps: Deps): boolean {
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method !== 'GET') return methodNotAllowed(['GET']);
   if (!deps.dashboardPassword || !deps.hasDatabase) {
-    return reply(503, { ok: false, error: 'not_configured' });
+    return noStore(503, { ok: false, error: 'not_configured' });
   }
   if (!authorised(request, deps)) {
-    return reply(401, { ok: false, error: 'unauthorised' });
+    return noStore(401, { ok: false, error: 'unauthorised' });
   }
   const now = (deps.now ?? (() => new Date()))();
   const canEdit = hasSettingsSession(request, editSecret(deps.dashboardPassword, deps.settingsPassword), now.getTime());
   try {
     const [data, settings] = await Promise.all([deps.loadData(), deps.loadSettings()]);
-    return reply(200, { ok: true, generatedAt: now.toISOString(), data, settings, canEdit });
+    return noStore(200, { ok: true, generatedAt: now.toISOString(), data, settings, canEdit });
   } catch (error) {
     return serverError(error, 'api/dashboard');
   }

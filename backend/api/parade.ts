@@ -22,7 +22,7 @@
 import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
 import { OpenAiParser } from '../lib/parser/llm.ts';
-import { bearerToken, json, methodNotAllowed, readJson, sameSecret, serverError } from '../lib/http.ts';
+import { bearerToken, methodNotAllowed, noStore, readJson, sameSecret, serverError } from '../lib/http.ts';
 import { MANUAL_ID_PREFIX } from '../../shared/paradeMessage.ts';
 import { hasSession, isDashboardCaller } from '../lib/session.ts';
 import {
@@ -57,20 +57,6 @@ type Caller = 'dashboard' | 'relay';
 
 /** Longer than any real parade state by an order of magnitude; anything bigger is not one. */
 const MAX_BODY_CHARS = 50_000;
-
-/** Every response carries personnel data or acts on it, so none may be cached. */
-const NO_STORE = { 'Cache-Control': 'no-store' };
-
-/**
- * Builds a JSON response that is never cached.
- *
- * @param status The HTTP status code.
- * @param body Anything JSON-serialisable.
- * @returns The response.
- */
-function reply(status: number, body: unknown): Response {
-  return json(status, body, NO_STORE);
-}
 
 /**
  * Identifies the caller: a dashboard session cookie, or a bearer secret.
@@ -129,10 +115,10 @@ async function readMessage(
   if (!parsed.ok) return parsed;
   const body = parsed.body?.body;
   if (typeof body !== 'string' || body.trim() === '') {
-    return { ok: false, response: reply(400, { error: 'body must be the parade-state text.' }) };
+    return { ok: false, response: noStore(400, { error: 'body must be the parade-state text.' }) };
   }
   if (body.length > MAX_BODY_CHARS) {
-    return { ok: false, response: reply(413, { error: 'That is too long to be a parade state.' }) };
+    return { ok: false, response: noStore(413, { error: 'That is too long to be a parade state.' }) };
   }
   return { ok: true, body, waMessageId: parsed.body?.waMessageId };
 }
@@ -144,12 +130,12 @@ async function readMessage(
  * @returns 200 when rows exist, 404 for an unknown id, 422 when a person must correct the text.
  */
 function outcomeResponse(outcome: IngestOutcome): Response {
-  if (outcome.status === 'already_parsed') return reply(200, outcome);
-  if (outcome.status === 'not_found') return reply(404, { error: 'No such message.' });
+  if (outcome.status === 'already_parsed') return noStore(200, outcome);
+  if (outcome.status === 'not_found') return noStore(404, { error: 'No such message.' });
   // Only the parser, the duration and the status: nothing that could quote a personnel line.
   console.log('[api/parade] parse', JSON.stringify({ parser: outcome.parser, ms: outcome.parseMs, status: outcome.status }));
   const timing = { 'Server-Timing': `parse;dur=${outcome.parseMs};desc="${outcome.parser}"` };
-  return json(outcome.status === 'parsed' ? 200 : 422, outcome, { ...NO_STORE, ...timing });
+  return noStore(outcome.status === 'parsed' ? 200 : 422, outcome, timing);
 }
 
 /**
@@ -170,7 +156,7 @@ async function post(request: Request, deps: Deps, caller: Caller): Promise<Respo
   } else if (typeof message.waMessageId === 'string' && message.waMessageId.trim() !== '') {
     waMessageId = message.waMessageId.trim();
   } else {
-    return reply(400, { error: 'waMessageId is required.' });
+    return noStore(400, { error: 'waMessageId is required.' });
   }
   return outcomeResponse(await deps.store.ingest({ waMessageId, body: message.body }));
 }
@@ -184,17 +170,17 @@ async function post(request: Request, deps: Deps, caller: Caller): Promise<Respo
  */
 async function manage(request: Request, deps: Deps): Promise<Response> {
   const id = idOf(request);
-  if (Number.isNaN(id)) return reply(400, { error: 'id must be a positive whole number.' });
+  if (Number.isNaN(id)) return noStore(400, { error: 'id must be a positive whole number.' });
 
   if (request.method === 'GET') {
-    if (id === null) return reply(200, { messages: await deps.store.list() });
+    if (id === null) return noStore(200, { messages: await deps.store.list() });
     const message = await deps.store.get(id);
-    return message ? reply(200, message) : reply(404, { error: 'No such message.' });
+    return message ? noStore(200, message) : noStore(404, { error: 'No such message.' });
   }
 
-  if (id === null) return reply(400, { error: 'id is required.' });
+  if (id === null) return noStore(400, { error: 'id is required.' });
   if (request.method === 'DELETE') {
-    return (await deps.store.remove(id)) ? reply(200, { status: 'deleted', id }) : reply(404, { error: 'No such message.' });
+    return (await deps.store.remove(id)) ? noStore(200, { status: 'deleted', id }) : noStore(404, { error: 'No such message.' });
   }
 
   const message = await readMessage(request);
@@ -214,12 +200,12 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
     return methodNotAllowed(['GET', 'POST', 'PUT', 'DELETE']);
   }
   if (!deps.dashboardPassword && !deps.ingestSecret) {
-    return reply(503, { error: 'Neither DASHBOARD_PASSWORD nor PARADE_INGEST_SECRET is configured.' });
+    return noStore(503, { error: 'Neither DASHBOARD_PASSWORD nor PARADE_INGEST_SECRET is configured.' });
   }
 
   const caller = callerOf(request, deps);
-  if (!caller) return reply(401, { error: 'Not authorised.' });
-  if (caller === 'relay' && request.method !== 'POST') return reply(403, { error: 'The relay may only POST.' });
+  if (!caller) return noStore(401, { error: 'Not authorised.' });
+  if (caller === 'relay' && request.method !== 'POST') return noStore(403, { error: 'The relay may only POST.' });
 
   try {
     return request.method === 'POST' ? await post(request, deps, caller) : await manage(request, deps);

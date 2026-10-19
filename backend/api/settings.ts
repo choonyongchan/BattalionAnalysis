@@ -17,7 +17,7 @@
  * Every refusal happens before the store is touched. Nothing here logs a value.
  */
 import { getDb } from '../db/index.ts';
-import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
+import { methodNotAllowed, noStore, readJson, serverError } from '../lib/http.ts';
 import { editSecret, hasSettingsSession, isSameOrigin } from '../lib/session.ts';
 import { resetSection, saveSection, type SaveOutcome } from '../lib/settings.ts';
 import { isSection } from '../../shared/settings/defaults.ts';
@@ -36,20 +36,6 @@ export interface Deps {
   settingsPassword: string | undefined;
   /** The clock, injected so tests hold it. */
   now?: () => number;
-}
-
-/** No response here may be cached. */
-const NO_STORE = { 'Cache-Control': 'no-store' };
-
-/**
- * Builds a JSON response that is never cached.
- *
- * @param status The HTTP status code.
- * @param body Anything JSON-serialisable.
- * @returns The response.
- */
-function reply(status: number, body: unknown): Response {
-  return json(status, body, NO_STORE);
 }
 
 /** The `settings.version` column is `int4`; anything past this cannot be stored. */
@@ -78,8 +64,8 @@ function isVersion(value: unknown): value is number {
  * @returns The response.
  */
 function outcomeResponse(outcome: SaveOutcome, warnings: unknown[] = []): Response {
-  if (outcome.status === 'conflict') return reply(409, { ok: false, error: 'conflict' });
-  return reply(200, { ok: true, version: outcome.version, warnings });
+  if (outcome.status === 'conflict') return noStore(409, { ok: false, error: 'conflict' });
+  return noStore(200, { ok: true, version: outcome.version, warnings });
 }
 
 /**
@@ -94,10 +80,10 @@ async function put(request: Request, deps: Deps): Promise<Response> {
   if (!parsed.ok) return parsed.response;
   const { section, value, version } = parsed.body ?? {};
   if (typeof section !== 'string' || !isSection(section)) {
-    return reply(400, { ok: false, error: 'bad_request', message: 'Unknown settings section.' });
+    return noStore(400, { ok: false, error: 'bad_request', message: 'Unknown settings section.' });
   }
   if (!isVersion(version)) {
-    return reply(400, {
+    return noStore(400, {
       ok: false,
       error: 'bad_request',
       message: `version must be a whole number from 0 to ${MAX_VERSION}.`,
@@ -105,7 +91,7 @@ async function put(request: Request, deps: Deps): Promise<Response> {
   }
   const checked = validateSection(section, value);
   if (checked.errors.length > 0) {
-    return reply(422, { ok: false, error: 'invalid', errors: checked.errors, warnings: checked.warnings });
+    return noStore(422, { ok: false, error: 'invalid', errors: checked.errors, warnings: checked.warnings });
   }
   return outcomeResponse(await deps.store.save(section, checked.value, version), checked.warnings);
 }
@@ -123,7 +109,7 @@ async function remove(request: Request, deps: Deps): Promise<Response> {
   const version = params.get('version');
   const parsedVersion = version !== null && /^\d+$/.test(version) ? Number(version) : NaN;
   if (!isSection(section) || !isVersion(parsedVersion)) {
-    return reply(400, { ok: false, error: 'bad_request', message: 'section and version are required.' });
+    return noStore(400, { ok: false, error: 'bad_request', message: 'section and version are required.' });
   }
   return outcomeResponse(await deps.store.reset(section, parsedVersion));
 }
@@ -140,10 +126,10 @@ async function remove(request: Request, deps: Deps): Promise<Response> {
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method !== 'PUT' && request.method !== 'DELETE') return methodNotAllowed(['PUT', 'DELETE']);
   const secret = editSecret(deps.dashboardPassword, deps.settingsPassword);
-  if (!deps.dashboardPassword || !secret) return reply(503, { ok: false, error: 'not_configured' });
+  if (!deps.dashboardPassword || !secret) return noStore(503, { ok: false, error: 'not_configured' });
   const now = (deps.now ?? (() => Date.now()))();
-  if (!hasSettingsSession(request, secret, now)) return reply(401, { ok: false, error: 'unauthorised' });
-  if (!isSameOrigin(request)) return reply(403, { ok: false, error: 'cross_site' });
+  if (!hasSettingsSession(request, secret, now)) return noStore(401, { ok: false, error: 'unauthorised' });
+  if (!isSameOrigin(request)) return noStore(403, { ok: false, error: 'cross_site' });
   try {
     return request.method === 'PUT' ? await put(request, deps) : await remove(request, deps);
   } catch (error) {

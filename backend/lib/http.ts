@@ -19,6 +19,11 @@ export function json(status: number, body: unknown, headers: Record<string, stri
   });
 }
 
+/** A JSON response that is never cached; every route's answer can carry personnel data. */
+export function noStore(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return json(status, body, { 'Cache-Control': 'no-store', ...headers });
+}
+
 /**
  * Rejects a request whose method the route does not implement.
  *

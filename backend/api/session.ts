@@ -15,7 +15,7 @@
  * bare 401 that says nothing about how wrong it was, and the comparison is constant-time.
  */
 import { getDb } from '../db/index.ts';
-import { json, methodNotAllowed, readJson, sameSecret } from '../lib/http.ts';
+import { methodNotAllowed, noStore, readJson, sameSecret } from '../lib/http.ts';
 import { readSettings } from '../lib/settings.ts';
 import {
   SESSION_TTL_MS,
@@ -37,9 +37,6 @@ export interface Deps {
   /** The clock, injected so tests hold it. */
   now?: () => number;
 }
-
-/** No response here may be cached, and none may be stored by a shared proxy. */
-const NO_STORE = { 'Cache-Control': 'no-store' };
 
 /**
  * How long a new session should last.
@@ -73,14 +70,14 @@ async function sessionTtl(deps: Deps): Promise<number> {
  */
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method === 'DELETE') {
-    const response = json(200, { ok: true }, NO_STORE);
+    const response = noStore(200, { ok: true });
     response.headers.append('Set-Cookie', clearSessionCookie());
     response.headers.append('Set-Cookie', clearSessionCookie(SETTINGS_COOKIE));
     return response;
   }
   if (request.method !== 'POST') return methodNotAllowed(['POST', 'DELETE']);
   if (!deps.dashboardPassword || !sessionsConfigured()) {
-    return json(503, { ok: false, error: 'not_configured' }, NO_STORE);
+    return noStore(503, { ok: false, error: 'not_configured' });
   }
 
   const parsed = await readJson<{ password?: unknown }>(request);
@@ -89,12 +86,12 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
   const edit = editSecret(deps.dashboardPassword, deps.settingsPassword);
   const canEdit = Boolean(password !== '' && edit && sameSecret(password, edit));
   if (password === '' || (!canEdit && !sameSecret(password, deps.dashboardPassword))) {
-    return json(401, { ok: false, error: 'unauthorised' }, NO_STORE);
+    return noStore(401, { ok: false, error: 'unauthorised' });
   }
 
   const now = (deps.now ?? (() => Date.now()))();
   const ttlMs = await sessionTtl(deps);
-  const response = json(200, { ok: true, expiresAt: new Date(now + ttlMs).toISOString(), canEdit }, NO_STORE);
+  const response = noStore(200, { ok: true, expiresAt: new Date(now + ttlMs).toISOString(), canEdit });
   response.headers.append('Set-Cookie', sessionCookie(issueSession(deps.dashboardPassword, ttlMs, now), ttlMs));
   if (canEdit) {
     response.headers.append('Set-Cookie', sessionCookie(issueSession(edit!, ttlMs, now), ttlMs, SETTINGS_COOKIE));

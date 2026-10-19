@@ -17,7 +17,7 @@ import { sftFormsg } from '../db/schema.ts';
 import { formsgSdk } from '../lib/formsg/sdk.ts';
 import { mapSftSubmission } from '../lib/formsg/sft.ts';
 import { handleWebhook, nricColumn, type Deps as WebhookDeps, type FormSpec } from '../lib/formsg/webhook.ts';
-import { json, methodNotAllowed, readJson, serverError } from '../lib/http.ts';
+import { methodNotAllowed, noStore, readJson, serverError } from '../lib/http.ts';
 import { isDashboardCaller } from '../lib/session.ts';
 import { deleteSftRecord, listSftRecords, updateSftRecord, type SftEdit } from '../lib/sft.ts';
 import { validateSftEdit } from '../../shared/sftEdit.ts';
@@ -52,20 +52,6 @@ const METHODS = ['GET', 'POST', 'PUT', 'DELETE'];
 /** Longer than any FormSG submission id; anything bigger is not one. */
 const MAX_ID_CHARS = 100;
 
-/** Every dashboard response carries personnel data or acts on it, so none may be cached. */
-const NO_STORE = { 'Cache-Control': 'no-store' };
-
-/**
- * Builds a JSON response that is never cached.
- *
- * @param status The HTTP status code.
- * @param body Anything JSON-serialisable.
- * @returns The response.
- */
-function reply(status: number, body: unknown): Response {
-  return json(status, body, NO_STORE);
-}
-
 /**
  * Reads the `?id=` query parameter, a FormSG submission id.
  *
@@ -89,11 +75,11 @@ async function correct(request: Request, deps: Deps, id: string): Promise<Respon
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const checked = validateSftEdit(parsed.body, (deps.now ?? Date.now)());
-  if (!checked.ok) return reply(422, { error: 'Correct the marked fields.', errors: checked.errors });
+  if (!checked.ok) return noStore(422, { error: 'Correct the marked fields.', errors: checked.errors });
   const column = nricColumn(checked.value);
-  if (column) return reply(422, { error: 'An identifier cannot be stored.', errors: { [column]: 'Remove the NRIC.' } });
+  if (column) return noStore(422, { error: 'An identifier cannot be stored.', errors: { [column]: 'Remove the NRIC.' } });
   const record = await deps.records.update(id, checked.value as SftEdit);
-  return record ? reply(200, { status: 'updated', record }) : reply(404, { error: 'No such SFT record.' });
+  return record ? noStore(200, { status: 'updated', record }) : noStore(404, { error: 'No such SFT record.' });
 }
 
 /**
@@ -104,16 +90,16 @@ async function correct(request: Request, deps: Deps, id: string): Promise<Respon
  * @returns The response.
  */
 async function manage(request: Request, deps: Deps): Promise<Response> {
-  if (!deps.dashboardPassword) return reply(503, { error: 'DASHBOARD_PASSWORD is not configured.' });
+  if (!deps.dashboardPassword) return noStore(503, { error: 'DASHBOARD_PASSWORD is not configured.' });
   if (!isDashboardCaller(request, deps.dashboardPassword, (deps.now ?? Date.now)())) {
-    return reply(401, { error: 'Not authorised.' });
+    return noStore(401, { error: 'Not authorised.' });
   }
   try {
-    if (request.method === 'GET') return reply(200, { records: await deps.records.list() });
+    if (request.method === 'GET') return noStore(200, { records: await deps.records.list() });
     const id = idOf(request);
-    if (!id) return reply(400, { error: 'id is required.' });
+    if (!id) return noStore(400, { error: 'id is required.' });
     if (request.method === 'PUT') return await correct(request, deps, id);
-    return (await deps.records.remove(id)) ? reply(200, { status: 'deleted', id }) : reply(404, { error: 'No such SFT record.' });
+    return (await deps.records.remove(id)) ? noStore(200, { status: 'deleted', id }) : noStore(404, { error: 'No such SFT record.' });
   } catch (error) {
     return serverError(error, 'api/sft');
   }
