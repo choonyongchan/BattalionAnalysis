@@ -29,6 +29,11 @@ export function isCompany(value: unknown): value is Company {
   return COMPANIES.includes(value as Company);
 }
 
+/** A company's place in parade order (its colour slot on every chart), or -1. */
+export function companyIndex(name: string): number {
+  return COMPANIES.indexOf(name as Company);
+}
+
 /** The `unit_type` of a whole-company row; battalion strength sums only these to avoid double counting. */
 export const UNIT_TYPE_COMPANY: UnitType = 'Company';
 

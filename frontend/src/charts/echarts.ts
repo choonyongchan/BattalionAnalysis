@@ -1,15 +1,6 @@
 /**
- * The one place ECharts is assembled.
- *
- * ECharts ships as a registry: `echarts/core` is an empty engine, and every series type,
- * component and renderer has to be handed to `use()` before an option mentioning it will
- * draw. Importing the `echarts` barrel instead would register all of them — roughly a
- * megabyte of chart types this dashboard does not have — and defeat the code splitting
- * `vite.config.js` sets up for the ECharts chunk. So the registration happens once, here,
- * and no other file in the dashboard calls `use()`.
- *
- * Adding a chart type is therefore a two-line change in this file plus the component.
- * Forgetting the line shows up as an ECharts console error naming the missing type.
+ * The one place ECharts is assembled: `echarts/core` is empty, and each chart type, component and
+ * renderer is registered here (the barrel would pull in ~1 MB). A missing line shows as a console error.
  */
 
 import { use, init } from 'echarts/core';

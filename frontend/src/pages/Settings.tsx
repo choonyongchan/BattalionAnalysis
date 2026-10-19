@@ -26,10 +26,7 @@ import {
 } from './settings/editors.tsx';
 import { UnlockPanel } from './settings/UnlockPanel.tsx';
 
-/**
- * The view and editor for each section; a section without an entry is not shown yet.
- * @type {!Object<string, {View: function(!Object): !preact.VNode, Editor: function(!Object): !preact.VNode}>}
- */
+/** The view and editor for each section; a section without an entry is not shown yet. */
 const EDITORS = {
   unit: { View: UnitView, Editor: UnitEditor },
   calendar: { View: CalendarView, Editor: CalendarEditor },
@@ -43,10 +40,7 @@ const TIERS = [
   { name: 'advanced', label: 'Advanced' },
 ];
 
-/**
- * The Settings page.
- * @returns {!preact.VNode} The page.
- */
+/** The Settings page. */
 export function Settings() {
   const [tier, setTier] = useState('basic');
   const data = dataset.value;

@@ -15,14 +15,7 @@ import { Banner, Card } from '../../components/Card.tsx';
 import { resetSection, saveSection } from '../../data/settings.ts';
 import { validateSection } from '../../../../shared/settings/validate.ts';
 
-/**
- * A section card.
- * @param {{section: string, title: string, value: !Object, meta: ?Object,
- *     View: function(!Object): !preact.VNode, Editor: function(!Object): !preact.VNode}} props
- *     The section, its card title, its value in force, its stored version/state, and the
- *     components that show and edit it.
- * @returns {!preact.VNode} The card.
- */
+/** A section card. */
 export function SectionCard({ section, title, value, meta, View, Editor }) {
   const [draft, setDraft] = useState(null);
   const [errors, setErrors] = useState([]);
@@ -32,10 +25,7 @@ export function SectionCard({ section, title, value, meta, View, Editor }) {
   const version = (meta && meta.version) || 0;
   const note = meta && meta.invalid ? 'Stored value invalid, showing defaults' : meta && meta.isDefault ? 'Default' : '';
 
-  /**
-   * Opens the form on a copy of the value in force.
-   * @returns {void}
-   */
+  /** Opens the form on a copy of the value in force. */
   function edit() {
     setDraft(structuredClone(value));
     setErrors([]);
@@ -43,11 +33,7 @@ export function SectionCard({ section, title, value, meta, View, Editor }) {
     setMessage('');
   }
 
-  /**
-   * Runs a write, then re-reads the dashboard; shows a refusal on the card.
-   * @param {function(): !Promise<*>} write The save or reset.
-   * @returns {!Promise<void>} Resolves when done.
-   */
+  /** Runs a write, then re-reads the dashboard; shows a refusal on the card. */
   async function run(write) {
     setBusy(true);
     setMessage('');
@@ -64,11 +50,7 @@ export function SectionCard({ section, title, value, meta, View, Editor }) {
     }
   }
 
-  /**
-   * Validates the draft locally, then saves it.
-   * @param {!Event} event The submit event.
-   * @returns {void}
-   */
+  /** Validates the draft locally, then saves it. */
   function onSave(event) {
     event.preventDefault();
     const checked = validateSection(section, draft);

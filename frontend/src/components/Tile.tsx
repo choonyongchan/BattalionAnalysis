@@ -1,15 +1,9 @@
-/**
- * The stat tile row at the top of every page.
- */
+/** The stat tile row at the top of every page. */
 
-/**
- * One tile: a label, a hero figure, and an optional caveat line beneath it.
- * @param {{label: string, value: string, foot?: string}} props The tile's contents.
- *     `value` is pre-formatted by the caller via `format.js` — a tile never formats its
- *     own number, so every figure in the dashboard goes through one formatter.
- * @returns {!preact.VNode} The tile.
- */
-export function Tile({ label, value, foot }) {
+import type { ComponentChildren } from 'preact';
+
+/** One tile: a label, a figure already formatted through `format.ts`, and an optional caveat. */
+export function Tile({ label, value, foot }: { label: string; value: string; foot?: string }) {
   return (
     <div class="tile">
       <span class="tile__label">{label}</span>
@@ -19,11 +13,7 @@ export function Tile({ label, value, foot }) {
   );
 }
 
-/**
- * The row of tiles itself.
- * @param {{children: *}} props The Tile elements.
- * @returns {!preact.VNode} The row.
- */
-export function TileRow({ children }) {
+/** The row of tiles. */
+export function TileRow({ children }: { children: ComponentChildren }) {
   return <div class="tilerow">{children}</div>;
 }

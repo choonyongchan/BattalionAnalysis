@@ -1,34 +1,28 @@
 /**
- * The left rail: brand, the seven pages, and the two session controls.
- *
- * It is a rail rather than a top tab strip because the three medical pages are read
- * against each other — a commander looks at report sick, then MC, then status, comparing
- * as they go — and a vertical list keeps all three in view while one is open.
+ * The left rail: brand, pages and the session controls. A rail rather than tabs, so the medical pages a
+ * commander compares stay in view together.
  */
 
+import type { ComponentType } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { Link, useRoute } from 'wouter-preact';
 import { dataset } from './state.ts';
 import { Logo } from './Logo.tsx';
 import { LockIcon, MoonIcon, SunIcon, SystemThemeIcon } from './icons.tsx';
-import { navGroups } from './routes.ts';
+import { DEFAULT_ROUTE, navGroups, type PageRoute } from './routes.ts';
 import { lock } from './auth.ts';
-import { cycleTheme, resolvedTheme, themeChoice } from '../theme/useTheme.ts';
+import { cycleTheme, resolvedTheme, themeChoice, type ThemeChoice } from '../theme/useTheme.ts';
 import { unitSettings } from '../data/settings.ts';
 
-/** @type {!Object<string, {icon: function, label: string}>} How each theme setting reads. */
-const THEME_LABELS = {
+/** How each theme setting reads. */
+const THEME_LABELS: Record<ThemeChoice, { icon: ComponentType; label: string }> = {
   system: { icon: SystemThemeIcon, label: 'Theme: match the system' },
   light: { icon: SunIcon, label: 'Theme: light' },
   dark: { icon: MoonIcon, label: 'Theme: dark' },
 };
 
-/**
- * One navigation entry, marked current when its route is open.
- * @param {{route: !Object, onNavigate: function(): void}} props The route, and what to do after.
- * @returns {!preact.VNode} The link.
- */
-function NavLink({ route, onNavigate }) {
+/** One navigation entry, marked current when its route is open. */
+function NavLink({ route, onNavigate }: { route: PageRoute; onNavigate: () => void }) {
   const [isActive] = useRoute(route.path);
   const Icon = route.icon;
   return (
@@ -44,12 +38,8 @@ function NavLink({ route, onNavigate }) {
   );
 }
 
-/**
- * Says how long ago a moment was, in the coarsest unit that still reads naturally.
- * @param {number} ms Milliseconds elapsed.
- * @returns {string} For example "just now", "5 min ago", "3 h ago".
- */
-function ago(ms) {
+/** How long ago, in the coarsest unit that reads naturally: "just now", "5 min ago", "3 h ago". */
+function ago(ms: number): string {
   const minutes = Math.floor(ms / 60000);
   if (minutes < 1) return 'just now';
   if (minutes < 60) return minutes + ' min ago';
@@ -57,10 +47,7 @@ function ago(ms) {
   return hours < 24 ? hours + ' h ago' : Math.floor(hours / 24) + ' d ago';
 }
 
-/**
- * A tiny line under the nav saying when the data was last fetched, re-read every minute.
- * @returns {?preact.VNode} The line, or nothing before the first load.
- */
+/** When the data was last fetched, re-read every minute; nothing before the first load. */
 function SyncStatus() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -68,7 +55,7 @@ function SyncStatus() {
     return () => clearInterval(timer);
   }, []);
 
-  const stamp = dataset.value && dataset.value.generatedAt;
+  const stamp = dataset.value?.generatedAt;
   const at = stamp ? new Date(stamp) : null;
   if (!at || Number.isNaN(at.getTime())) return null;
   return (
@@ -78,19 +65,14 @@ function SyncStatus() {
   );
 }
 
-/**
- * Renders the sidebar.
- * @param {{open: boolean, onNavigate: function(): void}} props Whether the slide-over is
- *     showing on narrow screens, and what to call once a link is followed.
- * @returns {!preact.VNode} The rail.
- */
-export function Sidebar({ open, onNavigate }) {
+/** The rail; `open` shows the slide-over on narrow screens, `onNavigate` runs after a link is followed. */
+export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const theme = THEME_LABELS[themeChoice.value];
   const ThemeIcon = theme.icon;
 
   return (
     <nav class="sidebar" data-open={String(open)} aria-label="Dashboard sections">
-      <Link class="sidebar__brand" href="/overview" onClick={onNavigate}>
+      <Link class="sidebar__brand" href={DEFAULT_ROUTE} onClick={onNavigate}>
         <Logo size={44} />
         <span>
           <span class="sidebar__wordmark">{unitSettings().name}</span>

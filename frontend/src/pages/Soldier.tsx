@@ -24,12 +24,7 @@ import { buildEpisodes } from '../model/episodes.ts';
 import { toSubmissions } from '../model/formsg.ts';
 import { soldierIndex, soldierReport } from '../model/soldier.ts';
 
-/**
- * A ranked reason table, used for the MC / report-sick / status reason breakdowns.
- * @param {{title: string, rows: Array<{reason: string, count: number}>}} props The
- *     panel's title and its ranked reasons.
- * @returns {!preact.VNode} The panel.
- */
+/** A ranked reason table, used for the MC / report-sick / status reason breakdowns. */
 function ReasonTable({ title, rows }) {
   return (
     <Card title={title}>
@@ -49,10 +44,7 @@ function ReasonTable({ title, rows }) {
   );
 }
 
-/**
- * The Soldier page.
- * @returns {!preact.VNode} The page.
- */
+/** The Soldier page. */
 export function Soldier() {
   const data = dataset.value;
   const [selectedKey, setSelectedKey] = useState(null);

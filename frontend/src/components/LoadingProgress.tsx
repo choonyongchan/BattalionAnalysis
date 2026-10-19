@@ -1,46 +1,28 @@
 /**
- * The bar shown while one slow request is in flight.
- *
- * The first read after a quiet spell wakes the Vercel function and the Neon database, which
- * can take several seconds. A disabled button and nothing else reads as a hung page, so the wait is given a shape: a bar that keeps moving, a line of text
- * that changes, and an elapsed count next to the figure the wait is measured against.
- *
- * Two decisions here are deliberate and should survive a refactor:
- *
- * - **The progress is an estimate, and the bar never fills.** The read is one GET with
- *   no progress events, so there is nothing real to report; the fill eases along
- *   `1 - e^(-t/tau)` toward a ceiling below 100%. A bar that reaches the end and then sits
- *   there is the exact failure this component exists to prevent, and it can only be
- *   avoided by never arriving. The bar disappears because the screen behind it changes,
- *   not because it finished.
- * - **The stage lines describe the request, not the server's position in it.** Nothing
- *   here can observe which part of the pipeline is running, so the lines say what is being
- *   waited on and roughly when, and never claim a step has completed.
+ * The bar shown while one slow request is in flight (a cold Vercel function and Neon take seconds).
+ * The fill is an estimate easing toward a ceiling it never reaches, since a bar that fills and sits there
+ * reads as hung; the stage lines say what is being waited on, never that a step finished.
  */
 
 import { useEffect, useState } from 'preact/hooks';
 
-/** @type {number} How often the bar and the elapsed count are recomputed, in ms. */
+/** A line shown from `at` seconds into the wait. */
+export interface Stage {
+  at: number;
+  label: string;
+}
+
+/** How often the bar and the elapsed count are recomputed, in ms. */
 const TICK_MS = 250;
 
-/** @type {number} The fraction the fill eases toward and never reaches. */
+/** The fraction the fill eases toward and never reaches. */
 const CEILING = 0.92;
 
-/**
- * Shapes the easing so the bar is ~90% of the way to the ceiling at the expected time.
- * @type {number}
- */
+/** Shapes the easing so the bar is ~90% of the way to the ceiling at the expected time. */
 const EASE_SHAPE = 2.3;
 
-/**
- * Counts seconds since the component mounted.
- *
- * The clock is read from `Date.now` rather than accumulated from the interval, because a
- * background tab throttles timers and an accumulated count would drift behind the wait it
- * is meant to describe.
- * @returns {number} Fractional seconds elapsed.
- */
-function useElapsedSeconds() {
+/** Seconds since mount, from `Date.now` (a background tab throttles timers, so counting ticks drifts). */
+function useElapsedSeconds(): number {
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -54,55 +36,26 @@ function useElapsedSeconds() {
   return seconds;
 }
 
-/**
- * The share of the bar to fill after a given wait.
- * @param {number} seconds Seconds elapsed.
- * @param {number} expectedSeconds The wait this is measured against.
- * @returns {number} A fraction in [0, CEILING).
- */
-function fillFraction(seconds, expectedSeconds) {
+/** The share of the bar to fill after a wait, in [0, CEILING). */
+function fillFraction(seconds: number, expectedSeconds: number): number {
   return CEILING * (1 - Math.exp((-seconds * EASE_SHAPE) / expectedSeconds));
 }
 
-/**
- * The last stage whose start time has passed.
- * @param {!Array<{at: number, label: string}>} stages Stages in ascending `at` order.
- * @param {number} seconds Seconds elapsed.
- * @returns {string} The stage's label.
- */
-function stageAt(stages, seconds) {
-  let label = stages[0].label;
-  stages.forEach((stage) => {
-    if (seconds >= stage.at) {
-      label = stage.label;
-    }
-  });
-  return label;
+/** The label of the last stage whose start time has passed. */
+function stageAt(stages: Stage[], seconds: number): string {
+  return stages.filter((stage) => seconds >= stage.at).pop()?.label ?? stages[0]?.label ?? '';
 }
 
-/**
- * The line under the bar, which turns from a promise into an explanation once the
- * expected wait has passed. Saying "longer than usual" is what keeps a slow load from
- * reading as a broken one.
- * @param {number} seconds Seconds elapsed.
- * @param {number} expectedSeconds The wait this is measured against.
- * @returns {string} The elapsed line.
- */
-function elapsedNote(seconds, expectedSeconds) {
+/** The elapsed line, which says "longer than usual" past the expected wait so slow never reads as broken. */
+function elapsedNote(seconds: number, expectedSeconds: number): string {
   const whole = Math.floor(seconds);
   return seconds < expectedSeconds
     ? whole + 's · usually about ' + expectedSeconds + 's'
     : whole + 's · longer than usual, still waiting';
 }
 
-/**
- * Renders an easing progress bar with a changing stage line.
- * @param {{stages: !Array<{at: number, label: string}>, expectedSeconds: number,
- *   label: string}} props The stages to cycle, the expected wait in seconds, and the
- *   accessible name for the bar.
- * @returns {!preact.VNode} The bar.
- */
-export function LoadingProgress({ stages, expectedSeconds, label }) {
+/** An easing progress bar with a changing stage line; `label` names the bar. */
+export function LoadingProgress({ stages, expectedSeconds, label }: { stages: Stage[]; expectedSeconds: number; label: string }) {
   const seconds = useElapsedSeconds();
   const percent = fillFraction(seconds, expectedSeconds) * 100;
   const stage = stageAt(stages, seconds);

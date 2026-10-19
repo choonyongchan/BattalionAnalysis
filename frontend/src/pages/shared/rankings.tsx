@@ -13,30 +13,34 @@ import { longMcRoster, longMcTrend } from '../../model/metrics.ts';
 import { withinRange } from '../../model/dateRange.ts';
 import { topByCount, topByDays, topByStatusCount, rankUnits } from '../../model/leaderboards.ts';
 import { locationCounts, locationCoverage } from '../../model/locations.ts';
-import { toIsoDate, toText } from '../../../../shared/values.ts';
+import { toText } from '../../../../shared/values.ts';
 import { isDuty } from '../../model/classify.ts';
+import type { DutyFilter } from '../../model/metrics.ts';
+import type { Episode } from '../../model/episodes.ts';
+import type { SoldierEntry } from '../../model/soldier.ts';
+import type { UnitRank } from '../../model/leaderboards.ts';
+import type { LeaderboardRow } from '../../components/Leaderboard.tsx';
+import type { PersonnelRow } from '../../../../shared/dashboard.ts';
+import type { CategoryRange } from './category.tsx';
 import { settingOf } from '../../model/activeSettings.ts';
 
 /**
- * The leaderboard each metric draws: its card title, its ranking, and the column set
- * `Leaderboard` renders for it.
- * @type {!Object<string, {title: string, top: function(Array<!Object>, string): Array<!Object>}>}
+ * The leaderboard each metric draws: its card title, its ranking, and the column set `Leaderboard` renders
+ * for it.
  */
-const LEADERBOARDS = {
+const LEADERBOARDS: Record<'count' | 'days' | 'status', { title: string; top: (episodes: Episode[], dutyClass: DutyFilter) => LeaderboardRow[] }> = {
   count: { title: 'Episode Count', top: (episodes, dutyClass) => topByCount(episodes, dutyClass) },
   days: { title: 'Days Lost', top: (episodes, dutyClass) => topByDays(episodes, dutyClass) },
   status: { title: 'Statuses Held', top: (episodes) => topByStatusCount(episodes) },
 };
 
 /**
- * Clinic-ranking bars for MC and MA, drawn separately since their location coverage
- * differs sharply (88% on MA, 17% on MC in the observed data). Only parade states inside
- * the range count, like every other section on the page.
- * @param {{personnel: Array<!Object>, range: !Object}} props Personnel rows and the range.
- * @returns {!preact.VNode} The cards.
+ * Clinic-ranking bars for MC and MA, drawn separately since their location coverage differs sharply (88% on
+ * MA, 17% on MC in the observed data). Only parade states inside the range count, like every other section on
+ * the page.
  */
-export function LocationsCard({ personnel: all, range }) {
-  const personnel = all.filter((row) => withinRange(toIsoDate(row.date), range.from, range.to));
+export function LocationsCard({ personnel: all, range }: { personnel: PersonnelRow[]; range: CategoryRange }) {
+  const personnel = all.filter((row) => withinRange(row.date, range.from, range.to));
   const mc = locationCoverage(personnel, 'Att C');
   const ma = locationCoverage(personnel, 'MA');
   const mcCounts = locationCounts(personnel, { category: 'Att C' }).slice(0, 10);
@@ -49,27 +53,21 @@ export function LocationsCard({ personnel: all, range }) {
         coverage={'Location stated on ' + fmtFraction(mc.withLocation, mc.total) + ' of Att C rows.'}
         empty="No location recorded on any Att C row in range."
       >
-        <Bar categories={mcCounts.map((c) => c.location)} values={mcCounts.map((c) => c.count)} valueName="visits" />
+        <Bar categories={mcCounts.map((entry) => entry.location)} values={mcCounts.map((entry) => entry.count)} valueName="visits" />
       </ChartCard>
       <ChartCard
         title="Top MA Clinics"
         coverage={'Location stated on ' + fmtFraction(ma.withLocation, ma.total) + ' of MA rows.'}
         empty="No location recorded on any MA row in range."
       >
-        <Bar categories={maCounts.map((c) => c.location)} values={maCounts.map((c) => c.count)} valueName="visits" />
+        <Bar categories={maCounts.map((entry) => entry.location)} values={maCounts.map((entry) => entry.count)} valueName="visits" />
       </ChartCard>
     </div>
   );
 }
 
-/**
- * The long-term MC panel: peak count and roster of episodes of at least the Thresholds
- * long-MC length.
- * @param {{episodes: Array<!Object>, range: !Object}} props All episodes (a long MC that
- *     started before the range still counts toward its peak), and the range.
- * @returns {!preact.VNode} The card.
- */
-export function LongMcCard({ episodes, range }) {
+/** The long-term MC panel: peak count and roster of episodes of at least the Thresholds long-MC length. */
+export function LongMcCard({ episodes, range }: { episodes: Episode[]; range: CategoryRange }) {
   const longMcDays = settingOf('thresholds').longMcDays;
   const trend = longMcTrend(episodes, range.from, range.to, 'Att C', longMcDays - 1);
   const roster = longMcRoster(episodes, 'Att C', longMcDays - 1);
@@ -102,42 +100,35 @@ export function LongMcCard({ episodes, range }) {
   );
 }
 
-/**
- * The top-10 soldiers for one duty class over the range.
- * @param {{range: !Object, dutyClass: (string|!Array<string>), metric: string}} props The range, the duty
- *     class, and 'count', 'days' or 'status' (a key of LEADERBOARDS).
- * @returns {!preact.VNode} The card.
- */
-export function EpisodeLeaderboard({ range, dutyClass, metric }) {
+/** The top soldiers (Thresholds leaderboard size) for one duty class over the range. */
+export function EpisodeLeaderboard({ range, dutyClass, metric }: { range: CategoryRange; dutyClass: DutyFilter; metric: 'count' | 'days' | 'status' }) {
   const board = LEADERBOARDS[metric];
   return (
-    <Card title={'Top 10 by ' + board.title}>
+    <Card title={`Top ${settingOf('thresholds').leaderboardSize} by ${board.title}`}>
       <Leaderboard rows={board.top(range.episodes, dutyClass)} metric={metric} />
     </Card>
   );
 }
 
 /**
- * The company and platoon rankings, side by side: episodes in range, and the distinct
- * soldiers behind them.
- * @param {{range: !Object, dutyClass: (string|!Array<string>), labels: {count: string,
- *     soldiers: string}}} props The range, the duty class, and the two column headings.
- * @returns {!preact.VNode} The cards.
+ * The company and platoon rankings, side by side: episodes in range, and the distinct soldiers behind them.
  */
-export function UnitRankings({ range, dutyClass, labels }) {
+export function UnitRankings({
+  range,
+  dutyClass,
+  labels,
+}: {
+  range: Pick<CategoryRange, 'episodes'>;
+  dutyClass: DutyFilter;
+  labels: { count: string; soldiers: string };
+}) {
   const companies = rankUnits(range.episodes, dutyClass, 'company');
   const platoons = rankUnits(range.episodes, dutyClass, 'platoon');
   const countColumns = [
-    { key: 'count', label: labels.count, numeric: true, sortable: true, sortValue: (r) => r.countRaw },
-    { key: 'soldiers', label: labels.soldiers, numeric: true, sortable: true, sortValue: (r) => r.soldiersRaw },
+    { key: 'count', label: labels.count, numeric: true, sortable: true, sortValue: (row: UnitRow) => row.raw.count },
+    { key: 'soldiers', label: labels.soldiers, numeric: true, sortable: true, sortValue: (row: UnitRow) => row.raw.soldiers },
   ];
-  const toRow = (row) => ({
-    ...row,
-    count: fmtInt(row.count),
-    countRaw: row.count,
-    soldiers: fmtInt(row.soldiers),
-    soldiersRaw: row.soldiers,
-  });
+  const toRow = (row: UnitRank): UnitRow => ({ ...row, count: fmtInt(row.count), soldiers: fmtInt(row.soldiers), raw: row });
 
   return (
     <div class="grid-2">
@@ -167,14 +158,12 @@ export function UnitRankings({ range, dutyClass, labels }) {
   );
 }
 
-/**
- * Soldier search, and the picked soldier's episodes of this duty class.
- * @param {{index: !Object, episodes: Array<!Object>, dutyClass: (string|!Array<string>)}} props The soldier
- *     index, all episodes, and the duty class to list.
- * @returns {!preact.VNode} The search card, plus the history card once a soldier is picked.
- */
-export function SoldierLookup({ index, episodes, dutyClass }) {
-  const [soldierKey, setSoldierKey] = useState(null);
+/** A unit's formatted counts, keeping the raw ones to sort by. */
+type UnitRow = Omit<UnitRank, 'count' | 'soldiers'> & { count: string; soldiers: string; raw: UnitRank };
+
+/** Soldier search, and the picked soldier's episodes of this duty class. */
+export function SoldierLookup({ index, episodes, dutyClass }: { index: SoldierEntry[]; episodes: Episode[]; dutyClass: DutyFilter }) {
+  const [soldierKey, setSoldierKey] = useState<string | null>(null);
   const rows = soldierKey
     ? episodes
         .filter((episode) => episode.key === soldierKey && isDuty(dutyClass, episode.dutyClass))

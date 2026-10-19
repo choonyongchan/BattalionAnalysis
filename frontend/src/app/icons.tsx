@@ -1,21 +1,12 @@
 /**
- * The shell's icon set.
- *
- * Hand-drawn rather than pulled from a library: eleven nav icons and a handful of controls is not
- * worth a dependency, and drawing them here keeps every one on the same 24-unit grid at
- * the same 1.6 stroke, which is what makes an icon rail look deliberate rather than
- * assembled. All inherit `currentColor`, so the active-link and theme colours reach them
- * without a second definition.
- *
- * Each icon is named for what it points at, in the unit's own words.
+ * The shell's hand-drawn icons, all on one 24-unit grid at a 1.6 stroke (a dozen icons is not worth a
+ * dependency). They inherit `currentColor`, so theme and active-link colours reach them.
  */
 
-/**
- * Wraps a path set in the shared 24-unit stroked frame.
- * @param {{children: *, size?: number}} props The paths, and an optional pixel size.
- * @returns {!preact.VNode} The icon.
- */
-function Glyph({ children, size = 18 }) {
+import type { ComponentChildren } from 'preact';
+
+/** The shared 24-unit stroked frame around an icon's paths. */
+function Glyph({ children, size = 18 }: { children: ComponentChildren; size?: number }) {
   return (
     <svg
       class="navlink__icon"
@@ -34,21 +25,21 @@ function Glyph({ children, size = 18 }) {
   );
 }
 
-/** @returns {!preact.VNode} Bars rising left to right: the battalion at a glance. */
+/** Bars rising left to right: the battalion at a glance. */
 export const OverviewIcon = () => (
   <Glyph>
     <path d="M4 20V13M10 20V7M16 20V10M22 20H2" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A line rising across an axis: the battalion over time. */
+/** A line rising across an axis: the battalion over time. */
 export const TrendsIcon = () => (
   <Glyph>
     <path d="M3 20h18M4 16l5-5 4 3 7-8" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A clipboard with a tick: parade states filed and checked. */
+/** A clipboard with a tick: parade states filed and checked. */
 export const FilingIcon = () => (
   <Glyph>
     <rect x="5" y="4.5" width="14" height="16" rx="2" />
@@ -56,14 +47,14 @@ export const FilingIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A dumbbell: self-regulated fitness training. */
+/** A dumbbell: self-regulated fitness training. */
 export const SftIcon = () => (
   <Glyph>
     <path d="M8 12h8M5 8v8M8 6v12M16 6v12M19 8v8" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A medical cross in a rounded square: reporting sick. */
+/** A medical cross in a rounded square: reporting sick. */
 export const ReportSickIcon = () => (
   <Glyph>
     <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
@@ -71,7 +62,7 @@ export const ReportSickIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A certificate page: MC and medical appointments. */
+/** A certificate page: MC and medical appointments. */
 export const McMaIcon = () => (
   <Glyph>
     <path d="M6 3h8l4 4v14H6z" />
@@ -79,7 +70,7 @@ export const McMaIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A shield with a bar through it: present, with limits. */
+/** A shield with a bar through it: present, with limits. */
 export const StatusIcon = () => (
   <Glyph>
     <path d="M12 3l7 2.6v5.1c0 4.1-2.8 7.5-7 8.9-4.2-1.4-7-4.8-7-8.9V5.6Z" />
@@ -87,7 +78,7 @@ export const StatusIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} One person: the soldier lookup. */
+/** One person: the soldier lookup. */
 export const SoldierIcon = () => (
   <Glyph>
     <circle cx="12" cy="8" r="3.4" />
@@ -95,7 +86,7 @@ export const SoldierIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A command tree: who is on duty. */
+/** A command tree: who is on duty. */
 export const DutyRosterIcon = () => (
   <Glyph>
     <rect x="9" y="2.8" width="6" height="4.4" rx="1.2" />
@@ -105,7 +96,7 @@ export const DutyRosterIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} Sliders: the settings the dashboard reads. */
+/** Sliders: the settings the dashboard reads. */
 export const SettingsIcon = () => (
   <Glyph>
     <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
@@ -114,7 +105,7 @@ export const SettingsIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A closed padlock: end the session. */
+/** A closed padlock: end the session. */
 export const LockIcon = () => (
   <Glyph size={16}>
     <rect x="4.5" y="10.5" width="15" height="10" rx="2.4" />
@@ -122,14 +113,14 @@ export const LockIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A clipboard with lines: a parade state to file or correct. */
+/** A clipboard with lines: a parade state to file or correct. */
 export const DepositIcon = () => (
   <Glyph>
     <path d="M9 4h6v3H9zM9 5.5H6.5A1.5 1.5 0 0 0 5 7v12.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V7a1.5 1.5 0 0 0-1.5-1.5H15M8.5 11.5h7M8.5 15h7M8.5 18.5h4" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A magnifying glass: search. */
+/** A magnifying glass: search. */
 export const SearchIcon = () => (
   <Glyph>
     <circle cx="10.5" cy="10.5" r="6.5" />
@@ -137,21 +128,21 @@ export const SearchIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A cross: clear what was typed. */
+/** A cross: clear what was typed. */
 export const ClearIcon = () => (
   <Glyph>
     <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} Three stacked rules: open the navigation. */
+/** Three stacked rules: open the navigation. */
 export const MenuIcon = () => (
   <Glyph>
     <path d="M4 7h16M4 12h16M4 17h16" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A sun: the light theme. */
+/** A sun: the light theme. */
 export const SunIcon = () => (
   <Glyph size={16}>
     <circle cx="12" cy="12" r="4" />
@@ -159,14 +150,14 @@ export const SunIcon = () => (
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A crescent: the dark theme. */
+/** A crescent: the dark theme. */
 export const MoonIcon = () => (
   <Glyph size={16}>
     <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z" />
   </Glyph>
 );
 
-/** @returns {!preact.VNode} A half-filled circle: follow the machine. */
+/** A half-filled circle: follow the machine. */
 export const SystemThemeIcon = () => (
   <Glyph size={16}>
     <circle cx="12" cy="12" r="8.4" />

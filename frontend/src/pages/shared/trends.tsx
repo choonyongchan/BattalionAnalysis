@@ -2,31 +2,39 @@
  * Trend cards for the category pages: a Battalion/Companies line chart per duty class.
  */
 
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { company } from '../../app/state.ts';
-import { Segmented, SCOPE_OPTIONS } from '../../components/Segmented.tsx';
+import { Segmented, SCOPE_OPTIONS, type Scope } from '../../components/Segmented.tsx';
 import { ChartCard, Line } from '../../charts/index.ts';
-import { COMPANIES } from '../../../../shared/domain.ts';
-import { ALL_COMPANIES } from '../../model/scope.ts';
-import { dutyTrend } from '../../model/strength.ts';
+import { companyIndex, isCompany } from '../../../../shared/domain.ts';
+import { dutyTrend, type GappyTrend } from '../../model/strength.ts';
+import type { DutyFilter } from '../../model/metrics.ts';
+import type { Dataset } from '../../data/feed.ts';
+import type { CategoryRange } from './category.tsx';
 
-/**
- * One trend card: a Battalion/Companies toggle over a Line chart.
- *
- * A real component rather than a helper called as a function, so its `useState` for the
- * scope toggle owns a hook slot of its own. With a single company selected in the page
- * bar the toggle has nothing to switch between, so it is hidden and the chart draws that
- * company's one line in its own colour slot.
- * @param {{title: string, coverage: string, trendFn: function(string, string[]): !Object,
- *     range: !Object, controls?: *, valueName?: string}} props The card's title and
- *     coverage line; `trendFn(scope, dates)` returns `{dates, series}`; the range supplies
- *     the dates and annotations; `controls` is any card-own filter, drawn beside the scope
- *     toggle; `valueName` names the axis unit.
- * @returns {!preact.VNode} The card.
- */
-export function TrendSection({ title, coverage, trendFn, range, controls, valueName = 'soldiers' }) {
-  const scopedCompany = company.value !== ALL_COMPANIES ? company.value : null;
-  const [scope, setScope] = useState('battalion');
+/** The range fields a trend card reads. */
+type TrendRange = Pick<CategoryRange, 'days' | 'weekends' | 'holidays'>;
+
+/** One trend card: a Battalion/Companies toggle over a Line chart. */
+export function TrendSection({
+  title,
+  coverage,
+  trendFn,
+  range,
+  controls,
+  valueName = 'soldiers',
+}: {
+  title: string;
+  coverage: string;
+  /** The series for a scope over the range's days. */
+  trendFn: (scope: Scope, dates: string[]) => GappyTrend;
+  range: TrendRange;
+  controls?: ComponentChildren;
+  valueName?: string;
+}) {
+  const scopedCompany = isCompany(company.value) ? company.value : null;
+  const [scope, setScope] = useState<Scope>('battalion');
   const effectiveScope = scopedCompany ? 'battalion' : scope;
   const trend = trendFn(effectiveScope, range.days);
 
@@ -48,11 +56,7 @@ export function TrendSection({ title, coverage, trendFn, range, controls, valueN
         series={trend.series.map((series) => ({
           ...series,
           name: scopedCompany || series.name,
-          slot: scopedCompany
-            ? COMPANIES.indexOf(scopedCompany)
-            : effectiveScope === 'companies'
-              ? COMPANIES.indexOf(series.name)
-              : undefined,
+          slot: scopedCompany ? companyIndex(scopedCompany) : effectiveScope === 'companies' ? companyIndex(series.name) : undefined,
           neutral: !scopedCompany && effectiveScope === 'battalion',
         }))}
         weekends={range.weekends}
@@ -63,13 +67,8 @@ export function TrendSection({ title, coverage, trendFn, range, controls, valueN
   );
 }
 
-/**
- * The parade-state count trend of one duty class.
- * @param {{title: string, data: !Object, dutyClass: (string|!Array<string>), range: !Object}} props The
- *     card title, the scoped dataset, the duty class, and the range.
- * @returns {!preact.VNode} The card.
- */
-export function DutyTrend({ title, data, dutyClass, range }) {
+/** The parade-state count trend of one duty class. */
+export function DutyTrend({ title, data, dutyClass, range }: { title: string; data: Dataset; dutyClass: DutyFilter; range: TrendRange }) {
   return (
     <TrendSection
       title={title}

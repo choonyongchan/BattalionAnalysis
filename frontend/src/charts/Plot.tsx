@@ -1,30 +1,13 @@
 /**
- * The element a chart is drawn into.
- *
- * Every chart component in this directory renders one of these when it is showing its
- * chart, and its table twin when it is not. Keeping the hook in here rather than in each
- * chart is what lets a chart component switch between the two views with a plain
- * conditional: a component that called `useChart` and then returned a table would be
- * calling a hook conditionally, and Preact would tear on the first toggle. `Plot`
- * unmounting on the way to the table view is also what disposes the ECharts instance, so
- * a card left on Table is not holding a chart open behind it.
- *
- * The container is `role="img"`: what is inside it is a picture, and the table twin — one
- * click away, in the same card — is the equivalent a screen reader gets.
+ * The element a chart is drawn into. Keeping the hook here lets a chart switch to its table twin with a
+ * plain conditional (no conditional hook), and unmounting disposes the ECharts instance. `role="img"`:
+ * the table twin, one click away, is the screen-reader equivalent.
  */
 
-import { useChart } from './useChart.ts';
+import { useChart, type BuildOption } from './useChart.ts';
 
-/**
- * A sized container with a live ECharts instance in it.
- * @param {{build: function(!Object, number): !Object, height: number, label: string}} props
- *     `build` returns the ECharts option, given the palette and the current pixel width;
- *     `height` is the container height in pixels, sized to include the axis band so the
- *     card never grows a nested scrollbar; `label` describes the chart for a screen
- *     reader that will not be shown the marks.
- * @returns {!Object} The container element.
- */
-export function Plot({ build, height, label }) {
+/** A container `height` px tall (axis band included) with a live chart; `label` describes it for screen readers. */
+export function Plot({ build, height, label }: { build: BuildOption; height: number; label: string }) {
   const container = useChart(build);
   return (
     <div

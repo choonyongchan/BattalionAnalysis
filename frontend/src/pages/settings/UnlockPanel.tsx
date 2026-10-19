@@ -9,21 +9,14 @@ import { refresh } from '../../app/auth.ts';
 import { Banner, Card } from '../../components/Card.tsx';
 import { unlockEditing } from '../../data/session.ts';
 
-/**
- * The unlock card.
- * @returns {!preact.VNode} The card.
- */
+/** The unlock card. */
 export function UnlockPanel() {
   const [typed, setTyped] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  /**
-   * Sends the typed password and clears the field either way.
-   * @param {!Event} event The submit event.
-   * @returns {!Promise<void>} Resolves when done.
-   */
-  async function onSubmit(event) {
+  /** Sends the typed password and clears the field either way. */
+  async function onSubmit(event: Event) {
     event.preventDefault();
     const value = typed;
     setTyped('');
@@ -33,7 +26,7 @@ export function UnlockPanel() {
       await unlockEditing(value);
       await refresh();
     } catch (failure) {
-      setError(failure.message);
+      setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
       setBusy(false);
     }

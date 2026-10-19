@@ -16,26 +16,25 @@ import { DataTable } from '../components/Table.tsx';
 import { fmtDate } from '../format.ts';
 import { DUTY_CLASS } from '../model/classify.ts';
 import { withinRange } from '../model/dateRange.ts';
-import { sftAgainstStatus, toSftRecords } from '../model/sft.ts';
+import { sftAgainstStatus, toSftSessions } from '../model/sft.ts';
 import { activeWithin } from '../model/episodes.ts';
 import { bucketsFor } from '../model/statusBuckets.ts';
-import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.tsx';
+import { CategoryPage, EpisodeTiles, useCategory, type CategoryRange } from './shared/category.tsx';
+import type { Dataset } from '../data/feed.ts';
 import { DutyTrend } from './shared/trends.tsx';
 import { EpisodeLeaderboard, SoldierLookup, UnitRankings } from './shared/rankings.tsx';
 import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.tsx';
 
-/** @type {string} The duty class this page is about. */
+/** The duty class this page is about. */
 const DUTY = DUTY_CLASS.STATUS;
 
 /**
- * SFT sessions logged on a day the soldier held a training restriction, for a commander to
- * check: some may be allowed (gym under Excuse RMJ), some are a safety question.
- * @param {{data: !Object, range: !Object}} props The scoped dataset and the range.
- * @returns {!preact.VNode} The card.
+ * SFT sessions logged on a day the soldier held a training restriction, for a commander to check: some may be
+ * allowed (gym under Excuse RMJ), some are a safety question.
  */
-function SftStatusCard({ data, range }) {
+function SftStatusCard({ data, range }: { data: Dataset; range: CategoryRange }) {
   const records = useMemo(
-    () => toSftRecords(data.sft).filter((record) => withinRange(record.date, range.from, range.to)),
+    () => toSftSessions(data.sft).filter((record) => withinRange(record.date, range.from, range.to)),
     [data.sft, range.from, range.to]
   );
   const lines = useMemo(() => sftAgainstStatus(records, data.personnel), [records, data.personnel]);
@@ -63,10 +62,7 @@ function SftStatusCard({ data, range }) {
   );
 }
 
-/**
- * The Status page.
- * @returns {!preact.VNode} The page.
- */
+/** The Status page. */
 export function Status() {
   const { data, episodes, index, range } = useCategory();
   const inForce = useMemo(
@@ -87,9 +83,9 @@ export function Status() {
       <DutyTrend title="Status Trend" data={data} dutyClass={DUTY} range={range} />
       <PlatoonHeatmap cells={episodeCells(inForce.episodes, DUTY)} />
       <ReasonsOverTime
-        rows={episodes.filter((e) => e.dutyClass === DUTY)}
-        dateOf={(e) => e.startDate}
-        labelsOf={(e) => e.reasons.flatMap(bucketsFor)}
+        rows={episodes.filter((episode) => episode.dutyClass === DUTY)}
+        dateOf={(episode) => episode.startDate}
+        labelsOf={(episode) => episode.reasons.flatMap(bucketsFor)}
         range={range}
       />
       <SftStatusCard data={data} range={range} />

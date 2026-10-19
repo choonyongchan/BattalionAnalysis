@@ -10,15 +10,28 @@ import { Plot } from './Plot.tsx';
 import { TableTwin } from './TableTwin.tsx';
 import { fmtInt } from '../format.ts';
 import { tooltipLines } from './tooltip.ts';
-import { baseOption, gridOption, seriesColor, valueAxisOption } from './theme.ts';
+import { baseOption, gridOption, seriesColor, valueAxisOption, type ChartOption, type Palette } from './theme.ts';
+import type { ChartViewProps } from './ChartCard.tsx';
 
-/**
- * Builds the ECharts option.
- * @param {!Object} props The component's props.
- * @param {!Object} palette A palette from `readPalette`.
- * @returns {!Object} The option.
- */
-function option_(props, palette) {
+/** One dot: its two counts, its name, its group (a company) and the group's colour slot. */
+export interface ScatterPoint {
+  x: number;
+  y: number;
+  label: string;
+  group: string;
+  slot: number;
+}
+
+/** A scatter plot's props. */
+export interface ScatterProps extends ChartViewProps {
+  points: ScatterPoint[];
+  xName: string;
+  yName: string;
+  height?: number;
+}
+
+/** The ECharts option. */
+function option(props: ScatterProps, palette: Palette): ChartOption {
   const { points, xName, yName } = props;
   const base = baseOption(palette);
   return {
@@ -27,7 +40,7 @@ function option_(props, palette) {
     tooltip: {
       ...base.tooltip,
       trigger: 'item',
-      formatter: (params) => {
+      formatter: (params: { data: { point: ScatterPoint } }) => {
         const point = params.data.point;
         return tooltipLines(
           point.label,
@@ -52,15 +65,8 @@ function option_(props, palette) {
   };
 }
 
-/**
- * A scatter plot of two counts.
- * @param {{points: Array<{x: number, y: number, label: string, group: string, slot: number}>,
- *     xName: string, yName: string, height: (number|undefined), view: (string|undefined)}}
- *     props One point per thing: its two counts, its name, its group (a company) and the
- *     group's colour slot; the axis names; `view` is set by `ChartCard`.
- * @returns {!Object} The chart, or its table twin.
- */
-export function Scatter(props) {
+/** A scatter plot of two counts, or its table twin. */
+export function Scatter(props: ScatterProps) {
   const { points, xName, yName, height = 340, view } = props;
   if (view === 'table') {
     return (
@@ -75,14 +81,10 @@ export function Scatter(props) {
     <Plot
       height={height}
       label={points.length + ' dots, ' + xName + ' across and ' + yName + ' up. Switch to Table for the values.'}
-      build={(palette) => option_(props, palette)}
+      build={(palette) => option(props, palette)}
     />
   );
 }
 
-/**
- * Whether there is anything to draw.
- * @param {!Object} props The component's props.
- * @returns {boolean} True when the chart has nothing to show.
- */
-Scatter.isEmpty = (props) => !props.points || props.points.length === 0;
+/** Whether there is nothing to draw. */
+Scatter.isEmpty = (props: ScatterProps) => props.points.length === 0;

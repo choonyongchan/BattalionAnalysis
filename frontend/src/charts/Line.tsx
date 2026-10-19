@@ -1,66 +1,57 @@
 /**
- * A trend over parade days, one line per company.
- *
- * The one thing this chart does differently from the implementation it replaces:
- * **`connectNulls` is false.** The previous implementation set it true and defended the
- * choice in a comment — a gapped line "reads as the rate having dropped to nothing". That defence is
- * wrong in this dataset. Only five of forty-five parade days carry all six companies, so
- * the holes are not rare accidents to be smoothed over; they are most of the picture. A
- * line drawn straight across a day nobody filed asserts a reading that was never taken,
- * and it asserts it in the same ink as the readings that were. The gap is the honest mark,
- * and the reader learns to see an unfiled day as a break in the line.
- *
- * Two annotation kinds ride on a carrier series rather than on the first data series, so
- * they survive a reader switching that company off in the legend: weekend bands behind the
- * plot in `--weekend-band`, and a vertical rule per public holiday in `--holiday-line`
- * carrying the holiday's name. A dip on a Saturday is a battalion that was not in camp,
- * not a battalion that got better, and without the band behind it the chart says the
- * second thing.
+ * A trend over parade days, one line per company. `connectNulls` is false: most days lack a company, and
+ * a line drawn across a day nobody filed asserts a reading never taken. Weekend bands and holiday rules
+ * ride on a carrier series, so switching a company off in the legend never hides them.
  */
 
 import { Plot } from './Plot.tsx';
 import { TableTwin } from './TableTwin.tsx';
 import { fmtDate, fmtDayMonth, fmtInt } from '../format.ts';
 import { tooltipNode } from './tooltip.ts';
-import { axisOption, baseOption, legendOption, seriesColor, valueAxisOption } from './theme.ts';
-
-/** @type {number} Above this many points the symbols merge into a smear and come off. */
-const SYMBOL_LIMIT = 45;
+import { axisOption, baseOption, legendOption, seriesColor, valueAxisOption, type ChartOption, type Palette } from './theme.ts';
+import type { ChartViewProps } from './ChartCard.tsx';
+import type { Band } from '../model/calendarMarks.ts';
+import type { Holiday } from '../../../shared/settings/defaults.ts';
 
 /**
- * Narrows an annotation's date span to the categories actually on the axis.
- *
- * A weekend band or a holiday can only be drawn where the axis has a column for it. An
- * axis of parade days only has no Saturday to hang a band on, so rather than misplacing
- * the band at a neighbouring date the annotation is dropped.
- * @param {string} fromIso Inclusive start.
- * @param {string} toIso Inclusive end.
- * @param {string[]} categories The axis values, ascending.
- * @returns {?{from: string, to: string}} The clipped span, or null when nothing overlaps.
+ * One line; a null value is a day not filed (a gap). `slot` fixes a company's colour, `neutral` draws a
+ * battalion total in muted ink, `accent` a non-company series beside it.
  */
-function clipToAxis_(fromIso, toIso, categories) {
+export interface LineSeries {
+  name: string;
+  values: (number | null)[];
+  slot?: number;
+  neutral?: boolean;
+  accent?: boolean;
+}
+
+/** A trend's props; `categories` are ascending ISO dates, and annotations off the axis are dropped. */
+export interface LineProps extends ChartViewProps {
+  categories: string[];
+  series: LineSeries[];
+  valueName?: string;
+  weekends?: Band[];
+  holidays?: Holiday[];
+  height?: number;
+}
+
+/** What an axis tooltip receives per series. */
+type AxisPoint = { seriesName: string; axisValue: string; value: number | null | undefined; color: string };
+
+/** Above this many points the symbols merge into a smear and come off. */
+const SYMBOL_LIMIT = 45;
+
+/** An annotation span clipped to the axis, or null where the axis has no column for it (never misplaced). */
+function clipToAxis(fromIso: string, toIso: string, categories: string[]): Band | null {
   const from = categories.find((value) => value >= fromIso);
   const to = categories.filter((value) => value <= toIso).pop();
   return from !== undefined && to !== undefined && from <= to ? { from, to } : null;
 }
 
-/**
- * The carrier series holding the weekend bands and holiday rules.
- *
- * An empty `line` series: it draws nothing itself, is absent from the legend, and cannot
- * be switched off — which is the point, since the annotations explain the data series and
- * should not vanish with whichever one happened to be carrying them.
- * @param {!Object} palette A palette from `readPalette`.
- * @param {Array<{from: string, to: string}>} weekends Weekend bands, as from
- *     `model/calendarMarks.js`'s `weekendBands`.
- * @param {Array<{date: string, name: string}>} holidays Public holidays, as from
- *     `holidaysIn`.
- * @param {string[]} categories The axis values.
- * @returns {!Object} An ECharts series.
- */
-function annotationSeries_(palette, weekends, holidays, categories) {
+/** The empty carrier series holding weekend bands and holiday rules, kept out of the legend. */
+function annotationSeries(palette: Palette, weekends: Band[], holidays: Holiday[], categories: string[]): ChartOption {
   const bands = weekends
-    .map((band) => clipToAxis_(band.from, band.to, categories))
+    .map((band) => clipToAxis(band.from, band.to, categories))
     .filter((band) => band !== null);
   const rules = holidays.filter((holiday) => categories.includes(holiday.date));
 
@@ -74,8 +65,7 @@ function annotationSeries_(palette, weekends, holidays, categories) {
       silent: true,
       itemStyle: { color: palette.weekendBand },
       data: bands.map((band, index) => [
-        // Labelled once, on the leftmost band. Repeating "Weekend" down a term's worth of
-        // Saturdays is ink that says the same thing eight times.
+        // Labelled once, on the leftmost band.
         {
           xAxis: band.from,
           name: 'Weekend',
@@ -94,30 +84,24 @@ function annotationSeries_(palette, weekends, holidays, categories) {
       symbol: 'none',
       lineStyle: { color: palette.holidayLine, width: 1, type: 'solid' },
       label: {
-        // Turned along the rule deliberately: a horizontal holiday name would overlap its
-        // neighbour on any range holding two holidays in the same week.
+        // Along the rule, so two holidays in one week do not overlap.
         rotate: 90,
         position: 'insideEndTop',
         distance: 4,
         color: palette.inkMuted,
         fontSize: 10,
-        formatter: (params) => params.name,
+        formatter: (params: { name: string }) => params.name,
       },
       data: rules.map((holiday) => ({ xAxis: holiday.date, name: holiday.name })),
     },
   };
 }
 
-/** @type {string} The carrier series' name, kept out of the legend. */
+/** The carrier series' name, kept out of the legend. */
 const ANNOTATION_SERIES = '__annotations';
 
-/**
- * Builds the ECharts option.
- * @param {!Object} props The component's props.
- * @param {!Object} palette A palette from `readPalette`.
- * @returns {!Object} The option.
- */
-function option_(props, palette) {
+/** The ECharts option. */
+function option(props: LineProps, palette: Palette): ChartOption {
   const { categories, series, valueName, weekends = [], holidays = [] } = props;
   const base = baseOption(palette);
   // Several coloured lines are named where they end, so nobody matches colours to a legend.
@@ -129,16 +113,16 @@ function option_(props, palette) {
     grid: { ...base.grid, top: 36, right: labelEnds ? 72 : base.grid.right },
     legend: legendOption(
       palette,
-      series.map((entry) => entry.name)
+      series.map((entry) => entry.name),
     ),
     tooltip: {
       ...base.tooltip,
       trigger: 'axis',
       axisPointer: { type: 'line', lineStyle: { color: palette.hairline } },
-      formatter: (params) => {
+      formatter: (params: AxisPoint[]) => {
         const points = params.filter((point) => point.seriesName !== ANNOTATION_SERIES);
         return tooltipNode(
-          points.length ? fmtDate(points[0].axisValue) : null,
+          points[0] ? fmtDate(points[0].axisValue) : '',
           points.map((point) => ({
             label: point.seriesName,
             value: point.value === null || point.value === undefined ? 'no filing' : fmtInt(point.value),
@@ -149,10 +133,7 @@ function option_(props, palette) {
         );
       },
     },
-    // `boundaryGap: false` puts the first and last points hard against the plot edges, and
-    // their labels are centred on them — so half of each hangs outside the SVG. Anchoring
-    // the two end labels inward is what keeps the date range readable, and is carried
-    // forward from the previous implementation.
+    // The end labels sit on the plot edges, so they are anchored inward to stay whole.
     xAxis: axisOption(palette, {
       type: 'category',
       data: categories,
@@ -169,7 +150,7 @@ function option_(props, palette) {
     }),
     yAxis: valueAxisOption(palette, valueName, true),
     series: [
-      annotationSeries_(palette, weekends, holidays, categories),
+      annotationSeries(palette, weekends, holidays, categories),
       ...series.map((entry, index) => {
         const color = entry.neutral
           ? palette.inkMuted
@@ -183,8 +164,7 @@ function option_(props, palette) {
           smooth: false,
           symbol: 'circle',
           symbolSize: 8,
-          // Below the limit each reading is a mark a reader can hover and count; above it
-          // the marks touch and the line becomes a caterpillar.
+          // Marks a reader can hover, until they touch.
           showSymbol: categories.length <= SYMBOL_LIMIT,
           // A 2px surface ring, so a marker stays legible where two series cross.
           itemStyle: { color, borderColor: palette.surface, borderWidth: 2 },
@@ -198,27 +178,8 @@ function option_(props, palette) {
   };
 }
 
-/**
- * A multi-series time series with weekend and holiday annotations.
- * @param {{categories: string[],
- *     series: Array<{name: string, values: Array<?number>, slot: (number|undefined),
- *         neutral: (boolean|undefined), accent: (boolean|undefined)}>,
- *     valueName: (string|undefined),
- *     weekends: (Array<{from: string, to: string}>|undefined),
- *     holidays: (Array<{date: string, name: string}>|undefined),
- *     height: (number|undefined),
- *     view: (string|undefined)}} props
- *     `categories` are the axis values, ascending, normally ISO dates; a `series` value of
- *     `null` is a day that company did not file and is drawn as a gap; `slot` fixes the
- *     colour to a company's identity (pass `COMPANIES.indexOf(name)`) so a filter never
- *     repaints the survivors; `neutral` draws the series in muted ink, for a battalion
- *     total or a baseline that is not one of the six; `accent` draws a non-company series
- *     in the accent colour, beside a neutral one; `weekends` and `holidays` take the
- *     shapes `model/calendarMarks.js` returns and are silently dropped where the axis has
- *     no column for them; `view` is set by `ChartCard`.
- * @returns {!Object} The chart, or its table twin.
- */
-export function Line(props) {
+/** A multi-series trend with weekend and holiday annotations, or its table twin. */
+export function Line(props: LineProps) {
   const { categories, series, valueName, height = 300, view } = props;
   if (view === 'table') {
     return (
@@ -238,32 +199,12 @@ export function Line(props) {
   return (
     <Plot
       height={height}
-      label={
-        (valueName || 'Trend') +
-        ' over ' +
-        categories.length +
-        ' days, ' +
-        series.length +
-        ' series. Switch to Table for the values.'
-      }
-      build={(palette) => option_(props, palette)}
+      label={`${valueName || 'Trend'} over ${categories.length} days, ${series.length} series. Switch to Table for the values.`}
+      build={(palette) => option(props, palette)}
     />
   );
 }
 
-/**
- * Whether there is anything to draw.
- *
- * A series of all nulls is not data: it is a company that filed nothing in the window, and
- * six of those is an empty chart with six legend entries on it.
- * @param {!Object} props The component's props.
- * @returns {boolean} True when the chart has nothing to show.
- */
-Line.isEmpty = (props) =>
-  !props.categories ||
-  props.categories.length === 0 ||
-  !props.series ||
-  props.series.length === 0 ||
-  props.series.every((entry) =>
-    (entry.values || []).every((value) => value === null || value === undefined)
-  );
+/** Whether there is nothing to draw; series of all nulls (companies that filed nothing) are not data. */
+Line.isEmpty = (props: LineProps) =>
+  props.categories.length === 0 || props.series.every((entry) => entry.values.every((value) => value === null));

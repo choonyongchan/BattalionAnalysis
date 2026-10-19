@@ -1,60 +1,47 @@
-/**
- * A ranked table of soldiers, the shape every leaderboard in the dashboard shares.
- */
+/** A ranked table of soldiers, the shape every leaderboard shares. */
 
-import { DataTable } from './Table.tsx';
+import { DataTable, type Column } from './Table.tsx';
 import { fmtInt, fmtDecimal } from '../format.ts';
+import type { RankedSoldier } from '../model/leaderboards.ts';
 
-/**
- * Marks a platoon cell as inferred, in the same hatch the heatmap uses for the same fact.
- * @param {string} platoon The platoon label.
- * @param {boolean} inferred Whether it was worked out from the 4D rather than stated.
- * @returns {!preact.VNode} The cell contents.
- */
-function PlatoonCell({ platoon, inferred }) {
-  return <span class={inferred ? 'inferred' : ''}>{platoon}</span>;
-}
+/** A leaderboard row: a ranked soldier, with day or status counts when the metric has them. */
+export type LeaderboardRow = RankedSoldier & { days?: number; meanDays?: number; temporary?: number; permanent?: number };
 
-/**
- * Renders a leaderboard of `topByCount` / `topByDays` / `topByStatusCount` rows.
- * @param {{rows: Array<!Object>, metric: string}} props `rows` from `leaderboards.js`;
- *     `metric` is 'count' (a plain count column), 'days' (count + days + mean days), or
- *     'status' (temporary/permanent split).
- * @returns {!preact.VNode} The table.
- */
-export function Leaderboard({ rows, metric }) {
-  const base = [
+/** The columns after name, company and platoon, per metric. */
+const METRIC_COLUMNS: Record<'count' | 'days' | 'status', Column<object>[]> = {
+  count: [{ key: 'count', label: 'Count', numeric: true }],
+  days: [
+    { key: 'count', label: '# MC', numeric: true },
+    { key: 'days', label: 'Days away', numeric: true },
+    { key: 'meanDays', label: 'Mean days', numeric: true },
+  ],
+  status: [
+    { key: 'temporary', label: 'Temporary', numeric: true },
+    { key: 'permanent', label: 'Permanent', numeric: true },
+    { key: 'count', label: 'Total', numeric: true },
+  ],
+};
+
+/** `leaderboards.ts` rows as a table; an inferred platoon wears the same hatch as on the heatmap. */
+export function Leaderboard({ rows, metric }: { rows: LeaderboardRow[]; metric: 'count' | 'days' | 'status' }) {
+  const columns: Column<object>[] = [
     { key: 'rank', label: '#', numeric: true },
     { key: 'name', label: 'Name' },
     { key: 'company', label: 'Company' },
     { key: 'platoon', label: 'Platoon' },
+    ...METRIC_COLUMNS[metric],
   ];
-
-  const metricColumns =
-    metric === 'days'
-      ? [
-          { key: 'count', label: '# MC', numeric: true },
-          { key: 'days', label: 'Days away', numeric: true },
-          { key: 'meanDays', label: 'Mean days', numeric: true },
-        ]
-      : metric === 'status'
-        ? [
-            { key: 'temporary', label: 'Temporary', numeric: true },
-            { key: 'permanent', label: 'Permanent', numeric: true },
-            { key: 'count', label: 'Total', numeric: true },
-          ]
-        : [{ key: 'count', label: 'Count', numeric: true }];
-
   const displayRows = rows.map((row, index) => ({
-    ...row,
+    key: row.key,
     rank: index + 1,
-    platoon: <PlatoonCell platoon={row.platoon} inferred={row.platoonInferred} />,
+    name: row.name,
+    company: row.company,
+    platoon: <span class={row.platoonInferred ? 'inferred' : ''}>{row.platoon}</span>,
     count: fmtInt(row.count),
     days: fmtInt(row.days),
     meanDays: fmtDecimal(row.meanDays),
     temporary: fmtInt(row.temporary),
     permanent: fmtInt(row.permanent),
   }));
-
-  return <DataTable columns={base.concat(metricColumns)} rows={displayRows} rowKey={(row) => row.key} />;
+  return <DataTable columns={columns} rows={displayRows} rowKey={(row) => row.key} />;
 }

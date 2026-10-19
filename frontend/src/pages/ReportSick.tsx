@@ -24,29 +24,29 @@ import {
   submissionCounts,
   submissionTrend,
   topSubmitters,
+  type Submission,
 } from '../model/formsg.ts';
+import type { Episode } from '../model/episodes.ts';
+import type { StrengthRow } from '../../../shared/dashboard.ts';
+import type { Option } from '../components/Segmented.tsx';
 import { episodeCounts } from '../model/metrics.ts';
 import { CLUSTER_CASES, CLUSTER_DAYS, clinicalBucketOf, infectiousByPlatoon, reasonKeywords } from '../model/symptoms.ts';
 import { platoonOf } from '../model/platoon.ts';
 import { WEEKDAY_NAMES } from '../../../shared/dates.ts';
 import { withinRange } from '../model/dateRange.ts';
-import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.tsx';
+import { CategoryPage, EpisodeTiles, useCategory, type CategoryRange } from './shared/category.tsx';
 import { DutyTrend, TrendSection } from './shared/trends.tsx';
 import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.tsx';
 import { SoldierLookup, UnitRankings } from './shared/rankings.tsx';
 
-/** @type {string} The duty class this page is about. */
+/** The duty class this page is about. */
 const DUTY = DUTY_CLASS.REPORT_SICK;
 
-/**
- * The FormSG leaderboard: who reports sick most through the form.
- * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
- * @returns {!preact.VNode} The card.
- */
-function ReportedSickTop({ submissions }) {
-  const top = topSubmitters(submissions, 10);
+/** The FormSG leaderboard: who reports sick most through the form. */
+function ReportedSickTop({ submissions }: { submissions: Submission[] }) {
+  const top = topSubmitters(submissions);
   return (
-    <Card title="Top 10 by Reported Sick (FormSG)">
+    <Card title={`Top ${top.length} by Reported Sick (FormSG)`}>
       <DataTable
         columns={[
           { key: 'rank', label: '#', numeric: true },
@@ -61,15 +61,8 @@ function ReportedSickTop({ submissions }) {
   );
 }
 
-/**
- * The words soldiers use most in the form's free-text reason, as a ranked bar.
- *
- * A bar rather than the word cloud it replaces: a cloud's font size cannot be read as a
- * number, and its layout puts the eye on long words rather than frequent ones.
- * @param {{submissions: Array<!Object>}} props FormSG submissions already restricted to the range.
- * @returns {!preact.VNode} The card.
- */
-function ReasonWords({ submissions }) {
+/** The words soldiers use most in the form's free-text reason, as a ranked bar. */
+function ReasonWords({ submissions }: { submissions: Submission[] }) {
   const words = reasonKeywords(submissions, 12);
   return (
     <ChartCard
@@ -77,30 +70,21 @@ function ReasonWords({ submissions }) {
       coverage="The 12 commonest words in the free-text reason, after common words are dropped."
       empty="No free-text reasons recorded in range."
     >
-      <Bar categories={words.map((w) => w.word)} values={words.map((w) => w.count)} valueName="submissions" />
+      <Bar categories={words.map((entry) => entry.word)} values={words.map((entry) => entry.count)} valueName="submissions" />
     </ChartCard>
   );
 }
 
-/** @type {string} The type filter's "no filter" option. */
+/** The type filter's "no filter" option. */
 const ALL_TYPES = 'ALL';
 
-/** @type {Array<{name: string, label: string}>} The type filter's options, "All" first. */
-const TYPE_OPTIONS = [{ name: ALL_TYPES, label: 'All' }, ...REPORT_SICK_TYPES];
+/** The type filter's options, "All" first. */
+const TYPE_OPTIONS: Option[] = [{ name: ALL_TYPES, label: 'All' }, ...REPORT_SICK_TYPES];
 
-/**
- * The FormSG trend, with a filter for the form's report-sick type.
- *
- * A component of its own so the filter's `useState` has its own hook slot. The filter
- * narrows only this chart; the tiles, heatmap and rankings still count every submission.
- * @param {{submissions: Array<!Object>, strength: Array<!Object>, range: !Object}} props
- *     Every FormSG submission in scope, Strength Data, and the range.
- * @returns {!preact.VNode} The trend card.
- */
-function FormSgTrend({ submissions, strength, range }) {
+/** The FormSG trend, with a filter for the form's report-sick type. */
+function FormSgTrend({ submissions, strength, range }: { submissions: Submission[]; strength: StrengthRow[]; range: CategoryRange }) {
   const [type, setType] = useState(ALL_TYPES);
-  const shown =
-    type === ALL_TYPES ? submissions : submissions.filter((s) => reportSickTypeOf(s) === type);
+  const shown = type === ALL_TYPES ? submissions : submissions.filter((submission) => reportSickTypeOf(submission) === type);
 
   return (
     <TrendSection
@@ -115,21 +99,18 @@ function FormSgTrend({ submissions, strength, range }) {
   );
 }
 
-/** @type {string[]} The punch card's columns, midnight to 23:00. */
+/** The punch card's columns, midnight to 23:00. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
 
-/** @type {number} Days the outbreak watch looks back from the end of the range. */
+/** Days the outbreak watch looks back from the end of the range. */
 const WATCH_DAYS = 14;
 
 /**
- * Infectious-sounding cases per platoon over the last two weeks of the range, with any
- * platoon where they cluster named above the grid: an early warning for the MO.
- * @param {{episodes: Array<!Object>, to: string}} props All episodes, and the range's end.
- * @returns {!preact.VNode} The card.
+ * Infectious-sounding cases per platoon over the last two weeks of the range, with any platoon where they
+ * cluster named above the grid: an early warning for the MO.
  */
-function OutbreakCard({ episodes, to }) {
-  const platoon = (episode) =>
-    platoonOf({ company: episode.company, platoon: episode.platoon, fourD: episode.fourD }).platoon;
+function OutbreakCard({ episodes, to }: { episodes: Episode[]; to: string }) {
+  const platoon = (episode: Episode) => platoonOf(episode).platoon;
   const watch = infectiousByPlatoon(episodes, to, WATCH_DAYS, platoon);
   const note =
     watch.clusters.length > 0
@@ -156,18 +137,10 @@ function OutbreakCard({ episodes, to }) {
   );
 }
 
-/**
- * The Report Sick page.
- *
- * Every panel carries both sources of the same event: the parade state ("Reporting
- * Sick") and FormSG ("Reported Sick"). Each source's tiles count soldiers rather than
- * events, and the second tile row ends with the absolute gap between the two event counts,
- * because a reader comparing the channels needs that gap on screen.
- * @returns {!preact.VNode} The page.
- */
+/** The Report Sick page. */
 export function ReportSick() {
   const { data, episodes, submissions, index, range } = useCategory();
-  const ranged = submissions.filter((s) => withinRange(s.date, range.from, range.to));
+  const ranged = submissions.filter((submission) => withinRange(submission.date, range.from, range.to));
   const formSg = submissionCounts(ranged).total;
   const paradeEpisodes = episodeCounts(range.episodes, DUTY).total.episodes;
 
@@ -200,8 +173,8 @@ export function ReportSick() {
       <ReasonsOverTime
         title="Top Report Sick Categories over time"
         rows={submissions}
-        dateOf={(s) => s.date}
-        labelsOf={(s) => [clinicalBucketOf(s.symptomAnswer)]}
+        dateOf={(submission) => submission.date}
+        labelsOf={(submission) => [clinicalBucketOf(submission.symptomAnswer)]}
         range={range}
       />
       <div class="grid-2">

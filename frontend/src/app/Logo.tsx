@@ -1,27 +1,14 @@
 /**
- * The dashboard's mark: the unit crest, or whatever the Unit settings replace it with.
- *
- * The bundled crest is the default — a raster asset, not `currentColor`, since it carries
- * its own heraldic colours (gold, red, the fist-and-rifles device) that would be lost if
- * flattened to one theme-ink colour. The source crest shipped
- * on a solid black square; it was flood-filled to transparency and cropped to the crest's
- * bounding box, so the same asset sits cleanly on both the light and dark sidebar
- * background. The Unit settings may replace it with a different logo; `title` defaults to
- * the unit name. Before login no settings are loaded, so the login screen shows the
- * bundled crest.
+ * The unit crest (a raster with its own heraldic colours, made transparent for both themes), or the logo
+ * the Unit settings set. Before login no settings are loaded, so the login screen shows the crest.
  */
 
 import logoUrl from '../assets/40SARlogo.png';
 import { dataset } from './state.ts';
 import { unitSettings } from '../data/settings.ts';
 
-/**
- * Renders the brand mark.
- * @param {{size?: number, title?: string}} props Pixel height (the crest is portrait,
- *     ~0.83:1, so width follows automatically), and an accessible name.
- * @returns {!preact.VNode} The mark.
- */
-export function Logo({ size = 28, title }) {
+/** The brand mark at a pixel height (width follows), named by `title` or the unit name. */
+export function Logo({ size = 28, title }: { size?: number; title?: string }) {
   // Read so the mark re-renders when a refresh brings new settings.
   void dataset.value;
   const unit = unitSettings();

@@ -20,16 +20,10 @@ import { trackPage } from '../app/telemetry.ts';
 import { loadError, status } from '../app/state.ts';
 import { LoadingProgress } from '../components/LoadingProgress.tsx';
 
-/** @type {number} The wait the bar is paced against, in seconds. */
+/** The wait the bar is paced against, in seconds. */
 const EXPECTED_SECONDS = 5;
 
-/**
- * What the screen says while it waits, and from which second.
- *
- * These are descriptions of the one request in flight, timed to how it usually unfolds —
- * not observations of where the server has got to, which nothing on this side can see.
- * @type {!Array<{at: number, label: string}>}
- */
+/** What the screen says while it waits, and from which second. */
 const STAGES = [
   { at: 0, label: 'Sending the password' },
   { at: 1, label: 'Reading parade states and report-sick submissions' },
@@ -37,30 +31,21 @@ const STAGES = [
   { at: 12, label: 'Nothing has gone wrong — the database is just slow to wake' },
 ];
 
-/**
- * Renders the login screen.
- * @returns {!preact.VNode} The screen.
- */
+/** Renders the login screen. */
 export function Login() {
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState('');
   const busy = status.value === 'loading';
 
   useEffect(() => trackPage('/login'), []);
 
-  /**
-   * Sends the typed password and clears the field either way.
-   * @param {!Event} event The submit event.
-   * @returns {void}
-   */
-  function onSubmit(event) {
+  /** Sends the typed password and clears the field either way. */
+  function onSubmit(event: Event) {
     event.preventDefault();
     const value = typed;
     setTyped('');
-    unlock(value).then((ok) => {
-      if (!ok && inputRef.current) {
-        inputRef.current.focus();
-      }
+    void unlock(value).then((ok) => {
+      if (!ok) inputRef.current?.focus();
     });
   }
 

@@ -1,11 +1,9 @@
 /**
- * The frame every page renders inside.
- *
- * It owns four things and no data: whether the narrow-screen rail is open, the page
- * heading, the skip link, and the background refresh that keeps an open page current. Pages receive nothing from it — they read `state.js`
- * directly — so a page can be opened, read and tested without the frame around it.
+ * The frame every page renders in. It owns the narrow-screen rail, the heading, the skip link and the
+ * background refresh; pages read `state.ts` directly, so each can be rendered without it.
  */
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { useLocation } from 'wouter-preact';
 import { Sidebar } from './Sidebar.tsx';
@@ -17,12 +15,8 @@ import { trackPage } from './telemetry.ts';
 import { dataset } from './state.ts';
 import { unitSettings } from '../data/settings.ts';
 
-/**
- * Renders the sidebar, the top bar shown on narrow screens, and the content column.
- * @param {{children: *}} props The open page.
- * @returns {!preact.VNode} The shell.
- */
-export function Shell({ children }) {
+/** The sidebar, the narrow-screen top bar and the content column. */
+export function Shell({ children }: { children: ComponentChildren }) {
   const [location] = useLocation();
   const [railOpen, setRailOpen] = useState(false);
   const route = routeAt(location);

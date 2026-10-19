@@ -1,15 +1,11 @@
 /**
- * A calendar button that opens the quick ranges and a two-click month grid.
- *
- * Closed, the bar shows one button naming the committed range; the quick ranges ("This
- * week", "Last month", …) appear only in the popover, beside the month grid, so the bar
- * stays one control wide. Hand-rolled rather than a dependency — a date-range picker is a
- * small, well-understood control, and a library earns its weight only when the control is
- * not. The state that changes on every click (which month is shown, the half-made
- * selection) stays local; only the committed range is reported to the caller.
+ * A calendar button opening quick ranges and a two-click month grid (hand-rolled: a small, well-understood
+ * control). Click-by-click state stays local; only the committed range is reported.
  */
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
+import { useOutsideClick } from './useOutsideClick.ts';
+import type { DateRange } from '../model/dateRange.ts';
 import {
   addMonths,
   daysOfMonth,
@@ -22,35 +18,39 @@ import {
 import { weekdayOf } from '../../../shared/dates.ts';
 import { fmtDate } from '../format.ts';
 
-/** @type {string[]} Month names for the popover header. */
+/** Month names for the popover header. */
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** @type {string[]} Two-letter weekday headers, Monday first. */
+/** Two-letter weekday headers, Monday first. */
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-/**
- * The human label for a first-of-month ISO date, e.g. 'June 2026'.
- * @param {string} isoFirst ISO 'yyyy-MM-01'.
- * @returns {string} The label.
- */
-function monthLabel(isoFirst) {
-  const [year, month] = isoFirst.split('-').map(Number);
-  return MONTHS[month - 1] + ' ' + year;
+/** A first-of-month date as 'June 2026'. */
+function monthLabel(isoFirst: string): string {
+  const [year = 0, month = 1] = isoFirst.split('-').map(Number);
+  return `${MONTHS[month - 1]} ${year}`;
 }
 
-/**
- * The month grid inside the popover.
- * @param {{shownMonth: string, min: string, max: string, from: ?string, to: ?string,
- *     onPick: function(string): void}} props The month to show, the selectable bounds,
- *     the committed-or-pending range so far, and what to call when a day is clicked.
- * @returns {!preact.VNode} The grid.
- */
-function MonthGrid({ shownMonth, min, max, from, to, onPick }) {
+/** One month's day grid; days outside `min`..`max` are disabled, the range so far is marked. */
+function MonthGrid({
+  shownMonth,
+  min,
+  max,
+  from,
+  to,
+  onPick,
+}: {
+  shownMonth: string;
+  min: string;
+  max: string;
+  from: string | null;
+  to: string | null;
+  onPick: (isoDate: string) => void;
+}) {
   const days = daysOfMonth(shownMonth);
-  const blanks = weekdayOf(days[0]).index;
+  const blanks = weekdayOf(shownMonth).index;
 
   return (
     <div class="calendar__grid">
@@ -85,10 +85,7 @@ function MonthGrid({ shownMonth, min, max, from, to, onPick }) {
   );
 }
 
-/**
- * A calendar glyph for the trigger, on the shell's 24-unit, 1.6-stroke grid.
- * @returns {!preact.VNode} The icon.
- */
+/** A calendar glyph on the shell's 24-unit, 1.6-stroke grid. */
 function CalendarGlyph() {
   return (
     <svg
@@ -108,14 +105,8 @@ function CalendarGlyph() {
   );
 }
 
-/**
- * What the closed trigger says: the preset's name when the range is one, and the dates.
- * @param {?string} from Committed range start, or null.
- * @param {?string} to Committed range end, or null.
- * @param {?string} preset The matching preset's name, or null.
- * @returns {string} The label.
- */
-function triggerLabel(from, to, preset) {
+/** What the closed trigger says: the dates, after the preset's name when the range is one. */
+function triggerLabel(from: string | null, to: string | null, preset: string | null): string {
   if (!from && !to) {
     return 'All dates';
   }
@@ -124,13 +115,8 @@ function triggerLabel(from, to, preset) {
   return match ? match.label + ' · ' + dates : dates;
 }
 
-/**
- * The quick ranges, stacked beside the month grid inside the popover.
- * @param {{value: ?string, onSelect: function(string): void}} props The preset the
- *     committed range matches, and what to call with a preset name.
- * @returns {!preact.VNode} The list.
- */
-function PresetList({ value, onSelect }) {
+/** The quick ranges beside the month grid; `value` is the preset the committed range matches. */
+function PresetList({ value, onSelect }: { value: string | null; onSelect: (name: string) => void }) {
   return (
     <div class="daterange__presets" role="group" aria-label="Quick date ranges">
       {PRESETS.map((preset) => (
@@ -148,52 +134,41 @@ function PresetList({ value, onSelect }) {
   );
 }
 
-/**
- * The date-range picker: a calendar button, and a popover of quick ranges and a month grid.
- * @param {{min: string, max: string, from: ?string, to: ?string,
- *     onChange: function({from: ?string, to: ?string}): void}} props The selectable
- *     bounds, the committed range (null/null for "All"), and the change callback.
- * @returns {!preact.VNode} The picker.
- */
-export function DateRangePicker({ min, max, from, to, onChange }) {
+/** The picker: `min`..`max` are selectable, `from`/`to` the committed range (both null for "All"). */
+export function DateRangePicker({
+  min,
+  max,
+  from,
+  to,
+  onChange,
+}: {
+  min: string;
+  max: string;
+  from: string | null;
+  to: string | null;
+  onChange: (range: DateRange) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [pendingFrom, setPendingFrom] = useState(null);
+  const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [shownMonth, setShownMonth] = useState(firstOfMonth(to || from || max));
-  const rootRef = useRef(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-    /**
-     * Closes the popover on an outside click.
-     * @param {!Event} event The document mousedown.
-     * @returns {void}
-     */
-    function onDocMouseDown(event) {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-        setPendingFrom(null);
-      }
-    }
-    document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
-  }, [open]);
+  /** Closes the popover and drops a half-made selection. */
+  const close = () => {
+    setOpen(false);
+    setPendingFrom(null);
+  };
+  useOutsideClick(rootRef, open, close);
 
-  /**
-   * Handles a day click: the first click starts a pending range, the second commits it.
-   * @param {string} isoDate The clicked day.
-   * @returns {void}
-   */
-  function pickDay(isoDate) {
+  /** A first click starts a pending range; the second commits it. */
+  function pickDay(isoDate: string) {
     if (pendingFrom === null) {
       setPendingFrom(isoDate);
       return;
     }
     const nextFrom = pendingFrom < isoDate ? pendingFrom : isoDate;
     const nextTo = pendingFrom < isoDate ? isoDate : pendingFrom;
-    setPendingFrom(null);
-    setOpen(false);
+    close();
     onChange({ from: nextFrom, to: nextTo });
   }
 
@@ -202,14 +177,9 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
   const today = isoToday();
   const preset = matchPreset(from, to, today);
 
-  /**
-   * Commits a quick range and closes the popover.
-   * @param {string} name A `PRESETS` name.
-   * @returns {void}
-   */
-  function pickPreset(name) {
-    setPendingFrom(null);
-    setOpen(false);
+  /** Commits a quick range and closes the popover. */
+  function pickPreset(name: string) {
+    close();
     onChange(resolvePreset(name, today));
   }
 
@@ -222,8 +192,7 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
         aria-expanded={open}
         onClick={() => {
           if (open) {
-            setOpen(false);
-            setPendingFrom(null);
+            close();
             return;
           }
           setShownMonth(firstOfMonth(to || from || max));

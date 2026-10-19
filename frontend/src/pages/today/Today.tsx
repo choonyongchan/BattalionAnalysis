@@ -27,14 +27,11 @@ import { toSubmissions } from '../../model/formsg.ts';
 import { filingsOn, toFilings } from '../../model/submissions.ts';
 import { AwayAheadCard, OtherDutiesCard, RecentReturnsCard, RestrictionsCard, ReturnsCard, TierCard } from './cards.tsx';
 
-/** @type {string} Session every "today" figure and trend describes. */
+/** Session every "today" figure and trend describes. */
 const SESSION = 'FPS';
 
 
-/**
- * The Today page.
- * @returns {!preact.VNode} The page.
- */
+/** The Today page. */
 export function Today() {
   const full = dataset.value;
   const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);

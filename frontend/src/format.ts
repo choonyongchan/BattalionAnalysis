@@ -1,108 +1,53 @@
 /**
- * Every number, date and time the dashboard puts on screen goes through here.
- *
- * One module, because a figure has to read the same on a chart axis, in that chart's
- * tooltip, and in the table twin a reader copies into a brief. There were two copies of
- * this before — one under `charts/`, one under `components/` — and they had drifted into
- * two functions named `fmtShare` that took different arguments and returned different
- * precision, which is exactly the defect a single copy prevents.
- *
- * A missing value formats as an em dash everywhere, never as 0 and never as a blank
- * cell: a blank strength cell means "not stated", and printing 0 would say the opposite.
- *
- * Locale is 'en-SG' throughout — this is a Singapore Armed Forces battalion, and a figure
- * should not render in whatever locale the reading machine happens to carry.
+ * Every number, date and time on screen goes through here, so a figure reads the same on an axis, in a
+ * tooltip and in a table. A missing value is an em dash, never 0 (a blank strength is "not stated").
  */
 
 import { MONTH_NAMES } from '../../shared/dates.ts';
 
-/** @type {!Intl.NumberFormat} Whole numbers with thousands separators. */
 const COUNT = new Intl.NumberFormat('en-SG', { maximumFractionDigits: 0 });
-
-/** @type {!Intl.NumberFormat} One decimal place, for a rate. */
 const RATE = new Intl.NumberFormat('en-SG', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-/**
- * Formats a whole number, or an em dash when there is none.
- * @param {?number} value The number.
- * @returns {string} The formatted count, or '—'.
- */
-export function fmtInt(value) {
-  return Number.isFinite(value) ? COUNT.format(Math.round(value)) : '—';
+/** Whether a value is a finite number. */
+const isNumber = (value: number | null | undefined): value is number => Number.isFinite(value);
+
+/** A whole number with thousands separators, or '—'. */
+export function fmtInt(value: number | null | undefined): string {
+  return isNumber(value) ? COUNT.format(Math.round(value)) : '—';
 }
 
-/**
- * Formats a number to one decimal place, with an optional suffix.
- * @param {?number} value The number.
- * @param {string=} suffix Text appended when a value is present, e.g. '%'.
- * @returns {string} The formatted value, or '—'.
- */
-export function fmtDecimal(value, suffix) {
-  return Number.isFinite(value) ? RATE.format(value) + (suffix || '') : '—';
+/** A number to one decimal place with an optional suffix such as '%', or '—'. */
+export function fmtDecimal(value: number | null | undefined, suffix = ''): string {
+  return isNumber(value) ? RATE.format(value) + suffix : '—';
 }
 
-/**
- * Formats a proportion in the range 0..1 as a whole percentage.
- *
- * Whole numbers because this is the tile figure a commander reads at a glance; the
- * decimal belongs on a chart, where values are being compared against each other.
- * @param {?number} value The proportion, 0..1.
- * @returns {string} e.g. '18%', or '—'.
- */
-export function fmtPercent(value) {
-  return Number.isFinite(value) ? Math.round(value * 100) + '%' : '—';
+/** A 0..1 proportion as a whole percentage (the at-a-glance tile figure), or '—'. */
+export function fmtPercent(value: number | null | undefined): string {
+  return isNumber(value) ? Math.round(value * 100) + '%' : '—';
 }
 
-
-/**
- * Formats an ISO date the way the unit writes it, e.g. '22 Jun 26'.
- * @param {?string} isoDate ISO 'yyyy-MM-dd'.
- * @returns {string} The formatted date, or '—'.
- */
-export function fmtDate(isoDate) {
-  if (!isoDate) {
-    return '—';
-  }
-  const [year, month, day] = isoDate.split('-');
-  return Number(day) + ' ' + MONTH_NAMES[Number(month) - 1] + ' ' + year.slice(2);
+/** `yyyy-MM-dd` the way the unit writes it, e.g. '22 Jun 26', or '—'. */
+export function fmtDate(isoDate: string | null | undefined): string {
+  if (!isoDate) return '—';
+  const [year = '', month, day] = isoDate.split('-');
+  return `${Number(day)} ${MONTH_NAMES[Number(month) - 1]} ${year.slice(2)}`;
 }
 
-/**
- * Formats an ISO date as day and month only, e.g. '22 Jun', for a chart axis where the year
- * is the same on every tick and would only crowd the labels.
- * @param {?string} isoDate ISO 'yyyy-MM-dd'.
- * @returns {string} The formatted date; anything that is not an ISO date comes back as is.
- */
-export function fmtDayMonth(isoDate) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(isoDate))) {
-    return String(isoDate);
-  }
+/** `yyyy-MM-dd` as day and month, e.g. '22 Jun', for an axis; anything else comes back as is. */
+export function fmtDayMonth(isoDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
   const [, month, day] = isoDate.split('-');
-  return Number(day) + ' ' + MONTH_NAMES[Number(month) - 1];
+  return `${Number(day)} ${MONTH_NAMES[Number(month) - 1]}`;
 }
 
-/**
- * Formats a fraction as "n of m", the shape every coverage line in the dashboard uses.
- * @param {number} part The numerator.
- * @param {number} whole The denominator.
- * @returns {string} e.g. '5 of 45'.
- */
-export function fmtFraction(part, whole) {
-  return fmtInt(part) + ' of ' + fmtInt(whole);
+/** A fraction as "n of m", the shape every coverage line uses. */
+export function fmtFraction(part: number, whole: number): string {
+  return `${fmtInt(part)} of ${fmtInt(whole)}`;
 }
 
-/**
- * Formats minutes past midnight as a 24-hour clock time.
- *
- * Zero-padded on both halves because the reader is comparing six of these down a column,
- * and '7:05' next to '11:40' does not line up.
- * @param {?number} minutes Minutes past midnight.
- * @returns {string} 'HH:mm', or '—'.
- */
-export function fmtClock(minutes) {
-  if (!Number.isFinite(minutes)) {
-    return '—';
-  }
+/** Minutes past midnight as a zero-padded 24-hour 'HH:mm' (so a column lines up), or '—'. */
+export function fmtClock(minutes: number | null | undefined): string {
+  if (!isNumber(minutes)) return '—';
   const whole = ((Math.round(minutes) % 1440) + 1440) % 1440;
-  return String(Math.floor(whole / 60)).padStart(2, '0') + ':' + String(whole % 60).padStart(2, '0');
+  return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`;
 }

@@ -9,27 +9,22 @@ import { DUTY_CLASS, extractSymptoms, isDuty, MC_MA } from '../model/classify.ts
 import { startsByWeekday } from '../model/episodes.ts';
 import { soldierLoad } from '../model/leaderboards.ts';
 import { LENGTH_BANDS, lengthBySymptom } from '../model/symptoms.ts';
-import { COMPANIES } from '../../../shared/domain.ts';
+import { companyIndex } from '../../../shared/domain.ts';
 import { fmtInt } from '../format.ts';
 import { WEEKDAY_NAMES } from '../../../shared/dates.ts';
-import { CategoryPage, EpisodeTiles, useCategory } from './shared/category.tsx';
+import { CategoryPage, EpisodeTiles, useCategory, type CategoryRange } from './shared/category.tsx';
 import { DutyTrend } from './shared/trends.tsx';
 import { EpisodeLeaderboard, LocationsCard, LongMcCard, SoldierLookup, UnitRankings } from './shared/rankings.tsx';
 import { PlatoonHeatmap, ReasonsOverTime, episodeCells } from './shared/grids.tsx';
 
 /**
- * The duty classes this page is about: MC (Att C) and MA together, the same pair the
- * Overview's MC / MA tile counts. Defined in `classify.js` so the two cannot drift.
- * @type {!Array<string>}
+ * The duty classes this page is about: MC (Att C) and MA together, the same pair the Overview's MC / MA tile
+ * counts. Defined in `classify.js` so the two cannot drift.
  */
 const DUTY = MC_MA;
 
-/**
- * Which weekday MCs start on, and how many start next to a weekend or a holiday.
- * @param {{range: !Object}} props The range from `useCategory`.
- * @returns {!preact.VNode} The card.
- */
-function McStartsCard({ range }) {
+/** Which weekday MCs start on, and how many start next to a weekend or a holiday. */
+function McStartsCard({ range }: { range: CategoryRange }) {
   const { counts, nextToBreak, total } = startsByWeekday(range.episodes, DUTY_CLASS.ATT_C, range.holidays);
   return (
     <ChartCard
@@ -45,22 +40,18 @@ function McStartsCard({ range }) {
   );
 }
 
-/** @type {number} Soldiers the days-lost concentration figure names. */
+/** Soldiers the days-lost concentration figure names. */
 const TOP_SOLDIERS = 10;
 
-/**
- * Every soldier on MC in range as one dot: MCs across, days lost up.
- * @param {{range: !Object}} props The range from `useCategory`.
- * @returns {!preact.VNode} The card.
- */
-function McPatternCard({ range }) {
+/** Every soldier on MC in range as one dot: MCs across, days lost up. */
+function McPatternCard({ range }: { range: CategoryRange }) {
   const { entries, totalDays, topDays } = soldierLoad(range.episodes, DUTY_CLASS.ATT_C, TOP_SOLDIERS);
   const points = entries.map((entry) => ({
     x: entry.episodes,
     y: entry.daysLost,
     label: (entry.rank + ' ' + entry.name).trim(),
     group: entry.company,
-    slot: COMPANIES.indexOf(entry.company),
+    slot: companyIndex(entry.company),
   }));
   return (
     <ChartCard
@@ -77,12 +68,8 @@ function McPatternCard({ range }) {
   );
 }
 
-/**
- * How long MCs ran, by the symptom the parade state names.
- * @param {{range: !Object}} props The range from `useCategory`.
- * @returns {!preact.VNode} The card.
- */
-function McLengthCard({ range }) {
+/** How long MCs ran, by the symptom the parade state names. */
+function McLengthCard({ range }: { range: CategoryRange }) {
   const { rows, cells } = lengthBySymptom(
     range.episodes.filter((episode) => episode.dutyClass === DUTY_CLASS.ATT_C),
     8
@@ -106,10 +93,7 @@ function McLengthCard({ range }) {
   );
 }
 
-/**
- * The MC/MA page.
- * @returns {!preact.VNode} The page.
- */
+/** The MC/MA page. */
 export function McMa() {
   const { data, episodes, index, range } = useCategory();
 
@@ -126,9 +110,9 @@ export function McMa() {
       <DutyTrend title="MC / MA Trend" data={data} dutyClass={DUTY} range={range} />
       <PlatoonHeatmap cells={episodeCells(range.episodes, DUTY)} />
       <ReasonsOverTime
-        rows={episodes.filter((e) => isDuty(DUTY, e.dutyClass))}
-        dateOf={(e) => e.startDate}
-        labelsOf={(e) => (e.symptoms.length > 0 ? e.symptoms : extractSymptoms(e.reasons.join(' ')))}
+        rows={episodes.filter((episode) => isDuty(DUTY, episode.dutyClass))}
+        dateOf={(episode) => episode.startDate}
+        labelsOf={(episode) => (episode.symptoms.length > 0 ? episode.symptoms : extractSymptoms(episode.reasons.join(' ')))}
         range={range}
       />
       <div class="grid-2">

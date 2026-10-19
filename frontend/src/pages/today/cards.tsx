@@ -15,20 +15,16 @@ import { tierPresence } from '../../model/strength.ts';
 import { awayAhead, returnsToDuty } from '../../model/projection.ts';
 import { recentlyReturned } from '../../model/recentReturns.ts';
 
-/** @type {string} Session every "today" figure describes. */
+/** Session every "today" figure describes. */
 const SESSION = 'FPS';
 
-/** @type {number} Days the away-ahead chart covers. */
+/** Days the away-ahead chart covers. */
 const AHEAD_DAYS = 14;
 
-/** @type {number} Names a restriction cell's tooltip lists before "and N more". */
+/** Names a restriction cell's tooltip lists before "and N more". */
 const TOOLTIP_NAMES = 10;
 
-/**
- * Other duties on one parade, by duty: the largest absence slice, broken open.
- * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
- * @returns {!preact.VNode} The card.
- */
+/** Other duties on one parade, by duty: the largest absence slice, broken open. */
 export function OtherDutiesCard({ data, date }) {
   const duties = otherDutiesOn(data.personnel, date, SESSION).slice(0, 8);
   return (
@@ -43,10 +39,8 @@ export function OtherDutiesCard({ data, date }) {
 }
 
 /**
- * The restrictions in force on one parade, by company, with names in the tooltip: what a
- * training plan has to work around.
- * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
- * @returns {!preact.VNode} The card.
+ * The restrictions in force on one parade, by company, with names in the tooltip: what a training plan has to
+ * work around.
  */
 export function RestrictionsCard({ data, date }) {
   const { rows, cells } = restrictionsOn(data.personnel, date, SESSION);
@@ -74,11 +68,7 @@ export function RestrictionsCard({ data, date }) {
   );
 }
 
-/**
- * Soldiers already on MC or leave who are still away on each of the next days.
- * @param {{data: !Object, date: string}} props The scoped dataset and the parade date.
- * @returns {!preact.VNode} The card.
- */
+/** Soldiers already on MC or leave who are still away on each of the next days. */
 export function AwayAheadCard({ data, date }) {
   const { days, away } = awayAhead(returnsToDuty(data.personnel, date, SESSION), date, AHEAD_DAYS);
   return (
@@ -97,11 +87,7 @@ export function AwayAheadCard({ data, date }) {
   );
 }
 
-/**
- * Formats one tier cell: the percentage present, then present over strength.
- * @param {{strength: ?number, present: ?number, percent: ?number}} tier A tier total.
- * @returns {string} e.g. '91% (111/122)', or '—' when the tier was not stated.
- */
+/** Formats one tier cell: the percentage present, then present over strength. */
 function tierCell(tier) {
   if (tier.strength === null) {
     return '—';
@@ -109,12 +95,7 @@ function tierCell(tier) {
   return fmtPercent(tier.percent / 100) + ' (' + fmtInt(tier.present) + '/' + fmtInt(tier.strength) + ')';
 }
 
-/**
- * Presence by rank tier on one parade: a row per company that filed, under a battalion row.
- * @param {{strength: Array<!Object>, date: string, scoped: boolean}} props The scoped
- *     Strength Data, the parade date, and whether one company is selected (no battalion row).
- * @returns {!preact.VNode} The card.
- */
+/** Presence by rank tier on one parade: a row per company that filed, under a battalion row. */
 export function TierCard({ strength, date, scoped }) {
   const tiers = tierPresence(strength, date, SESSION);
   const rows = [
@@ -148,12 +129,7 @@ export function TierCard({ strength, date, scoped }) {
   );
 }
 
-/**
- * The forward view: who is due back when, from the dates each MC and leave line states.
- * @param {{data: !Object, date: string}} props The scoped dataset and the parade the
- *     absences are read from.
- * @returns {!preact.VNode} The card.
- */
+/** The forward view: who is due back when, from the dates each MC and leave line states. */
 export function ReturnsCard({ data, date }) {
   const returns = returnsToDuty(data.personnel, date, SESSION);
 
@@ -184,12 +160,7 @@ export function ReturnsCard({ data, date }) {
   );
 }
 
-/**
- * The backward twin of `ReturnsCard`: who came off MC or Light Duty just before this parade.
- * @param {{data: !Object, date: string}} props The scoped dataset and the parade the list
- *     is counted back from.
- * @returns {!preact.VNode} The card.
- */
+/** The backward twin of `ReturnsCard`: who came off MC or Light Duty just before this parade. */
 export function RecentReturnsCard({ data, date }) {
   const returns = recentlyReturned(data.personnel, date);
 

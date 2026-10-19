@@ -2,11 +2,7 @@
  * The pieces both Deposit panels (parade states and SFT) are built from.
  */
 
-/**
- * What the server said about the last save or delete.
- * @param {{result: ?{tone: string, text: string, reasons: !Array<string>}}} props The message.
- * @returns {?preact.VNode} The banner, or nothing before the first submit.
- */
+/** What the server said about the last save or delete. */
 export function Outcome({ result }) {
   if (!result) return null;
   return (
@@ -24,12 +20,7 @@ export function Outcome({ result }) {
 }
 
 /**
- * The Edit / Delete controls for one row. Delete asks once more inline rather than through
- * a browser dialog.
- * @param {{label: string, confirming: boolean, busy: boolean, onEdit: function(),
- *     onDelete: function(), onConfirm: function(), onKeep: function()}} props The row's
- *     name on the confirm button, and its state.
- * @returns {!preact.VNode} The controls.
+ * The Edit / Delete controls for one row. Delete asks once more inline rather than through a browser dialog.
  */
 export function RowActions({ label, confirming, busy, onEdit, onDelete, onConfirm, onKeep }) {
   if (confirming) {
@@ -56,13 +47,7 @@ export function RowActions({ label, confirming, busy, onEdit, onDelete, onConfir
   );
 }
 
-/**
- * Runs one server call with the panel marked busy, showing a thrown error as the outcome.
- * @param {function(boolean): void} setBusy Marks the panel busy.
- * @param {function(!Object): void} setResult Shows the outcome.
- * @param {function(): !Promise} action The call.
- * @returns {!Promise<void>} Resolves when the call is over.
- */
+/** Runs one server call with the panel marked busy, showing a thrown error as the outcome. */
 export async function runBusy(setBusy, setResult, action) {
   setBusy(true);
   try {

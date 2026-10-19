@@ -8,55 +8,47 @@
  */
 
 import { useMemo } from 'preact/hooks';
-import { company, dataset, dateFrom, dateTo } from '../app/state.ts';
+import { company, dateFrom, dateTo, loadedData } from '../app/state.ts';
 import { Card } from '../components/Card.tsx';
 import { DataTable } from '../components/Table.tsx';
 import { Tile, TileRow } from '../components/Tile.tsx';
 import { Bar, ChartCard, Donut } from '../charts/index.ts';
-import { COMPANIES } from '../../../shared/domain.ts';
+import { companyIndex } from '../../../shared/domain.ts';
 import { fmtDecimal, fmtInt } from '../format.ts';
 import { isoToday, withinRange } from '../model/dateRange.ts';
-import { scopeSubmissions } from '../model/scope.ts';
+import { onlyCompany } from '../model/scope.ts';
 import {
   averageGroupSize,
   byCompany,
   groupSizeDistribution,
   groupSizes,
   soldierCount,
-  toSftRecords,
+  toSftSessions,
+  type GroupSize,
+  type LabelCount,
+  type SftSession,
   topExercises,
   topLocations,
 } from '../model/sft.ts';
 import { CategoryPage } from './shared/category.tsx';
 
-/** @type {number} How many locations and exercises each ranking shows. */
+/** How many locations and exercises each ranking shows. */
 const TOP_N = 10;
 
-/**
- * The company-scoped SFT records and the active range.
- *
- * The range bounds are the full, unscoped SFT dates, so the picker does not contract when a
- * company with fewer sessions is picked.
- * @returns {{records: Array<!Object>, range: {from: string, to: string, min: string, max: string}}}
- *     Scoped records, and the range.
- */
+/** The company-scoped SFT records and the active range. */
 function useSft() {
-  const full = dataset.value;
-  const all = useMemo(() => toSftRecords(full.sft), [full.sft]);
-  const records = useMemo(() => scopeSubmissions(all, company.value), [all, company.value]);
+  const full = loadedData();
+  const all = useMemo(() => toSftSessions(full.sft), [full.sft]);
+  const records = useMemo(() => onlyCompany(all, company.value), [all, company.value]);
   const dates = all.map((record) => record.date).sort();
-  const min = dates[0] || isoToday();
-  const max = dates[dates.length - 1] || isoToday();
+  const min = dates[0] ?? isoToday();
+  const max = dates[dates.length - 1] ?? isoToday();
   const range = { from: dateFrom.value || min, to: dateTo.value || max, min, max };
   return { records, range };
 }
 
-/**
- * Sessions, soldiers, groups and mean group size per company.
- * @param {{records: Array<!Object>, groups: Array<!Object>}} props In-range records and their groups.
- * @returns {!preact.VNode} The card.
- */
-function CompanyBreakdown({ records, groups }) {
+/** Sessions, soldiers, groups and mean group size per company. */
+function CompanyBreakdown({ records, groups }: { records: SftSession[]; groups: GroupSize[] }) {
   const rows = byCompany(records).map((row) => {
     const mine = groups.filter((group) => group.company === row.company);
     return {
@@ -84,13 +76,8 @@ function CompanyBreakdown({ records, groups }) {
   );
 }
 
-/**
- * A ranked bar of labelled counts.
- * @param {{title: string, empty: string, rows: Array<{label: string, count: number}>,
- *     valueName: string}} props The card title, its empty message, the ranking, and the unit.
- * @returns {!preact.VNode} The card.
- */
-function Ranking({ title, empty, rows, valueName }) {
+/** A ranked bar of labelled counts. */
+function Ranking({ title, empty, rows, valueName }: { title: string; empty: string; rows: LabelCount[]; valueName: string }) {
   return (
     <ChartCard title={title} empty={empty}>
       <Bar categories={rows.map((row) => row.label)} values={rows.map((row) => row.count)} valueName={valueName} />
@@ -98,10 +85,7 @@ function Ranking({ title, empty, rows, valueName }) {
   );
 }
 
-/**
- * The SFT page.
- * @returns {!preact.VNode} The page.
- */
+/** The SFT page. */
 export function Sft() {
   const { records, range } = useSft();
   const ranged = records.filter((record) => withinRange(record.date, range.from, range.to));
@@ -132,7 +116,7 @@ export function Sft() {
           empty="No SFT sessions in range."
         >
           <Donut
-            slices={perCompany.map((row) => ({ name: row.company, value: row.soldiers, slot: COMPANIES.indexOf(row.company) }))}
+            slices={perCompany.map((row) => ({ name: row.company, value: row.soldiers, slot: companyIndex(row.company) }))}
             valueName="soldiers"
           />
         </ChartCard>
@@ -151,7 +135,7 @@ export function Sft() {
         />
       </ChartCard>
       <div class="grid-2">
-      <Ranking
+        <Ranking
         title="Common SFT Locations"
         empty="No locations recorded in range."
         rows={topLocations(ranged, TOP_N)}

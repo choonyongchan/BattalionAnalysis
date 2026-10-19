@@ -1,12 +1,6 @@
 /**
- * What the browser shows, given the hash and whether the dashboard is unlocked.
- *
- * Hash routing rather than history routing, because the dashboard is served from a
- * GitHub Pages sub-path with no server to rewrite deep links — `/soldier` would 404 on a
- * refresh, `#/soldier` cannot.
- *
- * The login screen is not a route. It stands in front of every route until data is
- * loaded, so there is no URL that shows a page frame with no data behind it.
+ * The login screen until data is loaded, then the shell with the page the hash names. Hash routing,
+ * because the static host has no rewrite for deep links (`/soldier` would 404 on a refresh).
  */
 
 import { Redirect, Route, Router as WouterRouter, Switch } from 'wouter-preact';
@@ -16,10 +10,7 @@ import { DEFAULT_ROUTE, ROUTES, ROUTE_ALIASES } from './routes.ts';
 import { isReady } from './state.ts';
 import { Login } from '../pages/Login.tsx';
 
-/**
- * Renders the login screen, or the shell with the page the hash names.
- * @returns {!preact.VNode} The application.
- */
+/** Renders the login screen, or the shell with the page the hash names. */
 export function Router() {
   if (!isReady.value) {
     return <Login />;
@@ -29,8 +20,10 @@ export function Router() {
     <WouterRouter hook={useHashLocation}>
       <Shell>
         <Switch>
-          {ROUTES.map((route) => (
-            <Route key={route.path} path={route.path} component={route.component} />
+          {ROUTES.map(({ path, component: Page }) => (
+            <Route key={path} path={path}>
+              <Page />
+            </Route>
           ))}
           {Object.entries(ROUTE_ALIASES).map(([from, to]) => (
             <Route key={from} path={from}>

@@ -1,14 +1,9 @@
-/**
- * The card frame every panel sits in, and the pieces that go inside one.
- */
+/** The card frame every panel sits in, and the pieces that go inside one. */
 
-/**
- * A titled surface. Cards carry no shadow — DESIGN.md reserves the one shadow for
- * product photography, and a card's elevation here is the surface change alone.
- * @param {{title?: string, note?: string, children: *}} props The card's contents.
- * @returns {!preact.VNode} The card.
- */
-export function Card({ title, note, children }) {
+import type { ComponentChildren } from 'preact';
+
+/** A titled surface; elevation is the surface change alone (DESIGN.md keeps shadows for photography). */
+export function Card({ title, note, children }: { title?: string; note?: string; children: ComponentChildren }) {
   return (
     <section class="card">
       {title ? (
@@ -22,33 +17,17 @@ export function Card({ title, note, children }) {
   );
 }
 
-/**
- * A coverage line: what fraction of the battalion this panel's figures actually cover.
- *
- * Every chart in this dashboard prints one, because only 5 of 45 real parade days carry
- * all six companies — a figure with no coverage line beside it overstates itself.
- * @param {{children: *}} props The coverage sentence.
- * @returns {!preact.VNode} The line.
- */
-export function Coverage({ children }) {
+/** How much of the battalion a panel's figures cover; every figure is owed one. */
+export function Coverage({ children }: { children: ComponentChildren }) {
   return <p class="coverage">{children}</p>;
 }
 
-/**
- * The empty state a panel shows instead of an axis with nothing on it.
- * @param {{children: *}} props A sentence saying what is missing and what would fill it.
- * @returns {!preact.VNode} The empty state.
- */
-export function EmptyState({ children }) {
+/** What a panel shows instead of an empty axis: what is missing and what would fill it. */
+export function EmptyState({ children }: { children: ComponentChildren }) {
   return <p class="empty">{children}</p>;
 }
 
-/**
- * A dismissable-free inline message: a warning or an error, never a category.
- * @param {{tone?: string, children: *}} props `tone` is 'warning' or 'error'; children is
- *     the message.
- * @returns {!preact.VNode} The banner.
- */
-export function Banner({ tone, children }) {
-  return <p class={'banner banner--' + (tone || 'warning')}>{children}</p>;
+/** An inline warning or error, never a category. */
+export function Banner({ tone = 'warning', children }: { tone?: 'warning' | 'error'; children: ComponentChildren }) {
+  return <p class={'banner banner--' + tone}>{children}</p>;
 }

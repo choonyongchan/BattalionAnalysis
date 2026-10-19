@@ -12,12 +12,7 @@ import { fmtDate } from '../../format.ts';
 import { weekdayOf } from '../../../../shared/dates.ts';
 import { MAX_LOGO_CHARS, errorAt } from '../../../../shared/settings/validate.ts';
 
-/**
- * A labelled input with its error beneath.
- * @param {{label: string, error: string, children: *}} props The label, the field's error,
- *     and the input.
- * @returns {!preact.VNode} The field.
- */
+/** A labelled input with its error beneath. */
 export function Field({ label, error, children }) {
   return (
     <label class="settings-field">
@@ -28,32 +23,18 @@ export function Field({ label, error, children }) {
   );
 }
 
-/**
- * Reads a number input: a whole number, or the raw text so the validator can refuse it.
- * @param {!Event} event The input event.
- * @returns {number|string} The number, or the text when it is not one.
- */
+/** Reads a number input: a whole number, or the raw text so the validator can refuse it. */
 function numberFrom(event) {
   const text = event.currentTarget.value;
   return text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text) : text;
 }
 
-/**
- * Replaces one item of a list field.
- * @param {!Array<!Object>} list The list.
- * @param {number} index The item.
- * @param {!Object} patch Fields to replace.
- * @returns {!Array<!Object>} A new list.
- */
+/** Replaces one item of a list field. */
 function patchAt(list, index, patch) {
   return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
 }
 
-/**
- * Shows the unit settings.
- * @param {{value: !Object}} props The unit section.
- * @returns {!preact.VNode} The view.
- */
+/** Shows the unit settings. */
 export function UnitView({ value }) {
   return (
     <dl class="settings-list">
@@ -67,18 +48,9 @@ export function UnitView({ value }) {
   );
 }
 
-/**
- * Edits the unit settings, including a logo upload.
- * @param {{draft: !Object, setDraft: function(!Object): void, errors: !Array<!Object>}} props
- *     The editor props.
- * @returns {!preact.VNode} The form fields.
- */
+/** Edits the unit settings, including a logo upload. */
 export function UnitEditor({ draft, setDraft, errors }) {
-  /**
-   * Reads the chosen file into a data URL.
-   * @param {!Event} event The change event.
-   * @returns {void}
-   */
+  /** Reads the chosen file into a data URL. */
   function onLogo(event) {
     const file = event.currentTarget.files && event.currentTarget.files[0];
     if (!file) return;
@@ -110,11 +82,7 @@ export function UnitEditor({ draft, setDraft, errors }) {
   );
 }
 
-/**
- * Shows the calendar: holidays with their weekday, and rotations.
- * @param {{value: !Object}} props The calendar section.
- * @returns {!preact.VNode} The view.
- */
+/** Shows the calendar: holidays with their weekday, and rotations. */
 export function CalendarView({ value }) {
   return (
     <>
@@ -150,12 +118,7 @@ export function CalendarView({ value }) {
   );
 }
 
-/**
- * Edits holidays and rotations as lists of rows.
- * @param {{draft: !Object, setDraft: function(!Object): void, errors: !Array<!Object>}} props
- *     The editor props.
- * @returns {!preact.VNode} The form fields.
- */
+/** Edits holidays and rotations as lists of rows. */
 export function CalendarEditor({ draft, setDraft, errors }) {
   const holidays = draft.holidays;
   const rotations = draft.rotations;
@@ -205,11 +168,7 @@ export function CalendarEditor({ draft, setDraft, errors }) {
   );
 }
 
-/**
- * Shows the thresholds.
- * @param {{value: !Object}} props The thresholds section.
- * @returns {!preact.VNode} The view.
- */
+/** Shows the thresholds. */
 export function ThresholdsView({ value }) {
   return (
     <dl class="settings-list">
@@ -221,12 +180,7 @@ export function ThresholdsView({ value }) {
   );
 }
 
-/**
- * Edits the thresholds.
- * @param {{draft: !Object, setDraft: function(!Object): void, errors: !Array<!Object>}} props
- *     The editor props.
- * @returns {!preact.VNode} The form fields.
- */
+/** Edits the thresholds. */
 export function ThresholdsEditor({ draft, setDraft, errors }) {
   return (
     <>
@@ -240,11 +194,7 @@ export function ThresholdsEditor({ draft, setDraft, errors }) {
   );
 }
 
-/**
- * Shows the session settings.
- * @param {{value: !Object}} props The session section.
- * @returns {!preact.VNode} The view.
- */
+/** Shows the session settings. */
 export function SessionView({ value }) {
   return (
     <dl class="settings-list">
@@ -256,12 +206,7 @@ export function SessionView({ value }) {
   );
 }
 
-/**
- * Edits the session settings.
- * @param {{draft: !Object, setDraft: function(!Object): void, errors: !Array<!Object>}} props
- *     The editor props.
- * @returns {!preact.VNode} The form fields.
- */
+/** Edits the session settings. */
 export function SessionEditor({ draft, setDraft, errors }) {
   return (
     <>

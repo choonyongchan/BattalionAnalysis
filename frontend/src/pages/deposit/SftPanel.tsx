@@ -27,13 +27,7 @@ import {
 import { Field } from '../settings/editors.tsx';
 import { Outcome, RowActions, runBusy } from './shared.tsx';
 
-/**
- * The correction form for one record.
- * @param {{form: !Object, setForm: function(!Object), errors: !Object<string, string>,
- *     busy: boolean, onSubmit: function(), onCancel: function()}} props The form's values,
- *     its setter, each field's error, and the handlers.
- * @returns {!preact.VNode} The form.
- */
+/** The correction form for one record. */
 function SftForm({ form, setForm, errors, busy, onSubmit, onCancel }) {
   const set = (key) => (event) => setForm({ ...form, [key]: event.currentTarget.value });
   return (
@@ -88,10 +82,7 @@ function SftForm({ form, setForm, errors, busy, onSubmit, onCancel }) {
   );
 }
 
-/**
- * The SFT panel.
- * @returns {!preact.VNode} The correction card and the stored records.
- */
+/** The SFT panel. */
 export function SftPanel() {
   const [records, setRecords] = useState(null);
   const [listError, setListError] = useState('');

@@ -15,11 +15,7 @@ import { ALL_COMPANIES } from '../model/scope.ts';
 import { FILING_CUTOFF_MINUTES, filingTimes, toFilings } from '../model/submissions.ts';
 import { CategoryPage, useCategory } from './shared/category.tsx';
 
-/**
- * A count of minutes after midnight as a clock time.
- * @param {number} minutes Minutes after midnight.
- * @returns {string} `HH:mm`.
- */
+/** A count of minutes after midnight as a clock time. */
 function fmtClock(minutes) {
   return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
 }
@@ -102,12 +98,7 @@ function DataQualityPanel({ quality }) {
   );
 }
 
-/**
- * How late each company's first parade state arrived, day by day.
- * @param {{filings: Array<!Object>, range: !Object}} props Filings from `toFilings`
- *     (already scoped), and the range.
- * @returns {!preact.VNode} The card.
- */
+/** How late each company's first parade state arrived, day by day. */
 function TimelinessCard({ filings, range }) {
   const { cells, onTime, filed, nextDay } = filingTimes(filings, range.days);
   const companies = COMPANIES.filter((company) => filed[company] > 0);
@@ -137,12 +128,7 @@ function TimelinessCard({ filings, range }) {
   );
 }
 
-/**
- * Sections whose stated count differs from the names listed under them, by company and day.
- * @param {{sectionCounts: Array<!Object>, personnel: Array<!Object>, range: !Object}} props
- *     The scoped stated counts and personnel rows, and the range.
- * @returns {!preact.VNode} The card.
- */
+/** Sections whose stated count differs from the names listed under them, by company and day. */
 function AccuracyCard({ sectionCounts, personnel, range }) {
   const inRange = sectionCounts.filter((row) => withinRange(row.date, range.from, range.to));
   const { cells, checked, mismatched } = countMismatches(inRange, personnel);
@@ -167,10 +153,7 @@ function AccuracyCard({ sectionCounts, personnel, range }) {
   );
 }
 
-/**
- * The Filing & Accuracy page.
- * @returns {!preact.VNode} The page.
- */
+/** The Filing & Accuracy page. */
 export function Filing() {
   const { data, range } = useCategory();
   const filings = useMemo(

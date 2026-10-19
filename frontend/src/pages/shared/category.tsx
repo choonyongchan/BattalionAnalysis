@@ -14,47 +14,50 @@
  */
 
 import { useMemo } from 'preact/hooks';
-import { company, dataset, dateFrom, dateTo } from '../../app/state.ts';
+import type { ComponentChildren } from 'preact';
+import { company, dateFrom, dateTo, loadedData } from '../../app/state.ts';
 import { Tile, TileRow } from '../../components/Tile.tsx';
 import { PageControls } from '../../components/PageControls.tsx';
 import { fmtDate, fmtInt } from '../../format.ts';
-import { scopeDataset, scopeSubmissions } from '../../model/scope.ts';
-import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.ts';
-import { buildEpisodes } from '../../model/episodes.ts';
+import { scopeDataset } from '../../model/scope.ts';
+import { holidaysIn, weekendBands, type Band } from '../../model/calendarMarks.ts';
+import { buildEpisodes, type Episode } from '../../model/episodes.ts';
 import { toSubmissions } from '../../model/formsg.ts';
 import { soldierIndex } from '../../model/soldier.ts';
-import { datesPresent, episodeCounts } from '../../model/metrics.ts';
+import { datesPresent, episodeCounts, type DutyFilter } from '../../model/metrics.ts';
+import type { Holiday } from '../../../../shared/settings/defaults.ts';
+import type { Rotation } from '../../../../shared/rotations.ts';
+
+/** The range a category page covers, and what falls in it. */
+export interface CategoryRange {
+  from: string;
+  to: string;
+  min: string;
+  max: string;
+  days: string[];
+  weekends: Band[];
+  holidays: Holiday[];
+  rotations: Rotation[];
+  /** Episodes starting in the range. */
+  episodes: Episode[];
+}
 import { eachDay, isoToday, withinRange } from '../../model/dateRange.ts';
 
-/**
- * Everything a category page reads: the company-scoped data and the active date range.
- *
- * The range bounds come from the full, unscoped parade dates so the picker and trend axis
- * do not contract when a company that filed on fewer days is picked.
- * @returns {{data: !Object, episodes: Array<!Object>, submissions: Array<!Object>,
- *     index: !Object, range: {from: string, to: string, min: string, max: string,
- *     days: string[], weekends: Array<!Object>, holidays: Array<!Object>,
- *     rotations: Array<!Object>, episodes: Array<!Object>}}} The scoped data, its soldier
- *     index, and the range with its trend days, annotations and in-range episodes.
- */
+/** Everything a category page reads: the company-scoped data and the active date range. */
 export function useCategory() {
-  const full = dataset.value;
+  const full = loadedData();
   const data = useMemo(() => scopeDataset(full, company.value), [full, company.value]);
   const paradeDates = useMemo(() => datesPresent(full.strength), [full.strength]);
   const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
-  const submissions = useMemo(
-    () => scopeSubmissions(toSubmissions(data.formSg), company.value),
-    [data.formSg, company.value]
-  );
+  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
   const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
-  const holidays = useMemo(() => toHolidays(data.holidays), [data.holidays]);
-  const rotations = data.rotations;
+  const { holidays, rotations } = data;
 
   const min = paradeDates[0] || isoToday();
   const max = paradeDates[paradeDates.length - 1] || isoToday();
   const from = dateFrom.value || min;
   const to = dateTo.value || max;
-  const range = useMemo(
+  const range = useMemo<CategoryRange>(
     () => ({
       from,
       to,
@@ -72,13 +75,16 @@ export function useCategory() {
   return { data, episodes, submissions, index, range };
 }
 
-/**
- * The page title, the range it covers, and the company + date bar.
- * @param {{title: string, range: !Object, children: *}} props The title, the range from
- *     `useCategory`, and the page's sections.
- * @returns {!preact.VNode} The page.
- */
-export function CategoryPage({ title, range, children }) {
+/** The page title, the range it covers, and the company + date bar. */
+export function CategoryPage({
+  title,
+  range,
+  children,
+}: {
+  title: string;
+  range: Pick<CategoryRange, 'from' | 'to' | 'min' | 'max'>;
+  children: ComponentChildren;
+}) {
   return (
     <div class="page">
       <header class="pagehead">
@@ -93,14 +99,17 @@ export function CategoryPage({ title, range, children }) {
   );
 }
 
-/**
- * Episodes, soldiers and episodes per soldier for one duty class, over the range.
- * @param {{range: !Object, dutyClass: (string|!Array<string>), labels?: {episodes?: string,
- *     soldiers?: string, perSoldier?: string}}} props The range, the duty class, and
- *     optional tile labels; `labels.episodes: null` leaves the episode-count tile out.
- * @returns {!preact.VNode} The tile row.
- */
-export function EpisodeTiles({ range, dutyClass, labels = {} }) {
+/** Episodes, soldiers and episodes per soldier for one duty class, over the range. */
+export function EpisodeTiles({
+  range,
+  dutyClass,
+  labels = {},
+}: {
+  range: CategoryRange;
+  dutyClass: DutyFilter;
+  /** Tile labels; `episodes: null` hides that tile. */
+  labels?: { episodes?: string | null; soldiers?: string; perSoldier?: string };
+}) {
   const { total } = episodeCounts(range.episodes, dutyClass);
   return (
     <TileRow>

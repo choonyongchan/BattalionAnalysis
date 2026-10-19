@@ -34,11 +34,7 @@ import { scopeDataset } from '../model/scope.ts';
 import { fmtDate, fmtFraction, fmtInt } from '../format.ts';
 import { settingOf } from '../model/activeSettings.ts';
 
-/**
- * One role and, indented beneath it, the roles that report to it.
- * @param {{node: !Object}} props A role node from `dutyRosterTree`.
- * @returns {!preact.VNode} The list item.
- */
+/** One role and, indented beneath it, the roles that report to it. */
 function RoleItem({ node }) {
   const children = node.children || [];
   return (
@@ -58,11 +54,7 @@ function RoleItem({ node }) {
   );
 }
 
-/**
- * One company's card: its name in the company's colour, then its chain of command.
- * @param {{node: !Object}} props A company node from `dutyRosterTree`.
- * @returns {!preact.VNode} The card.
- */
+/** One company's card: its name in the company's colour, then its chain of command. */
 function CompanyRoster({ node }) {
   const [top] = node.children || [];
   return (
@@ -79,15 +71,12 @@ function CompanyRoster({ node }) {
   );
 }
 
-/** @type {number} People the duty-load table lists. */
+/** People the duty-load table lists. */
 const LOAD_ROWS = 15;
 
 /**
- * Who has done the most duties since the roster began, weekends counted apart, and every
- * duty filed for someone the same parade lists on MC or leave.
- * @param {{roster: Array<!Object>, personnel: Array<!Object>, since: ?string}} props The
- *     scoped roster and personnel rows, and the first parade date.
- * @returns {!preact.VNode} The two cards.
+ * Who has done the most duties since the roster began, weekends counted apart, and every duty filed for
+ * someone the same parade lists on MC or leave.
  */
 function DutyFairness({ roster, personnel, since }) {
   const load = useMemo(() => rosterLoad(roster).slice(0, LOAD_ROWS), [roster]);
@@ -129,10 +118,7 @@ function DutyFairness({ roster, personnel, since }) {
   );
 }
 
-/**
- * The Duty Roster page.
- * @returns {!preact.VNode} The page.
- */
+/** The Duty Roster page. */
 export function DutyRoster() {
   const data = dataset.value;
   const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);

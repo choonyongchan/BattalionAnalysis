@@ -1,58 +1,58 @@
 /**
- * A grid of counts on a sequential ramp: company by platoon, reason by period, weekday by
- * hour.
- *
- * Magnitude, so one hue light to dark — a rainbow would invent categories the grid does not
- * have. The ramp is `--seq-1..5`, which is declared once per theme and is already the right
- * way round in both: in light it runs pale to deep on a white card, in dark it runs deep to
- * bright on a near-black one, so in both themes "more" is the cell that stands out further
- * from its surface. The previous implementation reversed the ramp by hand in the chart
- * code; here the tokens carry it and there is nothing to reverse.
- *
- * **An inferred cell is marked, not merely shaded.** `model/platoon.js` works a soldier's
- * platoon out of their 4D when the message did not state it, and a commander reading a
- * per-platoon rate needs to know which columns were stated and which were deduced. Colour
- * cannot carry that: the cell already spends its fill on magnitude, and a second hue would
- * be read as a value. So an inferred cell takes a 45° hatch in `--inferred` — a texture,
- * which survives a colour-blind reader and a greyscale printout alike, and which is the
- * same 45° rhythm `theme/components/table.css`'s `.inferred` uses on the table twin's cells, so
- * the two views mark it the same way.
+ * A grid of counts on the sequential ramp (one hue for magnitude; the tokens already run the right way
+ * in both themes). An inferred cell takes a 45° hatch, a texture that survives colour blindness and
+ * greyscale print, matching `.inferred` on the table twin.
  */
 
 import { Plot } from './Plot.tsx';
 import { TableTwin } from './TableTwin.tsx';
 import { fmtDayMonth, fmtInt } from '../format.ts';
 import { tooltipLines } from './tooltip.ts';
-import { axisOption, baseOption } from './theme.ts';
+import { axisOption, baseOption, type ChartOption, type Palette } from './theme.ts';
+import type { ChartViewProps } from './ChartCard.tsx';
+import type { Cell } from '../model/metrics.ts';
 
-/** @type {number} Pixels between hatch lines on an inferred cell. */
+/** A grid cell; `platoon` names the company's own platoon when columns are positions. */
+export interface HeatCell extends Omit<Cell, 'value'> {
+  value: number | null;
+  inferred?: boolean;
+  platoon?: string;
+}
+
+/**
+ * A heatmap's props. A cell off the axes is dropped, never drawn somewhere wrong; `detail` adds tooltip
+ * lines (inserted as text); `showValues` writes each count in its cell; `rowName` heads the table's rows.
+ */
+export interface HeatmapProps<C extends HeatCell = HeatCell> extends ChartViewProps {
+  rows: string[];
+  columns: string[];
+  cells: C[];
+  valueName?: string;
+  rowName?: string;
+  detail?: (cell: C) => string[];
+  showValues?: boolean;
+  height?: number;
+}
+
+/** A heatmap datum carrying its cell, as ECharts hands it back. */
+type CellParam<C> = { data: { cell: C } };
+
+/** What a custom series' renderItem gets to locate a cell. */
+type RenderApi = { size: (value: number[]) => number[]; coord: (value: number[]) => number[]; value: (dimension: number) => number };
+
+/** Pixels between hatch lines on an inferred cell. */
 const HATCH_GAP = 6;
 
-/** @type {string} What an inferred cell's tooltip says it is. */
+/** What an inferred cell's tooltip says it is. */
 const INFERRED_NOTE = 'Platoon inferred from the 4D, not stated in the message.';
 
 /**
- * The 45° hatch filling one cell, clipped to the cell's own rectangle.
- *
- * Each stripe is drawn twice: a wider one in `--surface` and then a narrower one in
- * `--inferred` on top of it. One colour would be wrong on half the ramp — a translucent
- * grey vanishes into the darkest cells and the surface colour vanishes into the palest —
- * and which half depends on the theme. The pair contrasts against every step of `--seq` in
- * both themes, and reads as a groove rather than as a smudge.
- *
- * Clipped by arithmetic rather than by a clip path: a custom series' children are plain
- * zrender shapes, and computing the two ends of each line inside the rectangle is both
- * shorter than a clip group and immune to how a renderer chooses to honour one.
- * @param {number} x Left edge.
- * @param {number} y Top edge.
- * @param {number} width Cell width.
- * @param {number} height Cell height.
- * @param {!Object} palette A palette from `readPalette`.
- * @returns {Array<!Object>} Line shapes, backing stripes first.
+ * The 45° hatch over one cell, clipped by arithmetic: each stripe twice, a wide `--surface` under a narrow
+ * `--inferred`, so it contrasts with every step of the ramp in both themes.
  */
-function hatch_(x, y, width, height, palette) {
-  const under = [];
-  const over = [];
+function hatch(x: number, y: number, width: number, height: number, palette: Palette): ChartOption[] {
+  const under: ChartOption[] = [];
+  const over: ChartOption[] = [];
   for (let offset = -height; offset < width; offset += HATCH_GAP) {
     const x1 = Math.max(x + offset, x);
     const x2 = Math.min(x + offset + height, x + width);
@@ -66,27 +66,18 @@ function hatch_(x, y, width, height, palette) {
   return [...under, ...over];
 }
 
-/**
- * The overlay series that marks inferred cells.
- *
- * Silent, so it never steals a hover from the heatmap cell underneath it — the tooltip a
- * reader wants is the one with the count in it.
- * @param {!Object} palette A palette from `readPalette`.
- * @param {Array<{value: Array<number>}>} inferred Inferred cells as `[column, row]` pairs.
- * @returns {!Object} An ECharts series.
- */
-function inferredOverlay_(palette, inferred) {
+/** The silent overlay series hatching inferred cells (`[column, row]`), so hover stays on the count. */
+function inferredOverlay(palette: Palette, inferred: { value: number[] }[]): ChartOption {
   return {
     type: 'custom',
     name: '__inferred',
     silent: true,
     legendHoverLink: false,
     data: inferred,
-    renderItem: (params, api) => {
-      const [width, height] = api.size([1, 1]);
-      const [cx, cy] = api.coord([api.value(0), api.value(1)]);
-      // Inset by the same 2px the heatmap leaves between cells, so the hatch sits inside
-      // the cell rather than bridging the gap to its neighbour.
+    renderItem: (_params: unknown, api: RenderApi) => {
+      const [width = 0, height = 0] = api.size([1, 1]);
+      const [cx = 0, cy = 0] = api.coord([api.value(0), api.value(1)]);
+      // Inset by the 2px gap between cells, so the hatch stays inside its cell.
       const x = cx - width / 2 + 2;
       const y = cy - height / 2 + 2;
       const w = Math.max(0, width - 4);
@@ -94,9 +85,8 @@ function inferredOverlay_(palette, inferred) {
       return {
         type: 'group',
         children: [
-          ...hatch_(x, y, w, h, palette),
-          // An inset outline so the marked cell has a boundary of its own. `'none'` is
-          // zrender's keyword for an unpainted fill, not a colour.
+          ...hatch(x, y, w, h, palette),
+          // An inset outline (`'none'` is zrender's unpainted fill).
           {
             type: 'rect',
             shape: { x, y, width: w, height: h, r: 2 },
@@ -113,16 +103,11 @@ function inferredOverlay_(palette, inferred) {
   };
 }
 
-/**
- * Builds the ECharts option.
- * @param {!Object} props The component's props.
- * @param {!Object} palette A palette from `readPalette`.
- * @returns {!Object} The option.
- */
-function option_(props, palette) {
+/** The ECharts option. */
+function option<C extends HeatCell>(props: HeatmapProps<C>, palette: Palette): ChartOption {
   const { rows, columns, cells, valueName, detail, showValues } = props;
   const named = cells.some((cell) => cell.platoon);
-  const max = Math.max(1, ...cells.map((cell) => (Number.isFinite(cell.value) ? cell.value : 0)));
+  const max = Math.max(1, ...cells.map((cell) => cell.value ?? 0));
   const placed = cells
     .map((cell) => ({
       cell,
@@ -132,7 +117,7 @@ function option_(props, palette) {
     .filter((entry) => entry.column >= 0 && entry.row >= 0);
 
   const base = baseOption(palette);
-  const gridAxis = (data, extra) =>
+  const gridAxis = (data: string[], extra: ChartOption) =>
     axisOption(palette, {
       type: 'category',
       data,
@@ -146,7 +131,7 @@ function option_(props, palette) {
     grid: { ...base.grid, top: 12, bottom: 48 },
     tooltip: {
       ...base.tooltip,
-      formatter: (params) => {
+      formatter: (params: CellParam<C>) => {
         const entry = params.data.cell;
         return tooltipLines(
           entry.row + ', ' + (entry.platoon ? entry.platoon + ' (' + entry.column + ')' : fmtDayMonth(entry.column)),
@@ -177,8 +162,7 @@ function option_(props, palette) {
       orient: 'horizontal',
       left: 'center',
       bottom: 0,
-      // Labelled at both ends: a colour ramp with no numbers on it tells the reader that a
-      // cell is darker, not by how much.
+      // Numbered at both ends, so the ramp says by how much, not only darker.
       itemWidth: 14,
       itemHeight: 160,
       text: [String(max), '0'],
@@ -194,12 +178,10 @@ function option_(props, palette) {
           value: [entry.column, entry.row, entry.cell.value],
           cell: entry.cell,
         })),
-        // A cell carrying its own platoon name says so in place, because on a position
-        // grid the column alone does not say which platoon a company means by it. The
-        // surface halo keeps the name legible on every step of the ramp.
+        // On a position grid the cell names its company's platoon; the halo keeps it legible.
         label: {
           show: named || Boolean(showValues),
-          formatter: (params) => {
+          formatter: (params: CellParam<C>) => {
             const cell = params.data.cell;
             if (!named) return cell.value ? fmtInt(cell.value) : '';
             const label =
@@ -219,7 +201,7 @@ function option_(props, palette) {
         itemStyle: { borderColor: palette.surface, borderWidth: 2, borderRadius: 2 },
         emphasis: { itemStyle: { borderColor: palette.ink, borderWidth: 2 } },
       },
-      inferredOverlay_(
+      inferredOverlay(
         palette,
         placed
           .filter((entry) => entry.cell.inferred)
@@ -229,76 +211,34 @@ function option_(props, palette) {
   };
 }
 
-/**
- * A heatmap of counts. Column values that are ISO dates are labelled as day and month.
- * @param {{rows: string[], columns: string[],
- *     cells: Array<{row: string, column: string, value: ?number,
- *         inferred: (boolean|undefined), platoon: (string|undefined)}>,
- *     valueName: (string|undefined), rowName: (string|undefined),
- *     detail: (function(!Object): string[]|undefined),
- *     showValues: (boolean|undefined), height: (number|undefined),
- *     view: (string|undefined)}} props
- *     `rows` are normally `COMPANIES`, and `rowName` (default 'Company') heads them in the table; a cell naming a row or column not on the axis is
- *     dropped rather than drawn somewhere wrong; `inferred` marks a cell whose platoon was
- *     worked out from the 4D and draws the hatch; `platoon` is the company's own name for
- *     the cell's column, written in the cell, when the columns are positions rather than
- *     platoons;
- *     `showValues` writes each non-zero count in its cell, for a grid small enough to read;
- *     `detail` adds tooltip lines for one cell — its text is inserted as text, never as
- *     markup; `view` is set by `ChartCard`.
- * @returns {!Object} The chart, or its table twin.
- */
-export function Heatmap(props) {
+/** A heatmap of counts (ISO-date columns labelled day and month), or its table twin. */
+export function Heatmap<C extends HeatCell>(props: HeatmapProps<C>) {
   const { rows, columns, cells, valueName, rowName = 'Company', height = 300, view } = props;
   if (view === 'table') {
     const byKey = new Map(cells.map((cell) => [cell.row + '|' + cell.column, cell]));
     return (
-      <>
-        <TableTwin
-          columns={[{ label: rowName }, ...columns.map((column) => ({ label: column, numeric: true }))]}
-          rows={rows.map((row) => [
-            row,
-            ...columns.map((column) => {
-              const cell = byKey.get(row + '|' + column);
-              const value = cell ? fmtInt(cell.value) : '—';
-              return {
-                text: cell && cell.platoon ? cell.platoon + ': ' + value : value,
-                inferred: Boolean(cell && cell.inferred),
-              };
-            }),
-          ])}
-          caption={(valueName || 'Value') + ' by ' + rowName.toLowerCase() + '; hatched cells are inferred'}
-        />
-      </>
+      <TableTwin
+        columns={[{ label: rowName }, ...columns.map((column) => ({ label: column, numeric: true }))]}
+        rows={rows.map((row) => [
+          row,
+          ...columns.map((column) => {
+            const cell = byKey.get(row + '|' + column);
+            const value = cell ? fmtInt(cell.value) : '—';
+            return { text: cell?.platoon ? cell.platoon + ': ' + value : value, inferred: Boolean(cell?.inferred) };
+          }),
+        ])}
+        caption={(valueName || 'Value') + ' by ' + rowName.toLowerCase() + '; hatched cells are inferred'}
+      />
     );
   }
   return (
-    <>
-      <Plot
-        height={height}
-        label={
-          (valueName || 'Value') +
-          ' for ' +
-          rows.length +
-          ' companies by ' +
-          columns.length +
-          ' platoons. Switch to Table for the values.'
-        }
-        build={(palette) => option_(props, palette)}
-      />
-    </>
+    <Plot
+      height={height}
+      label={`${valueName || 'Value'} for ${rows.length} companies by ${columns.length} platoons. Switch to Table for the values.`}
+      build={(palette) => option(props, palette)}
+    />
   );
 }
 
-/**
- * Whether there is anything to draw.
- * @param {!Object} props The component's props.
- * @returns {boolean} True when the chart has nothing to show.
- */
-Heatmap.isEmpty = (props) =>
-  !props.rows ||
-  props.rows.length === 0 ||
-  !props.columns ||
-  props.columns.length === 0 ||
-  !props.cells ||
-  props.cells.length === 0;
+/** Whether there is nothing to draw. */
+Heatmap.isEmpty = (props: HeatmapProps) => props.rows.length === 0 || props.columns.length === 0 || props.cells.length === 0;

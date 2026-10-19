@@ -10,29 +10,25 @@ import { useMemo } from 'preact/hooks';
 import { ChartCard, Line, Sankey } from '../charts/index.ts';
 import { fmtInt } from '../format.ts';
 import { DUTY_CLASS, MC_MA } from '../model/classify.ts';
+import type { Episode } from '../model/episodes.ts';
+import type { Submission } from '../model/formsg.ts';
+import type { DutyFilter } from '../model/metrics.ts';
+import type { Scope } from '../components/Segmented.tsx';
+import type { Dataset } from '../data/feed.ts';
 import { submissionTrend } from '../model/formsg.ts';
 import { reportSickFlow } from '../model/sankey.ts';
 import { dutyTrend, presentTrend } from '../model/strength.ts';
-import { CategoryPage, useCategory } from './shared/category.tsx';
+import { CategoryPage, useCategory, type CategoryRange } from './shared/category.tsx';
 import { TrendSection } from './shared/trends.tsx';
 
-/** @type {string} Session every trend describes. */
+/** Session every trend describes. */
 const SESSION = 'FPS';
 
-/** @type {string} The note under each soldier-count trend. */
+/** The note under each soldier-count trend. */
 const TREND_COVERAGE = 'Count of soldiers on each parade; a day with no parade state reads zero.';
 
-/**
- * Report sick from both sources on one chart: the parade state's count and FormSG's.
- *
- * They measure the same event recorded by different people, so the useful reading is the
- * gap between them. Always the battalion (or the one company picked in the page bar); the
- * per-company view lives on the Report Sick page.
- * @param {{data: !Object, submissions: Array<!Object>, range: !Object}} props The scoped
- *     dataset, its FormSG submissions, and the trend range.
- * @returns {!preact.VNode} The card.
- */
-function SickSourcesCard({ data, submissions, range }) {
+/** Report sick from both sources on one chart: the parade state's count and FormSG's. */
+function SickSourcesCard({ data, submissions, range }: { data: Dataset; submissions: Submission[]; range: CategoryRange }) {
   const options = { scope: 'battalion', session: SESSION, asRate: false };
   const parade = dutyTrend(data.personnel, data.strength, DUTY_CLASS.REPORT_SICK, range.days, options);
   const formsg = submissionTrend(submissions, data.strength, range.days, options);
@@ -44,8 +40,8 @@ function SickSourcesCard({ data, submissions, range }) {
       <Line
         categories={range.days}
         series={[
-          { name: 'Parade state', values: parade.series[0]?.values || [], neutral: true },
-          { name: 'FormSG', values: formsg.series[0]?.values || [], accent: true },
+          { name: 'Parade state', values: parade.series[0]?.values ?? [], neutral: true },
+          { name: 'FormSG', values: formsg.series[0]?.values ?? [], accent: true },
         ]}
         weekends={range.weekends}
         holidays={range.holidays}
@@ -55,26 +51,20 @@ function SickSourcesCard({ data, submissions, range }) {
   );
 }
 
-/**
- * The report-sick Sankey, with its coverage findings printed under it.
- * @param {{episodes: Array<!Object>, submissions: Array<!Object>, from: string, to:
- *     string}} props Inputs to `reportSickFlow`.
- * @returns {!preact.VNode} The card.
- */
-function SankeyCard({ episodes, submissions, from, to }) {
+/** The report-sick Sankey, with its coverage findings printed under it. */
+function SankeyCard({ episodes, submissions, from, to }: { episodes: Episode[]; submissions: Submission[]; from: string; to: string }) {
   const flow = useMemo(
     () => reportSickFlow({ episodes, submissions, from, to }),
     [episodes, submissions, from, to]
   );
-  const c = flow.coverage;
+  const counts = flow.coverage;
   return (
     <ChartCard
       title="Report-Sick Flow"
       note="Parade state to FormSG is counts only, not matched by name; type, outcome and Status follow each FormSG submission."
       coverage={
-        fmtInt(c.reportingSick) + ' reporting sick on the parade state, ' + fmtInt(c.reportedSick) +
-        ' reported sick on FormSG. Of those, the form records ' + fmtInt(c.mc) + ' MC, ' + fmtInt(c.status) +
-        ' Status, ' + fmtInt(c.both) + ' both and ' + fmtInt(c.none) + ' no outcome.'
+        `${fmtInt(counts.reportingSick)} reporting sick on the parade state, ${fmtInt(counts.reportedSick)} reported sick on FormSG. ` +
+        `Of those, the form records ${fmtInt(counts.mc)} MC, ${fmtInt(counts.status)} Status, ${fmtInt(counts.both)} both and ${fmtInt(counts.none)} no outcome.`
       }
     >
       <Sankey nodes={flow.nodes} links={flow.links} />
@@ -82,13 +72,10 @@ function SankeyCard({ episodes, submissions, from, to }) {
   );
 }
 
-/**
- * The Trends page.
- * @returns {!preact.VNode} The page.
- */
+/** The Trends page. */
 export function Trends() {
   const { data, episodes, submissions, range } = useCategory();
-  const dutyTrendFn = (dutyClass) => (scope, days) =>
+  const dutyTrendFn = (dutyClass: DutyFilter) => (scope: Scope, days: string[]) =>
     dutyTrend(data.personnel, data.strength, dutyClass, days, { scope, session: SESSION, asRate: false });
 
   return (

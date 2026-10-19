@@ -1,48 +1,43 @@
 /**
- * Everything the pages read, in one place.
- *
- * The shell owns all state; a page is a function of it. That is what keeps seven pages
- * from each growing their own copy of "which date range is selected" and drifting apart.
- *
- * The date pair and the single date answer different questions and are deliberately
- * separate. `selectedDate` names one parade — the Overview tiles and the Duty Roster tree
- * describe that day and ignore the range. `dateFrom`/`dateTo` bound every aggregate:
- * trends, rates, leaderboards, the Sankey. A reader is never left wondering which slice a
- * "today" figure covers, because a today figure covers today.
+ * Everything the pages read, in one place: the shell owns all state and a page is a function of it.
+ * `selectedDate` is the one parade the tiles describe; `dateFrom`/`dateTo` bound every aggregate.
  */
 
 import { signal, computed } from '@preact/signals';
+import type { Dataset } from '../data/feed.ts';
 
-/** @type {!import('@preact/signals').Signal<?Object>} Everything the feed returned. */
-export const dataset = signal(null);
+/** Where the session stands. */
+export type Status = 'locked' | 'loading' | 'ready' | 'error';
 
-/** @type {!import('@preact/signals').Signal<string>} 'locked' | 'loading' | 'ready' | 'error'. */
-export const status = signal('locked');
+/** Everything the feed returned. */
+export const dataset = signal<Dataset | null>(null);
 
-/** @type {!import('@preact/signals').Signal<string>} The message shown when status is 'error'. */
+/** Where the session stands. */
+export const status = signal<Status>('locked');
+
+/** The message shown on the login screen. */
 export const loadError = signal('');
 
-/** @type {!import('@preact/signals').Signal<?string>} The parade date the tiles describe. */
-export const selectedDate = signal(null);
+/** The parade date the tiles describe. */
+export const selectedDate = signal<string | null>(null);
 
-/** @type {!import('@preact/signals').Signal<?string>} Range start, or null for "from the beginning". */
-export const dateFrom = signal(null);
+/** Range start, or null for "from the beginning". */
+export const dateFrom = signal<string | null>(null);
 
-/** @type {!import('@preact/signals').Signal<?string>} Range end, or null for "to the latest". */
-export const dateTo = signal(null);
+/** Range end, or null for "to the latest". */
+export const dateTo = signal<string | null>(null);
 
-/** @type {!import('@preact/signals').Signal<string>} A company name, or 'ALL'. */
+/** A company name, or 'ALL'. */
 export const company = signal('ALL');
 
-/**
- * Whether the dashboard has data to draw.
- * @type {!import('@preact/signals').ReadonlySignal<boolean>}
- */
+/** Whether the dashboard has data to draw. */
 export const isReady = computed(() => status.value === 'ready' && dataset.value !== null);
 
-/**
- * Whether this session may change settings: it logged in, or unlocked editing, with the
- * settings password. The server decides; this only mirrors its answer.
- * @type {!import('@preact/signals').ReadonlySignal<boolean>}
- */
-export const canEdit = computed(() => Boolean(dataset.value && dataset.value.canEdit));
+/** Whether this session may change settings; the server decides, this mirrors its answer. */
+export const canEdit = computed(() => Boolean(dataset.value?.canEdit));
+
+/** The loaded dataset; pages render only once it exists (the router shows the login screen until then). */
+export function loadedData(): Dataset {
+  if (!dataset.value) throw new Error('A page rendered before the dataset loaded.');
+  return dataset.value;
+}

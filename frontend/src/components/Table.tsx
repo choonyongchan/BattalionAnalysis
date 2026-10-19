@@ -1,94 +1,74 @@
 /**
- * A plain data table, used directly by leaderboards and as a chart's table twin.
- *
- * Wrapped in its own horizontally-scrolling box so a wide table never makes the page
- * itself scroll sideways — the one layout rule every page in this dashboard keeps.
- *
- * A column may opt into client-side sorting with `sortable: true`; when no column does,
- * the table renders exactly as a static one and carries no state.
+ * A plain data table in its own horizontal scroller, so a wide table never scrolls the page sideways.
+ * A column may opt into client-side sorting with `sortable`; with none, it carries no state.
  */
 
+import type { ComponentChildren } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 
+/** A sort direction. */
+type Direction = 'asc' | 'desc';
+
 /**
- * Compares two `sortValue` results, always sinking nullish values to the bottom.
- * @param {*} a First value.
- * @param {*} b Second value.
- * @returns {number} Negative when `a` sorts first, positive when `b` does.
+ * One column: the row field it shows, whether it right-aligns as a number, and whether it sorts
+ * (`sortValue` reads the raw value behind a formatted cell; `defaultDir` is the first direction).
  */
-function compareValues_(a, b) {
+export interface Column<R> {
+  key: string;
+  label: string;
+  numeric?: boolean;
+  sortable?: boolean;
+  sortValue?: (row: R) => unknown;
+  defaultDir?: Direction;
+}
+
+/** Compares two sort values, always sinking blanks to the bottom. */
+function compareValues(a: unknown, b: unknown): number {
   const aNull = a === null || a === undefined || a === '';
   const bNull = b === null || b === undefined || b === '';
-  if (aNull && bNull) return 0;
-  if (aNull) return 1;
-  if (bNull) return -1;
+  if (aNull || bNull) return Number(aNull) - Number(bNull);
   if (typeof a === 'number' && typeof b === 'number') return a - b;
   return String(a).localeCompare(String(b), undefined, { numeric: true });
 }
 
-/**
- * The direction a column sorts in when first picked: its `defaultDir`, else largest first
- * for a number and A→Z for text.
- * @param {{numeric?: boolean, defaultDir?: string}} column The column definition.
- * @returns {string} 'asc' or 'desc'.
- */
-function firstDirOf_(column) {
-  return column.defaultDir || (column.numeric ? 'desc' : 'asc');
+/** A field of a row, read by name. */
+const field = <R,>(row: R, key: string): unknown => (row as Record<string, unknown>)[key];
+
+/** The first direction a column sorts in: its `defaultDir`, else largest first for numbers, A→Z for text. */
+function firstDirOf<R>(column: Column<R>): Direction {
+  return column.defaultDir ?? (column.numeric ? 'desc' : 'asc');
 }
 
-/**
- * The value a row contributes to sorting on a column.
- * @param {{key: string, sortValue?: function(!Object): *}} column The column definition.
- * @param {!Object} row The row.
- * @returns {*} A comparable value.
- */
-function sortValueOf_(column, row) {
-  return column.sortValue ? column.sortValue(row) : row[column.key];
-}
-
-/**
- * Renders a table from column definitions and rows.
- * @param {{columns: Array<{key: string, label: string, numeric?: boolean,
- *     sortable?: boolean, sortValue?: function(!Object): *, defaultDir?: string}>,
- *     rows: Array<!Object>,
- *     rowKey?: function(!Object, number): (string|number)}} props
- *     `columns` names each field to show, whether it right-aligns as a number, and whether
- *     it can be sorted (with an optional `sortValue` reading the raw comparable behind a
- *     pre-formatted cell, and an optional `defaultDir` of 'asc' or 'desc' it first sorts
- *     in); `rows` are plain objects read by `columns[].key`; `rowKey`
- *     picks a key, defaulting to the row's index.
- * @returns {!preact.VNode} The table, scroll-boxed.
- */
-export function DataTable({ columns, rows, rowKey }) {
-  const sortableColumns = columns.filter((column) => column.sortable);
-  const firstSortable = sortableColumns[0];
-  const [sort, setSort] = useState(
-    firstSortable
-      ? { key: firstSortable.key, dir: firstDirOf_(firstSortable) }
-      : null
+/** A table from column definitions and rows; `rowKey` defaults to the row's index. */
+export function DataTable<R extends object>({
+  columns,
+  rows,
+  rowKey,
+}: {
+  columns: Column<R>[];
+  rows: R[];
+  rowKey?: (row: R, index: number) => string | number;
+}) {
+  const firstSortable = columns.find((column) => column.sortable);
+  const [sort, setSort] = useState<{ key: string; dir: Direction } | null>(
+    firstSortable ? { key: firstSortable.key, dir: firstDirOf(firstSortable) } : null,
   );
 
-  const onSort = (column) => {
+  const onSort = (column: Column<R>) => {
     if (!column.sortable) return;
     setSort((current) =>
-      current && current.key === column.key
-        ? { key: column.key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-        : { key: column.key, dir: firstDirOf_(column) }
+      current?.key === column.key ? { key: column.key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key: column.key, dir: firstDirOf(column) },
     );
   };
 
   const sortedRows = useMemo(() => {
-    if (!sort) return rows;
-    const column = columns.find((candidate) => candidate.key === sort.key);
-    if (!column) return rows;
+    const column = sort && columns.find((candidate) => candidate.key === sort.key);
+    if (!sort || !column) return rows;
     const factor = sort.dir === 'asc' ? 1 : -1;
+    const valueOf = (row: R) => (column.sortValue ? column.sortValue(row) : field(row, column.key));
     return rows
       .map((row, index) => ({ row, index }))
-      .sort(
-        (a, b) =>
-          factor * compareValues_(sortValueOf_(column, a.row), sortValueOf_(column, b.row)) ||
-          a.index - b.index
-      )
+      .sort((a, b) => factor * compareValues(valueOf(a.row), valueOf(b.row)) || a.index - b.index)
       .map((entry) => entry.row);
   }, [rows, columns, sort]);
 
@@ -98,20 +78,16 @@ export function DataTable({ columns, rows, rowKey }) {
         <thead>
           <tr>
             {columns.map((column) => {
-              const active = sort && sort.key === column.key;
+              const active = sort?.key === column.key ? sort.dir : null;
               return (
                 <th
                   key={column.key}
-                  class={
-                    (column.numeric ? 'num' : '') + (column.sortable ? ' th-sortable' : '')
-                  }
-                  aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                  class={(column.numeric ? 'num' : '') + (column.sortable ? ' th-sortable' : '')}
+                  aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
                   onClick={column.sortable ? () => onSort(column) : undefined}
                 >
                   {column.label}
-                  {column.sortable ? (
-                    <span class="th-sort-indicator">{active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}</span>
-                  ) : null}
+                  {column.sortable ? <span class="th-sort-indicator">{active ? (active === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}</span> : null}
                 </th>
               );
             })}
@@ -122,7 +98,7 @@ export function DataTable({ columns, rows, rowKey }) {
             <tr key={rowKey ? rowKey(row, index) : index}>
               {columns.map((column) => (
                 <td key={column.key} class={column.numeric ? 'num' : ''}>
-                  {row[column.key]}
+                  {field(row, column.key) as ComponentChildren}
                 </td>
               ))}
             </tr>

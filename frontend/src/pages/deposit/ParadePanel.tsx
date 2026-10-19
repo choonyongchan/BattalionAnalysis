@@ -20,7 +20,7 @@ import { MESSAGE_STATUS, describeOutcome, reasonsOf, toMessageRows } from '../..
 import { settingOf } from '../../model/activeSettings.ts';
 import { Outcome, RowActions, runBusy } from './shared.tsx';
 
-/** @type {!Object<string, string>} The status class suffix for each status. */
+/** The status class suffix for each status. */
 const STATUS_CLASS = {
   [MESSAGE_STATUS.PARSED]: 'good',
   [MESSAGE_STATUS.NEEDS_REVIEW]: 'critical',
@@ -28,13 +28,7 @@ const STATUS_CLASS = {
   [MESSAGE_STATUS.PENDING]: 'warning',
 };
 
-/**
- * The deposit form, which doubles as the editor for a stored message.
- * @param {{text: string, onText: function(string), editing: ?number, busy: boolean,
- *     result: ?Object, onSubmit: function(), onCancel: function(), formRef: !Object}} props
- *     The form's state and handlers.
- * @returns {!preact.VNode} The card.
- */
+/** The deposit form, which doubles as the editor for a stored message. */
 function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, formRef }) {
   return (
     <Card
@@ -78,10 +72,8 @@ function DepositForm({ text, onText, editing, busy, result, onSubmit, onCancel, 
 }
 
 /**
- * The status cell: the label, and beneath it how many lines stopped the message parsing.
- * The lines themselves show only once the message is opened for editing.
- * @param {{status: string, problems: number}} props The row's status and doubted-line count.
- * @returns {!preact.VNode} The cell content.
+ * The status cell: the label, and beneath it how many lines stopped the message parsing. The lines themselves
+ * show only once the message is opened for editing.
  */
 function StatusCell({ status, problems }) {
   return (
@@ -96,10 +88,7 @@ function StatusCell({ status, problems }) {
   );
 }
 
-/**
- * The parade-state panel.
- * @returns {!preact.VNode} The deposit form and the stored messages.
- */
+/** The parade-state panel. */
 export function ParadePanel() {
   const [messages, setMessages] = useState(null);
   const [listError, setListError] = useState('');

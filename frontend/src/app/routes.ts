@@ -1,18 +1,9 @@
 /**
- * The eleven pages, in the order a commander reads them.
- *
- * One list, used three times: the sidebar renders it, the router matches it, and the
- * narrow-screen top bar takes its label from it. Adding a page means adding a row here
- * and nothing else.
- *
- * The grouping is the reading order, from now to the past. Today answers "what is the
- * battalion today" and Duty Roster "who is on duty". The medical pages answer the same
- * questions of report sick, MC and status in turn; Trends is the battalion over the range.
- * Training is self-regulated fitness training; Soldier looks one person up. Admin is
- * whether parade states arrive on time and add up, where a clerk deposits or corrects one,
- * and the settings the rest read from.
+ * The pages in reading order, from now to the past. One list feeds the sidebar, the router and the
+ * narrow-screen title: adding a page means adding a row here and nothing else.
  */
 
+import type { ComponentType } from 'preact';
 import {
   DepositIcon,
   FilingIcon,
@@ -38,11 +29,17 @@ import { DutyRoster } from '../pages/DutyRoster.tsx';
 import { Deposit } from '../pages/Deposit.tsx';
 import { Settings } from '../pages/Settings.tsx';
 
-/**
- * Every page: its route, its component, its label, its icon, and the sidebar group it sits in.
- * @type {!Array<{path: string, component: function, label: string, group: string, icon: function}>}
- */
-export const ROUTES = [
+/** One page: its hash path, component, label, sidebar group and icon. */
+export interface PageRoute {
+  path: string;
+  component: ComponentType;
+  label: string;
+  group: string;
+  icon: ComponentType<{ size?: number }>;
+}
+
+/** Every page, in sidebar order. */
+export const ROUTES: PageRoute[] = [
   {
     path: '/today',
     component: Today,
@@ -122,26 +119,18 @@ export const ROUTES = [
   },
 ];
 
-/**
- * Old paths and where they went, so a bookmark from before a rename still opens its page.
- * @type {!Object<string, string>}
- */
-export const ROUTE_ALIASES = {
+/** Old paths and where they went, so a bookmark from before a rename still opens its page. */
+export const ROUTE_ALIASES: Record<string, string> = {
   '/overview': '/today',
   '/status': '/status-restrictions',
 };
 
-/** @type {string} Where an unknown or empty hash lands. */
+/** Where an unknown or empty hash lands. */
 export const DEFAULT_ROUTE = '/today';
 
-/**
- * Groups the routes for the sidebar, keeping declaration order.
- *
- * A route with no group name renders in an unlabelled block.
- * @returns {!Array<{name: string, routes: !Array<!Object>}>} Groups in sidebar order.
- */
-export function navGroups() {
-  const groups = [];
+/** The routes grouped for the sidebar, in declaration order. */
+export function navGroups(): { name: string; routes: PageRoute[] }[] {
+  const groups: { name: string; routes: PageRoute[] }[] = [];
   ROUTES.forEach((route) => {
     const last = groups[groups.length - 1];
     if (last && last.name === route.group) {
@@ -153,11 +142,7 @@ export function navGroups() {
   return groups;
 }
 
-/**
- * Finds the route a path names.
- * @param {string} path The current route path.
- * @returns {?Object} The route, or null when the path names none.
- */
-export function routeAt(path) {
-  return ROUTES.find((route) => route.path === path) || null;
+/** The route a path names, or null. */
+export function routeAt(path: string): PageRoute | null {
+  return ROUTES.find((route) => route.path === path) ?? null;
 }
