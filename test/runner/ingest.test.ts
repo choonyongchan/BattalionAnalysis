@@ -4,49 +4,40 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { RelayError, createIngestor } from '../../runner/src/ingest.js';
+import { RelayError, createIngestor } from '../../runner/src/ingest.ts';
 
-/** @type {string} The intake URL used throughout. */
+/** The intake URL used throughout. */
 const URL = 'https://example.vercel.app/api/parade';
 
-/**
- * A fetch that answers from a script, one entry per call, recording each request.
- *
- * @param {!Array<(!Response|!Error)>} script What each successive call returns or throws.
- * @returns {{calls: !Array<{url: string, init: !Object}>, fetchImpl: typeof fetch}} The fake.
- */
-function scriptedFetch(script) {
-  const calls = [];
-  const fetchImpl = async (url, init) => {
+/** A fetch that answers from a script, one entry per call (the last repeats), recording each request. */
+function scriptedFetch(script: (Response | Error)[]) {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
     calls.push({ url, init });
-    const next = script[Math.min(calls.length - 1, script.length - 1)];
+    const next = script[Math.min(calls.length - 1, script.length - 1)]!;
     if (next instanceof Error) throw next;
     return next;
-  };
+  }) as unknown as typeof fetch;
   return { calls, fetchImpl };
 }
 
-/**
- * A JSON response.
- *
- * @param {number} status The status code.
- * @param {!Object} body The JSON body.
- * @returns {!Response} The response.
- */
-function answer(status, body) {
+/** A JSON response. */
+function answer(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-/**
- * Builds a relay over a scripted fetch, with sleeps recorded instead of waited.
- *
- * @param {!Array<(!Response|!Error)>} script What each call returns or throws.
- * @returns {{relay: !Object, calls: !Array<!Object>, sleeps: !Array<number>}} The relay and its records.
- */
-function relayOver(script) {
+/** A relay over a scripted fetch, with sleeps recorded instead of waited. */
+function relayOver(script: (Response | Error)[]) {
   const { calls, fetchImpl } = scriptedFetch(script);
-  const sleeps = [];
-  const relay = createIngestor({ url: URL, secret: 's3cret', fetchImpl, sleep: async (ms) => sleeps.push(ms) });
+  const sleeps: number[] = [];
+  const relay = createIngestor({
+    url: URL,
+    secret: 's3cret',
+    fetchImpl,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+  });
   return { relay, calls, sleeps };
 }
 
@@ -57,10 +48,10 @@ describe('createIngestor.ingest', () => {
     await relay.ingest('PARADE STATE', 'MSG1');
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(URL);
-    expect(calls[0].init.method).toBe('POST');
-    expect(calls[0].init.headers.Authorization).toBe('Bearer s3cret');
-    expect(JSON.parse(calls[0].init.body)).toEqual({ waMessageId: 'MSG1', body: 'PARADE STATE' });
+    expect(calls[0]!.url).toBe(URL);
+    expect(calls[0]!.init.method).toBe('POST');
+    expect(new Headers(calls[0]!.init.headers).get('Authorization')).toBe('Bearer s3cret');
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ waMessageId: 'MSG1', body: 'PARADE STATE' });
   });
 
   test('returns a 422 answer as final, without retrying', async () => {

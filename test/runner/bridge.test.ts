@@ -4,27 +4,20 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { loadConfig } from '../../runner/src/config.js';
-import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.js';
-import { createMessageHandler } from '../../runner/src/index.js';
+import { loadConfig } from '../../runner/src/config.ts';
+import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.ts';
+import { createMessageHandler } from '../../runner/src/index.ts';
+import type { IntakeOutcome } from '../../runner/src/ingest.ts';
+import type { WAMessage } from '@whiskeysockets/baileys';
 
-/** @type {string} A marker standing in for a name/NRIC that must never reach a log. */
+/** A marker standing in for a name/NRIC that must never reach a log. */
 const MARKER = 'NRIC S0000000Z BODY';
 
-/** @type {string} JID used as the watched group in the envelope tests. */
+/** JID used as the watched group in the envelope tests. */
 const GROUP_JID = '120363000000000000@g.us';
 
-/**
- * A complete environment for loadConfig, so a test can vary one key at a time.
- *
- * Passed in explicitly rather than set on process.env: .env.whatsapp is loaded
- * into process.env as a side effect that a test cannot undo, so a populated
- * .env.whatsapp on the developer's machine used to override whatever the test set.
- *
- * @param {!Object<string, string>=} overrides Keys to merge over the defaults.
- * @returns {!Object<string, string>} An environment object.
- */
-function sampleEnv(overrides = {}) {
+/** A complete environment for loadConfig, passed explicitly because `.env.whatsapp` is already in process.env. */
+function sampleEnv(overrides: Record<string, string> = {}): Record<string, string | undefined> {
   return {
     WA_GROUP_ID: GROUP_JID,
     PARADE_API_URL: 'https://example.vercel.app/api/parade',
@@ -33,8 +26,11 @@ function sampleEnv(overrides = {}) {
   };
 }
 
-/** @type {import('pino').Logger} A logger stub that records nothing. */
+/** A logger stub that records nothing. */
 const silentLogger = { info: () => {}, debug: () => {}, warn: () => {}, error: () => {} };
+
+/** A minimal envelope carrying only a message id. */
+const withId = (id: string) => ({ key: { id } }) as WAMessage;
 
 describe('loadConfig', () => {
   test('reads the required settings', () => {
@@ -73,15 +69,10 @@ describe('loadConfig', () => {
 
 
 describe('listener envelope filters', () => {
-  /**
-   * Builds a minimal Baileys envelope.
-   *
-   * @param {Object} overrides Fields to override on the default envelope.
-   * @returns {Object} The envelope.
-   */
-  function envelope(overrides = {}) {
+  /** A minimal inbound group envelope, with `key` fields or `message` replaced. */
+  function envelope(overrides: { key?: Partial<WAMessage['key']>; message?: WAMessage['message'] } = {}): WAMessage {
     return {
-      key: { id: 'MSG1', remoteJid: GROUP_JID, fromMe: false, ...(overrides.key || {}) },
+      key: { id: 'MSG1', remoteJid: GROUP_JID, fromMe: false, ...overrides.key },
       message: overrides.message === undefined ? { conversation: 'hello' } : overrides.message,
     };
   }
@@ -112,28 +103,19 @@ describe('listener envelope filters', () => {
 });
 
 describe('createMessageHandler', () => {
-  /**
-   * An ingestor that records what it was given.
-   *
-   * @param {function(): !Promise<Object>=} impl Replaces the default outcome.
-   * @returns {{calls: !Array<!Array<string>>, ingest: function(string, string): !Promise<Object>}}
-   */
-  function fakeIngestor(impl = async () => ({ status: 'parsed', id: 1 })) {
-    const calls = [];
+  /** An ingestor that records what it was given. */
+  function fakeIngestor(impl: () => Promise<IntakeOutcome> = async () => ({ status: 'parsed', id: 1 })) {
+    const calls: [string, string][] = [];
     return {
       calls,
-      ingest: async (text, messageId) => {
+      ingest: async (text: string, messageId: string) => {
         calls.push([text, messageId]);
         return impl();
       },
     };
   }
 
-  /**
-   * A minimal well-formed first parade state: enough signals and bulk to clear every
-   * signature gate, standing in for a real sample so these tests need no external corpus.
-   * @type {string}
-   */
+  /** A minimal first parade state that clears every signature gate. */
   const PARADE_STATE = [
     'HERCULES COMPANY FIRST PARADE STATE',
     'DATE: 220626 @ 0730 Hrs',
@@ -152,11 +134,11 @@ describe('createMessageHandler', () => {
   test('ingests an accepted parade state with its message id', async () => {
     const ingestor = fakeIngestor();
     const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
-    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
+    await handle(PARADE_STATE, withId('MSG1'));
 
     expect(ingestor.calls).toHaveLength(1);
-    expect(ingestor.calls[0][1]).toBe('MSG1');
-    expect(ingestor.calls[0][0]).toContain('PARADE STATE');
+    expect(ingestor.calls[0]?.[1]).toBe('MSG1');
+    expect(ingestor.calls[0]?.[0]).toContain('PARADE STATE');
   });
 
   test.each([
@@ -165,15 +147,15 @@ describe('createMessageHandler', () => {
     ['needs_review', 'warn', 'parade state stored; needs correcting on the dashboard'],
     ['rejected', 'warn', 'parade state rejected by the parser'],
   ])('logs a %s answer at %s', async (status, level, message) => {
-    const logged = [];
-    const capturingLogger = { ...silentLogger, [level]: (fields, msg) => logged.push(msg) };
+    const logged: (string | undefined)[] = [];
+    const capturingLogger = { ...silentLogger, [level as string]: (_fields: unknown, msg?: string) => logged.push(msg) };
     const handle = createMessageHandler({
       config: { dryRun: false },
       logger: capturingLogger,
-      ingestor: fakeIngestor(async () => ({ status, id: 1 })),
+      ingestor: fakeIngestor(async () => ({ status: status as string, id: 1 })),
     });
 
-    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
+    await handle(PARADE_STATE, withId('MSG1'));
 
     expect(logged).toEqual([message]);
   });
@@ -181,7 +163,7 @@ describe('createMessageHandler', () => {
   test('never ingests a rejected message', async () => {
     const ingestor = fakeIngestor();
     const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
-    await handle('Why is your parade state late?', { key: { id: 'MSG2' } });
+    await handle('Why is your parade state late?', withId('MSG2'));
 
     expect(ingestor.calls).toHaveLength(0);
   });
@@ -189,7 +171,7 @@ describe('createMessageHandler', () => {
   test('ingests nothing in DRY_RUN', async () => {
     const ingestor = fakeIngestor();
     const handle = createMessageHandler({ config: { dryRun: true }, logger: silentLogger, ingestor });
-    await handle(PARADE_STATE, { key: { id: 'MSG3' } });
+    await handle(PARADE_STATE, withId('MSG3'));
 
     expect(ingestor.calls).toHaveLength(0);
   });
@@ -200,16 +182,16 @@ describe('createMessageHandler', () => {
     });
     const handle = createMessageHandler({ config: { dryRun: false }, logger: silentLogger, ingestor });
 
-    expect(await handle(PARADE_STATE, { key: { id: 'MSG4' } })).toBeUndefined();
+    expect(await handle(PARADE_STATE, withId('MSG4'))).toBeUndefined();
   });
 
   test('never logs the problems or reason the intake quotes back', async () => {
-    const logged = [];
-    const capturingLogger = { ...silentLogger, warn: (fields, msg) => logged.push([fields, msg]) };
-    const ingestor = fakeIngestor(async () => ({ status: 'needs_review', id: 7, problems: [MARKER], reason: MARKER }));
+    const logged: unknown[] = [];
+    const capturingLogger = { ...silentLogger, warn: (fields: unknown, msg?: string) => logged.push([fields, msg]) };
+    const ingestor = fakeIngestor(async () => ({ status: 'needs_review', id: 7, problems: [MARKER], reason: MARKER }) as IntakeOutcome);
     const handle = createMessageHandler({ config: { dryRun: false }, logger: capturingLogger, ingestor });
 
-    await handle(PARADE_STATE, { key: { id: 'MSG5' } });
+    await handle(PARADE_STATE, withId('MSG5'));
 
     expect(logged).toHaveLength(1);
     expect(JSON.stringify(logged)).not.toContain(MARKER);

@@ -12,10 +12,10 @@
     "typecheck": "tsc -p .",
     "db:generate": "bun run --cwd backend db:generate",
     "db:migrate": "bun --env-file=.env.local backend/scripts/apply-migrations.ts",
-    "runner": "bun --env-file=.env.whatsapp runner/src/supervisor.js",
-    "runner:bridge": "bun --env-file=.env.whatsapp runner/src/index.js",
-    "runner:reset-auth": "bun runner/scripts/reset-auth.js",
-    "runner:service": "bun runner/scripts/service.js"
+    "runner": "bun --env-file=.env.whatsapp runner/src/supervisor.ts",
+    "runner:bridge": "bun --env-file=.env.whatsapp runner/src/index.ts",
+    "runner:reset-auth": "bun runner/scripts/reset-auth.ts",
+    "runner:service": "bun runner/scripts/service.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

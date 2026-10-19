@@ -7,11 +7,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { isParadeState } from '../../runner/src/signature.js';
+import { isParadeState } from '../../runner/src/signature.ts';
 
 describe('isParadeState - chatter', () => {
-  /** @type {Array<[string, string]>} Label and text of each rejected message. */
-  const negatives = [
+  /** Label and text of each rejected message. */
+  const negatives: [string, string][] = [
     ['the stated near-miss', 'Why is your parade state late?'],
     ['a greeting', 'Hi!'],
     ['an empty string', ''],
@@ -66,16 +66,8 @@ describe('isParadeState - verdict shape', () => {
 });
 
 describe('isParadeState - first parade gate', () => {
-  /**
-   * Builds a well-formed parade state around a given header.
-   *
-   * The body carries enough strength lines and bulk to clear every other gate,
-   * so the verdict turns purely on the header.
-   *
-   * @param {string} header The header lines under test.
-   * @returns {string} A complete parade-state message.
-   */
-  function withHeader(header) {
+  /** A well-formed parade state around a header, so the verdict turns purely on the header. */
+  function withHeader(header: string): string {
     return [
       header,
       '',
@@ -90,19 +82,13 @@ describe('isParadeState - first parade gate', () => {
     ].join('\n');
   }
 
-  /**
-   * Rewrites every present/strength pair as "present of strength", so no
-   * strength line is left.
-   *
-   * @param {string} text A parade state.
-   * @returns {string} The same text without a present/strength line.
-   */
-  function withoutStrengthLines(text) {
+  /** The same text with every present/strength pair rewritten as "present of strength". */
+  function withoutStrengthLines(text: string): string {
     return text.replace(/: (\d+)\/(\d+)$/gm, ': $1 of $2');
   }
 
-  /** @type {Array<[string, string]>} Label and header of each accepted message. */
-  const accepted = [
+  /** Label and header of each accepted message. */
+  const accepted: [string, string][] = [
     ['FIRST PARADE STATE', '40 SAR COUGAR COMPANY\nFIRST PARADE STATE\nDATE: 220626 TIME: 0530'],
     ['a bare FIRST PARADE', 'PARADE STATE FOR 220626\nSTALLION COY FIRST PARADE'],
     ['a terse FPS with no anchor phrase', '40 SAR ARCHER COY FPS\n220626'],
@@ -117,8 +103,8 @@ describe('isParadeState - first parade gate', () => {
     });
   }
 
-  /** @type {Array<[string, string, string]>} Label, header and expected reason fragment. */
-  const rejected = [
+  /** Label, header and expected reason fragment. */
+  const rejected: [string, string, string][] = [
     ['LAST PARADE STATE', '40 SAR BRAVES COMPANY\nLAST PARADE STATE\nDATE: 220626 TIME: 1830', 'last parade'],
     ['a terse LPS', '40 SAR BRAVES COY LPS\n220626', 'last parade'],
     ['a bare LP', 'BRAVES COY\n220626 LP 1830', 'last parade'],

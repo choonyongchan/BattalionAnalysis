@@ -5,18 +5,20 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["bun"],
-    "allowJs": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["backend/**/*.ts", "test/**/*.ts"]
+  "include": ["backend/**/*.ts", "shared/**/*.ts", "runner/**/*.ts", "frontend/src/**/*.ts", "frontend/src/**/*.tsx", "frontend/*.ts", "test/**/*.ts"]
 }

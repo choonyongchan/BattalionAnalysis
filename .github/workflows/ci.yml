@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - run: bun run typecheck
       # The DB and end-to-end suites skip unless this secret names a Neon test branch.
       - run: bun run test:coverage
         env:

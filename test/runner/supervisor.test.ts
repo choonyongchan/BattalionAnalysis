@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, mock, test } from 'bun:test';
-import { computeBackoffMs, isCleanExit, nextRestartCount, runSupervisor } from '../../runner/src/supervisor.js';
+import { computeBackoffMs, isCleanExit, nextRestartCount, runSupervisor, type Child } from '../../runner/src/supervisor.ts';
 
 describe('computeBackoffMs', () => {
   test('grows with each consecutive restart', () => {
@@ -50,32 +50,24 @@ describe('isCleanExit', () => {
   });
 });
 
-/**
- * Builds a spawner whose children exit with the given results, in order.
- *
- * @param {Array<{exitCode: ?number, signalCode?: ?string, ranMs?: number}>} exits
- *   One entry per child: how it exits and how long it ran.
- * @returns {Function} The spawner, a mock so its calls can be counted.
- */
-function fakeSpawner(exits) {
+/** How one fake child exits, and how long it ran. */
+type Exit = { exitCode: number | null; signalCode?: NodeJS.Signals | null; ranMs?: number };
+
+/** A spawner (a mock, so calls can be counted) whose children exit as listed, in order. */
+function fakeSpawner(exits: Exit[]) {
   let index = 0;
-  return mock(() => {
-    const { exitCode, signalCode = null, ranMs = 1_000 } = exits[index++];
-    const proc = { pid: index, exited: Promise.resolve(exitCode), signalCode, kill: mock() };
+  return mock((): Child => {
+    const { exitCode, signalCode = null, ranMs = 1_000 } = exits[index++]!;
+    const proc = { pid: index, exited: Promise.resolve(exitCode), signalCode, kill: mock() } as unknown as Child['proc'];
     return { proc, startedAt: Date.now() - ranMs };
   });
 }
 
-/**
- * Runs the supervisor against fake collaborators.
- *
- * @param {Function} spawnChild The fake spawner.
- * @param {Function=} onStopSignal The fake signal installer.
- * @returns {Promise<{code: number, wait: Function, logger: Object}>} The exit code
- *   and the fakes, for assertions.
- */
-async function supervise(spawnChild, onStopSignal = () => {}) {
-  const wait = mock(async () => {});
+type StopSignal = NonNullable<Parameters<typeof runSupervisor>[0]>['onStopSignal'];
+
+/** Runs the supervisor against fake collaborators; returns its exit code and the fakes. */
+async function supervise(spawnChild: () => Child, onStopSignal: StopSignal = () => {}) {
+  const wait = mock(async (_ms: number) => {});
   const logger = { info: mock(), warn: mock(), fatal: mock() };
   const code = await runSupervisor({ spawnChild, wait, onStopSignal, logger });
   return { code, wait, logger };
@@ -115,7 +107,7 @@ describe('runSupervisor', () => {
     expect(code).toBe(1);
     expect(spawn).toHaveBeenCalledTimes(4);
     expect(wait.mock.calls).toEqual([[3000], [15000], [60000]]);
-    expect(logger.fatal.mock.calls[1][0]).toContain('giving up after 3 consecutive restarts');
+    expect(logger.fatal.mock.calls[1]?.[0]).toContain('giving up after 3 consecutive restarts');
   });
 
   test('a long stable run resets the restart count', async () => {
@@ -136,23 +128,26 @@ describe('runSupervisor', () => {
     [130, 130],
     [null, 0],
   ])('stops on a signal instead of restarting (child exit %p -> %p)', async (exitCode, expected) => {
-    let resolveExit;
-    const proc = { pid: 1, exited: new Promise((resolve) => (resolveExit = resolve)), signalCode: 'SIGINT' };
+    let resolveExit: (code: number | null) => void = () => {};
+    const exited = new Promise<number | null>((resolve) => (resolveExit = resolve));
+    const proc = { pid: 1, exited, signalCode: 'SIGINT' } as unknown as Child['proc'];
     const spawn = mock(() => ({ proc, startedAt: Date.now() }));
-    let signal;
-    const running = supervise(spawn, (getChild, markShuttingDown) => {
-      signal = { getChild, markShuttingDown };
+    let getChild: () => Child['proc'] | null = () => null;
+    let markShuttingDown = () => {};
+    const running = supervise(spawn, (get, mark) => {
+      getChild = get;
+      markShuttingDown = mark;
     });
     await Promise.resolve();
 
-    expect(signal.getChild()).toBe(proc);
-    signal.markShuttingDown();
+    expect(getChild()).toBe(proc);
+    markShuttingDown();
     resolveExit(exitCode);
     const { code, wait } = await running;
 
     expect(code).toBe(expected);
     expect(spawn).toHaveBeenCalledTimes(1);
     expect(wait).not.toHaveBeenCalled();
-    expect(signal.getChild()).toBeNull();
+    expect(getChild()).toBeNull();
   });
 });

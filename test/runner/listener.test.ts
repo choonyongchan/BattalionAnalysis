@@ -9,7 +9,7 @@
 import { describe, expect, test } from 'bun:test';
 import { DisconnectReason } from '@whiskeysockets/baileys';
 import pino from 'pino';
-import { baileysLogger, classifyDisconnect, reconnectDelayMs } from '../../runner/src/listener.js';
+import { baileysLogger, classifyDisconnect, reconnectDelayMs } from '../../runner/src/listener.ts';
 
 describe('classifyDisconnect', () => {
   test('treats a logged-out session as fatal', () => {
@@ -56,8 +56,8 @@ describe('reconnectDelayMs', () => {
 
 describe('baileysLogger', () => {
   test('keeps the message and error text, never the payload Baileys attaches', () => {
-    const lines = [];
-    const sink = { write: (line) => lines.push(line) };
+    const lines: string[] = [];
+    const sink = { write: (line: string) => lines.push(line) };
     const logger = baileysLogger(pino({ level: 'info' }, sink));
     logger.warn({ key: { participant: '6591234567@s.whatsapp.net' }, notify: 'Tan Ah Kow', err: new Error('bad mac') }, 'failed to decrypt message');
     logger.child({}).error('plain text');

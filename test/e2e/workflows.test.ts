@@ -20,10 +20,10 @@ import { battalionStrength, dutyCountsOn } from '../../frontend/src/model/metric
 import { MESSAGE_STATUS, toMessageRows } from '../../frontend/src/model/paradeMessages.js';
 import { toEditForm } from '../../shared/sftEdit.ts';
 import { toSftRecords } from '../../frontend/src/model/sft.js';
-import { loadConfig } from '../../runner/src/config.js';
-import { createMessageHandler } from '../../runner/src/index.js';
-import { createIngestor } from '../../runner/src/ingest.js';
-import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.js';
+import { loadConfig } from '../../runner/src/config.ts';
+import { createMessageHandler } from '../../runner/src/index.ts';
+import { createIngestor } from '../../runner/src/ingest.ts';
+import { extractText, isWatchedGroupMessage } from '../../runner/src/listener.ts';
 import { DASHBOARD_PASSWORD, INGEST_SECRET, SETTINGS_PASSWORD, forgetCookies, startApp, withOrigin, type RunningApp } from '../support/app.ts';
 import { countRows, DB_TIMEOUT_MS, hasTestDb, resetTestDb } from '../support/db.ts';
 import { FAKE_NRIC, SFT_SPECS, SICK_SPECS, sftWebhookRequest, webhookRequest } from '../support/formsg.ts';

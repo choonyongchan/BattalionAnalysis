@@ -1,54 +1,32 @@
 /**
- * Runs the WhatsApp supervisor in the background forever, via Task Scheduler.
- *
- * `bun run runner:service install` (from an Administrator terminal) registers a
- * task that runs as SYSTEM, so it starts at boot with nobody logged in and needs
- * no stored password. An every-5-minutes trigger with `IgnoreNew` is the
- * watchdog: a no-op while the supervisor runs, a relaunch once it has died.
- * Pair interactively with `bun run runner` first - the QR needs a terminal.
- *
- * Usage: bun run runner:service <install|uninstall|start|stop|restart|status>
+ * Runs the supervisor in the background via Task Scheduler, as SYSTEM, started at boot and re-launched
+ * every 5 minutes if dead. Pair with `bun run runner` first. Usage: `bun run runner:service <command>`.
  */
 
 import { join } from 'node:path';
 
-/** @type {string} Scheduled task name. */
+/** Scheduled task name. */
 const TASK_NAME = 'WhatsAppBridge';
 
-/** @type {string} Repo root: the task's working directory, where `.env.whatsapp` lives. */
+/** Repo root: the task's working directory, where `.env.whatsapp` lives. */
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
-/** @type {string} Append-only log of the supervisor's output. */
+/** Append-only log of the supervisor's output. */
 const LOG_PATH = join(REPO_ROOT, 'runner', 'data', 'bridge.log');
 
-/**
- * @type {string} PowerShell that kills only this bridge's bun processes (the
- * supervisor and its child), not every bun on the machine.
- */
+/** PowerShell that kills only this bridge's bun processes, not every bun on the machine. */
 const KILL_BRIDGE = `Get-CimInstance Win32_Process -Filter "Name='bun.exe'" |
-  Where-Object { $_.CommandLine -match 'runner[\\\\/]src[\\\\/](supervisor|index)\\.js' } |
+  Where-Object { $_.CommandLine -match 'runner[\\\\/]src[\\\\/](supervisor|index)\\.ts' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`;
 
-/**
- * Quotes a value as a PowerShell single-quoted string literal.
- *
- * @param {string} value Raw value.
- * @returns {string} The quoted literal.
- */
-function psQuote(value) {
+/** A PowerShell single-quoted string literal. */
+function psQuote(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-/**
- * Builds the PowerShell that registers (or replaces) and starts the task.
- *
- * @param {string} bunPath Absolute path to the bun executable.
- * @param {string} repoRoot Absolute path to the repo root.
- * @param {string} logPath Absolute path to the log file.
- * @returns {string} A PowerShell script.
- */
-export function installScript(bunPath, repoRoot, logPath) {
-  const cmdArgs = `/c ""${bunPath}" --env-file=.env.whatsapp runner\\src\\supervisor.js >> "${logPath}" 2>&1"`;
+/** PowerShell that registers (or replaces) and starts the task. */
+export function installScript(bunPath: string, repoRoot: string, logPath: string): string {
+  const cmdArgs = `/c ""${bunPath}" --env-file=.env.whatsapp runner\\src\\supervisor.ts >> "${logPath}" 2>&1"`;
   return `$ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force ${psQuote(join(logPath, '..'))} | Out-Null
 $act  = New-ScheduledTaskAction -Execute 'cmd.exe' -WorkingDirectory ${psQuote(repoRoot)} -Argument ${psQuote(cmdArgs)}
@@ -63,15 +41,8 @@ powercfg /change standby-timeout-ac 0
 Start-ScheduledTask -TaskName ${psQuote(TASK_NAME)}`;
 }
 
-/**
- * Builds the PowerShell for every subcommand.
- *
- * @param {string} bunPath Absolute path to the bun executable.
- * @param {string} repoRoot Absolute path to the repo root.
- * @param {string} logPath Absolute path to the log file.
- * @returns {Record<string, string>} Subcommand name to PowerShell script.
- */
-export function scripts(bunPath, repoRoot, logPath) {
+/** PowerShell for every subcommand. */
+export function scripts(bunPath: string, repoRoot: string, logPath: string): Record<string, string> {
   const task = psQuote(TASK_NAME);
   const stop = `Disable-ScheduledTask -TaskName ${task} | Out-Null
 Stop-ScheduledTask -TaskName ${task}
@@ -89,15 +60,10 @@ if (Test-Path ${psQuote(logPath)}) { Get-Content ${psQuote(logPath)} -Tail 5 }`,
   };
 }
 
-/**
- * Dispatches the subcommand.
- *
- * @param {string | undefined} command One of install, uninstall, start, stop, restart, status.
- * @returns {void}
- */
-function main(command) {
+/** Runs one subcommand: install, uninstall, start, stop, restart or status. */
+function main(command: string | undefined): void {
   const all = scripts(process.execPath, REPO_ROOT, LOG_PATH);
-  if (process.platform !== 'win32' || !Object.hasOwn(all, command ?? '')) {
+  if (process.platform !== 'win32' || command === undefined || !Object.hasOwn(all, command)) {
     console.error(`usage (Windows only): bun run runner:service <${Object.keys(all).join('|')}>`);
     process.exit(1);
   }
