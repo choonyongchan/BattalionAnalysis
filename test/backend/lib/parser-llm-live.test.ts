@@ -1,11 +1,7 @@
 /**
- * The OpenAI fallback against the real API: proves the configured model exists, accepts the
- * strict schema, and reads a parade state correctly. The fake-`fetch` suite cannot catch a bad
- * model id or a schema the API rejects; this one can.
- *
- * Skipped unless `OPENAI_API_KEY` is set (in `.env.test`, which `bun test` loads), so `bun test`
- * stays offline by default. Each run makes a few billed calls.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The OpenAI fallback against the real API: proves the configured model exists, accepts the strict schema,
+ * and reads a parade state correctly. The fake-`fetch` suite cannot catch a bad model id or a schema the API
+ * rejects; this one can. NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { describe, expect, test } from 'bun:test';
 import { OpenAiParser } from '../../../backend/lib/parser/llm.ts';

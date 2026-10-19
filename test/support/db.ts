@@ -1,15 +1,6 @@
 /**
- * A real Neon database for the integration and end-to-end suites.
- *
- * The suites run against `TEST_DATABASE_URL`, a Neon branch kept for tests, through the same
- * `neon-http` driver the app uses, so `db.batch` and every constraint are the real ones. With the
- * variable unset those suites are skipped and `bun test` stays offline.
- *
- * Set the URL in `.env.test` (gitignored): `bun test` loads that file, not `.env.local`.
- *
- * Every test starts from empty tables, so the branch must never hold anything worth keeping.
- * `assertSafeTestUrl` refuses a URL that points at the app's own database, in case the
- * production URLs reach the environment anyway (a shell export, `--env-file`).
+ * A real Neon branch (`TEST_DATABASE_URL` in `.env.test`) for the integration and end-to-end suites; unset, they
+ * are skipped. Every test empties its tables, and `assertSafeTestUrl` refuses the app's own database.
  */
 import { neon } from '@neondatabase/serverless';
 import { sql } from 'drizzle-orm';
@@ -50,23 +41,14 @@ const TABLES = [
 const PROTECTED_VARS = ['DATABASE_URL', 'DATABASE_URL_DIRECT', 'DASHBOARD_DATABASE_URL'];
 
 /**
- * The Neon endpoint a connection string points at, ignoring the pooler suffix, so the pooled
- * and direct URLs of one branch compare equal.
- *
- * @param url A Postgres connection string.
- * @returns The endpoint host, lower-cased.
+ * The Neon endpoint a connection string points at, ignoring the pooler suffix, so the pooled and direct URLs
+ * of one branch compare equal.
  */
 export function endpointOf(url: string): string {
   return new URL(url).hostname.toLowerCase().replace('-pooler.', '.');
 }
 
-/**
- * Throws unless a test URL is clearly separate from every configured app database.
- *
- * @param url The candidate test URL.
- * @param env The environment to compare against.
- * @throws {Error} When the URL shares an endpoint with a protected database.
- */
+/** Throws unless a test URL is clearly separate from every configured app database. */
 export function assertSafeTestUrl(url: string, env: Record<string, string | undefined> = process.env): void {
   for (const name of PROTECTED_VARS) {
     const other = env[name];
@@ -77,13 +59,10 @@ export function assertSafeTestUrl(url: string, env: Record<string, string | unde
 }
 
 /**
- * Records every migration as applied when the branch already has the app's tables but no
- * bookkeeping rows. A schema-only Neon branch copies the schema and leaves every table empty,
- * `drizzle.__drizzle_migrations` included, so the migrator would otherwise try to create the
- * tables again. This is the same baselining the main branch had (see `tasks/todo.md`).
- *
- * @param url The test branch.
- * @returns Nothing.
+ * Records every migration as applied when the branch already has the app's tables but no bookkeeping rows. A
+ * schema-only Neon branch copies the schema and leaves every table empty, `drizzle.__drizzle_migrations`
+ * included, so the migrator would otherwise try to create the tables again. This is the same baselining the
+ * main branch had (see `tasks/todo.md`).
  */
 async function baselineSchemaOnlyBranch(url: string): Promise<void> {
   const sql = neon(url);
@@ -100,12 +79,7 @@ async function baselineSchemaOnlyBranch(url: string): Promise<void> {
 let handle: Db | undefined;
 let migrated: Promise<void> | undefined;
 
-/**
- * The test branch's Drizzle handle, built like `db/index.ts#getDb`. Migrates on first use.
- *
- * @returns The handle.
- * @throws {Error} When `TEST_DATABASE_URL` is unset or unsafe.
- */
+/** The test branch's Drizzle handle, built like `db/index.ts#getDb`. Migrates on first use. */
 export async function testDb(): Promise<Db> {
   if (!TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not set.');
   if (!handle) {
@@ -118,37 +92,21 @@ export async function testDb(): Promise<Db> {
   return handle;
 }
 
-/**
- * The test branch as `dashboard_read`, built like the dashboard route's handle.
- *
- * @returns The handle.
- * @throws {Error} When `TEST_DASHBOARD_DATABASE_URL` is unset or unsafe.
- */
+/** The test branch as `dashboard_read`, built like the dashboard route's handle. */
 export function readOnlyTestDb(): Db {
   if (!TEST_DASHBOARD_DATABASE_URL) throw new Error('TEST_DASHBOARD_DATABASE_URL is not set.');
   assertSafeTestUrl(TEST_DASHBOARD_DATABASE_URL);
   return drizzle(neon(TEST_DASHBOARD_DATABASE_URL), { schema });
 }
 
-/**
- * Empties every app table and restarts their ids, so each test sees a fresh database.
- *
- * @returns The handle, for convenience.
- */
+/** Empties every app table and restarts their ids, so each test sees a fresh database. */
 export async function resetTestDb(): Promise<Db> {
   const db = await testDb();
   await db.execute(sql.raw(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`));
   return db;
 }
 
-/**
- * Counts rows in a table, optionally for one parade submission.
- *
- * @param db The handle.
- * @param table A table name from the schema.
- * @param paradeResponseId Only rows of this submission, when given.
- * @returns The count.
- */
+/** Counts rows in a table, optionally for one parade submission. */
 export async function countRows(db: Db, table: string, paradeResponseId?: string): Promise<number> {
   const where = paradeResponseId ? sql` where parade_response_id = ${paradeResponseId}` : sql``;
   const result = await db.execute(sql`select count(*)::int as n from ${sql.identifier(table)}${where}`);

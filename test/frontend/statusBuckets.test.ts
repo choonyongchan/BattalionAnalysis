@@ -1,13 +1,4 @@
-/**
- * Tests for folding 403 free-text Status reasons into ten buckets.
- *
- * The risk worth covering is the vocabulary collapse: one restriction is typed at least
- * four different ways ("Excuse RMJ" / "EX RMJ" / "RMJ" / a sentence naming it alongside
- * others), and a row commonly names several restrictions at once, so the match must be
- * multi-label without producing duplicates. Permanence is the other risk — the intended
- * sentinel (`numDays` 999) does not appear anywhere in the real data, so the fallback on
- * `reason` text is what actually carries the signal today.
- */
+/** Tests for folding 403 free-text Status reasons into ten buckets. */
 
 import { describe, expect, test } from 'bun:test';
 import { bucketsFor, isPermanentStatus, restrictionsOn, STATUS_BUCKETS } from '../../frontend/src/model/statusBuckets.ts';

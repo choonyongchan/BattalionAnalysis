@@ -1,14 +1,4 @@
-/**
- * The Structured Outputs schema.
- *
- * OpenAI strict mode rejects a schema that breaks any of three rules, and it does so at
- * request time -- in production, on a real parade state, after the message has already been
- * accepted. Walking the whole tree here moves that failure to the test suite.
- *
- * The enum checks matter for a different reason: they are what proves the parser and the
- * database still share one vocabulary. The old system kept three hand-written copies of
- * these lists and tested that they matched; this asserts there is only one.
- */
+/** The Structured Outputs schema. */
 import { describe, expect, test } from 'bun:test';
 import { buildResponseSchema } from '../../../backend/lib/parser/schema.ts';
 import {
@@ -21,13 +11,7 @@ import {
 
 type Node = Record<string, any>;
 
-/**
- * Visits every object-typed node in a JSON Schema.
- *
- * @param node The node to start from.
- * @param path A human-readable path, used in failure messages.
- * @param visit Called for each object node.
- */
+/** Visits every object-typed node in a JSON Schema. */
 function walkObjects(node: Node, path: string, visit: (n: Node, p: string) => void): void {
   if (!node || typeof node !== 'object') return;
 

@@ -1,12 +1,4 @@
-/**
- * Tests for duty classification and symptom extraction.
- *
- * The most valuable cases here are the two the design was corrected into. `Att C` *is*
- * MC, so every `Att C` row counts as MC whatever its `reason` says — including the ones
- * written `HL`, `FEVER` and `FOOD POISONING`. And nothing outside `Att C` counts as MC,
- * which matters because `AFMC` rows (Air Force Medical Centre appointments) and a
- * `RETURNING FROM MC` would be wrongly swept in by a text match.
- */
+/** Tests for duty classification and symptom extraction. */
 
 import { describe, expect, test } from 'bun:test';
 import {

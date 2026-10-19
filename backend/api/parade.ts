@@ -1,23 +1,7 @@
 /**
- * The parade-state intake and its management API.
- *
- *   POST                 store and parse one message   relay secret or dashboard password
- *   GET                  list stored messages          dashboard password
- *   GET    ?id=<n>       one message's text            dashboard password
- *   PUT    ?id=<n>       replace its text, re-parse    dashboard password
- *   DELETE ?id=<n>       delete it and its rows        dashboard password
- *
- * The dashboard calls with the session cookie `api/session.ts` issued it, so the password
- * never sits in the page. The WhatsApp relay is not a browser and holds no cookie: it sends
- * `Authorization: Bearer <PARADE_INGEST_SECRET>` and may only POST. The password itself is
- * still accepted as a bearer token, which is how a script or a test calls in.
- *
- * A cookie-authorised write must also come from this deployment's own origin. `SameSite=Strict`
- * already keeps the cookie off cross-site requests, but a deposit or a delete is not something
- * to leave resting on one browser setting, so the origin is checked too.
- *
- * Status codes are chosen for the relay, which retries a 5xx and nothing else: a message that
- * parsed, or that never will without a person correcting it, answers 2xx or 4xx.
+ * The parade-state intake: POST stores and parses one message (relay secret or dashboard); GET, PUT and
+ * DELETE (`?id=`) list, edit and delete stored messages (dashboard only, same-origin writes).
+ * The relay retries only a 5xx, so a final answer is always 2xx or 4xx.
  */
 import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.ts';
@@ -58,17 +42,7 @@ type Caller = 'dashboard' | 'relay';
 /** Longer than any real parade state by an order of magnitude; anything bigger is not one. */
 const MAX_BODY_CHARS = 50_000;
 
-/**
- * Identifies the caller: a dashboard session cookie, or a bearer secret.
- *
- * An unset secret matches nothing, so a deployment missing one fails closed for that caller.
- * A session only counts on a request from this deployment's own origin when that request
- * changes something; see the file header.
- *
- * @param request The incoming request.
- * @param deps The configured secrets and the clock.
- * @returns The caller, or null when nothing it carries is accepted.
- */
+/** Identifies the caller: a dashboard session cookie, or a bearer secret. */
 function callerOf(request: Request, deps: Deps): Caller | null {
   const now = (deps.now ?? (() => Date.now()))();
   if (isDashboardCaller(request, deps.dashboardPassword, now)) return 'dashboard';
@@ -78,12 +52,7 @@ function callerOf(request: Request, deps: Deps): Caller | null {
   return token && deps.ingestSecret && sameSecret(token, deps.ingestSecret) ? 'relay' : null;
 }
 
-/**
- * Reads the `?id=` query parameter.
- *
- * @param request The incoming request.
- * @returns A positive integer id, null when absent, or NaN when present but malformed.
- */
+/** Reads the `?id=` query parameter. */
 function idOf(request: Request): number | null {
   const raw = new URL(request.url).searchParams.get('id');
   if (raw === null) return null;
@@ -92,22 +61,14 @@ function idOf(request: Request): number | null {
 }
 
 /**
- * The idempotency key for a message typed into the dashboard: its text's hash, so pasting
- * the same parade state twice is one message.
- *
- * @param body The message text.
- * @returns The key.
+ * The idempotency key for a message typed into the dashboard: its text's hash, so pasting the same parade
+ * state twice is one message.
  */
 function manualMessageId(body: string): string {
   return MANUAL_ID_PREFIX + createHash('sha256').update(body.trim()).digest('hex');
 }
 
-/**
- * Reads and checks a `{ body, waMessageId? }` request body.
- *
- * @param request The incoming request.
- * @returns The fields, or the 400 to return.
- */
+/** Reads and checks a `{ body, waMessageId? }` request body. */
 async function readMessage(
   request: Request,
 ): Promise<{ ok: true; body: string; waMessageId: unknown } | { ok: false; response: Response }> {
@@ -123,12 +84,7 @@ async function readMessage(
   return { ok: true, body, waMessageId: parsed.body?.waMessageId };
 }
 
-/**
- * Turns a pipeline outcome into a response.
- *
- * @param outcome What the pipeline did.
- * @returns 200 when rows exist, 404 for an unknown id, 422 when a person must correct the text.
- */
+/** Turns a pipeline outcome into a response. */
 function outcomeResponse(outcome: IngestOutcome): Response {
   if (outcome.status === 'already_parsed') return noStore(200, outcome);
   if (outcome.status === 'not_found') return noStore(404, { error: 'No such message.' });
@@ -138,14 +94,7 @@ function outcomeResponse(outcome: IngestOutcome): Response {
   return noStore(outcome.status === 'parsed' ? 200 : 422, outcome, timing);
 }
 
-/**
- * Handles POST: store and parse one message.
- *
- * @param request The incoming request.
- * @param deps The store.
- * @param caller Who sent it.
- * @returns The response.
- */
+/** Handles POST: store and parse one message. */
 async function post(request: Request, deps: Deps, caller: Caller): Promise<Response> {
   const message = await readMessage(request);
   if (!message.ok) return message.response;
@@ -161,13 +110,7 @@ async function post(request: Request, deps: Deps, caller: Caller): Promise<Respo
   return outcomeResponse(await deps.store.ingest({ waMessageId, body: message.body }));
 }
 
-/**
- * Handles the dashboard-only methods.
- *
- * @param request The incoming request.
- * @param deps The store.
- * @returns The response.
- */
+/** Handles the dashboard-only methods. */
 async function manage(request: Request, deps: Deps): Promise<Response> {
   const id = idOf(request);
   if (Number.isNaN(id)) return noStore(400, { error: 'id must be a positive whole number.' });
@@ -188,13 +131,7 @@ async function manage(request: Request, deps: Deps): Promise<Response> {
   return outcomeResponse(await deps.store.edit(id, message.body));
 }
 
-/**
- * Routes one request.
- *
- * @param request The incoming request.
- * @param deps The store and the configured secrets.
- * @returns The response.
- */
+/** Routes one request. */
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (!['GET', 'POST', 'PUT', 'DELETE'].includes(request.method)) {
     return methodNotAllowed(['GET', 'POST', 'PUT', 'DELETE']);
@@ -215,13 +152,8 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 }
 
 /**
- * The Vercel entry point.
- *
- * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
- * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   const db = getDb();

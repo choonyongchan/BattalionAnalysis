@@ -1,9 +1,6 @@
 /**
- * Turns a decrypted Self-Regulated Fitness Training submission into one `sft_formsg` row.
- *
- * Answers are matched by question title (v3 payloads carry none, so map nothing). The two
- * long acknowledgement questions match on a prefix, so a small wording edit to
- * their tail does not unmap them.
+ * Maps a decrypted SFT submission to one `sft_formsg` row by question title; the long acknowledgement
+ * questions match on a prefix so small wording edits do not unmap them.
  */
 import { companyFromUnitCoy } from '../../../shared/domain.ts';
 import { normaliseName } from '../../../shared/identity.ts';
@@ -53,24 +50,14 @@ const TITLE_PREFIXES: Array<[string, SftColumn]> = [
 /** Columns stored as a ticked/unticked boolean rather than text. */
 const ACKNOWLEDGEMENTS = new Set<SftColumn>(['informedCommander', 'windowConfirmed']);
 
-/**
- * Identifies which column an answer belongs to.
- *
- * @param answer The `question` from a webhook response entry.
- * @returns The column, or null when the answer is not recognised.
- */
+/** Identifies which column an answer belongs to. */
 export function resolveSftField(answer: { question?: string }): SftColumn | null {
   if (!answer.question) return null;
   const title = normaliseTitle(answer.question);
   return TITLE_MAP[title] ?? TITLE_PREFIXES.find(([prefix]) => title.startsWith(prefix))?.[1] ?? null;
 }
 
-/**
- * Collects each answer under its column.
- *
- * @param decrypted The submission.
- * @returns The answer text by column, and question titles that matched no column.
- */
+/** Collects each answer under its column. */
 function collectAnswers(decrypted: DecryptedSubmission): { answers: Map<SftColumn, string>; unmapped: string[] } {
   const answers = new Map<SftColumn, string>();
   const unmapped: string[] = [];
@@ -85,12 +72,7 @@ function collectAnswers(decrypted: DecryptedSubmission): { answers: Map<SftColum
   return { answers, unmapped };
 }
 
-/**
- * Maps a decrypted SFT submission to an insert-shaped row.
- *
- * @param decrypted The submission, already decrypted and signature-checked.
- * @returns The row, unmapped question titles, and unrecognised answers.
- */
+/** Maps a decrypted SFT submission to an insert-shaped row. */
 export function mapSftSubmission(decrypted: DecryptedSubmission): MappedSubmission {
   const { answers, unmapped } = collectAnswers(decrypted);
   const unrecognised: string[] = [];

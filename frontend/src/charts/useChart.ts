@@ -1,8 +1,6 @@
 /**
- * The lifecycle every chart shares, so its failure modes are impossible rather than remembered:
- * dispose on unmount (no leak), repaint on every theme change (no stale tint), a ResizeObserver on the
- * container (the sidebar resizes it without a window resize), and a re-layout once fonts load (no
- * clipped axis labels). The option is rebuilt on every render; a dependency list would be a second copy.
+ * The lifecycle every chart shares: dispose on unmount, repaint on a theme change, resize with its container
+ * (the sidebar resizes it without a window resize), and re-lay out once fonts load (no clipped labels).
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks';

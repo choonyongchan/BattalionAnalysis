@@ -1,13 +1,4 @@
-/**
- * Dummy FormSG report-sick and SFT submissions, encrypted and signed with the real SDK.
- *
- * The SDK's `test` mode verifies signatures against a signing key pair the SDK publishes for
- * exactly this purpose (`@opengovsg/formsg-sdk/dist/cjs/resource/signing-keys.js`), so a test
- * webhook passes the same `authenticate` and `decrypt` calls production runs, with no stub.
- *
- * NAMES ARE SYNTHETIC. `T0000001A` is NRIC-shaped on purpose: a placeholder that is not
- * NRIC-shaped would prove nothing about a pipeline whose job is to strip NRIC-shaped values.
- */
+/** Dummy FormSG report-sick and SFT submissions, encrypted and signed with the real SDK. */
 import formsgSdk from '@opengovsg/formsg-sdk';
 
 /** The SDK's published `test`-mode signing secret. */
@@ -69,13 +60,7 @@ export const SICK_SPECS: SickSpec[] = [
   { submissionId: 'sub-d', rank: 'REC', name: 'DELTA NG', fourD: '4104', company: 'Hercules', type: 'FFI', time: '07:45', reason: 'Rash', outcome: 'None', created: '2026-09-19T00:05:00.000Z' },
 ];
 
-/**
- * The storage-mode answers a submission carries, including the NRIC FormSG adds.
- *
- * @param spec The submission.
- * @param extra Further answers to append, e.g. a free-text field.
- * @returns The response list, as FormSG encrypts it.
- */
+/** The storage-mode answers a submission carries, including the NRIC FormSG adds. */
 export function responsesOf(spec: SickSpec, extra: Array<{ question: string; answer: string }> = []) {
   const answers: Array<[string, string]> = [
     ['Rank', spec.rank],
@@ -100,22 +85,12 @@ export function responsesOf(spec: SickSpec, extra: Array<{ question: string; ans
   return answers.map(([question, answer], index) => ({ _id: `f${index}`, question, answer, fieldType: 'textfield' }));
 }
 
-/**
- * The Singapore calendar day of a UTC instant.
- *
- * @param iso An ISO timestamp.
- * @returns `yyyy-MM-dd` in Singapore time.
- */
+/** The Singapore calendar day of a UTC instant. */
 export function sgtDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
-/**
- * The row a submission should become, read off the spec.
- *
- * @param spec The submission.
- * @returns The expected column values.
- */
+/** The row a submission should become, read off the spec. */
 export function expectedRow(spec: SickSpec): Record<string, unknown> {
   const statuses = Object.fromEntries(
     (spec.statuses ?? []).flatMap(({ status, days }, index) => [
@@ -156,14 +131,7 @@ export interface WebhookOptions {
 /** One storage-mode answer, as FormSG encrypts it. */
 type Answer = { _id: string; question: string; answer?: string; answerArray?: string[]; fieldType: string };
 
-/**
- * Builds a genuinely encrypted and signed webhook request for any form.
- *
- * @param submission The submission id, FormSG's `created`, and the answers.
- * @param form The form's registered post URI and public key.
- * @param options See `WebhookOptions`.
- * @returns The request to hand to the route.
- */
+/** Builds a genuinely encrypted and signed webhook request for any form. */
 function signedRequest(
   submission: { submissionId: string; created: string; responses: Answer[] },
   form: { postUri: string; publicKey: string },
@@ -197,13 +165,7 @@ function signedRequest(
   return new Request(options.target ?? form.postUri, { method: 'POST', headers, body: JSON.stringify({ data }) });
 }
 
-/**
- * Builds a genuinely encrypted and signed report-sick webhook request.
- *
- * @param spec The submission.
- * @param options See `WebhookOptions`.
- * @returns The request to hand to the route.
- */
+/** Builds a genuinely encrypted and signed report-sick webhook request. */
 export function webhookRequest(spec: SickSpec, options: WebhookOptions = {}): Request {
   const responses = responsesOf(spec, options.extra);
   return signedRequest({ ...spec, responses }, { postUri: POST_URI, publicKey: FORM_KEYS.publicKey }, options);
@@ -233,13 +195,7 @@ export const SFT_SPECS: SftSpec[] = [
   { submissionId: 'sft-e', rank: 'PTE', name: 'ECHO TAN', company: 'Archer', groupIc: '3SG FOXTROT LIM', pes: 'A', exercises: ['Run'], sfabt: 'N/A', location: 'Camp Stadium', created: '2026-09-19T10:00:00.000Z' },
 ];
 
-/**
- * The storage-mode answers an SFT submission carries, in the live form's question order.
- *
- * @param spec The submission.
- * @param extra Further answers to append.
- * @returns The response list, as FormSG encrypts it.
- */
+/** The storage-mode answers an SFT submission carries, in the live form's question order. */
 export function sftResponsesOf(spec: SftSpec, extra: Array<{ question: string; answer: string }> = []): Answer[] {
   const answers: Array<Omit<Answer, '_id'>> = [
     { question: 'Download Status', answer: 'Downloaded', fieldType: 'textfield' },
@@ -262,12 +218,7 @@ export function sftResponsesOf(spec: SftSpec, extra: Array<{ question: string; a
   return answers.map((answer, index) => ({ _id: `s${index}`, ...answer }));
 }
 
-/**
- * The row an SFT submission should become, read off the spec.
- *
- * @param spec The submission.
- * @returns The expected column values.
- */
+/** The row an SFT submission should become, read off the spec. */
 export function expectedSftRow(spec: SftSpec): Record<string, unknown> {
   return {
     responseId: spec.submissionId,
@@ -287,13 +238,7 @@ export function expectedSftRow(spec: SftSpec): Record<string, unknown> {
   };
 }
 
-/**
- * Builds a genuinely encrypted and signed SFT webhook request.
- *
- * @param spec The submission.
- * @param options See `WebhookOptions`.
- * @returns The request to hand to the route.
- */
+/** Builds a genuinely encrypted and signed SFT webhook request. */
 export function sftWebhookRequest(spec: SftSpec, options: WebhookOptions = {}): Request {
   const responses = sftResponsesOf(spec, options.extra);
   return signedRequest({ ...spec, responses }, { postUri: SFT_POST_URI, publicKey: SFT_FORM_KEYS.publicKey }, options);

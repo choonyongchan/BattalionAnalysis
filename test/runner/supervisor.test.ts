@@ -1,10 +1,4 @@
-/**
- * Tests for the supervisor's restart-decision helpers.
- *
- * The loop runs against fake children, so no real process is spawned and no
- * backoff is waited out. The real signal handlers are left untested: installing
- * them would leak process listeners into the rest of the run.
- */
+/** Tests for the supervisor's restart-decision helpers. */
 
 import { describe, expect, mock, test } from 'bun:test';
 import { computeBackoffMs, isCleanExit, nextRestartCount, runSupervisor, type Child } from '../../runner/src/supervisor.ts';

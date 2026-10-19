@@ -83,13 +83,7 @@ const TO_RANGE = /(\d{6}(?:\s+\d{4})?)\s+TO\s+(?=\d{6})/gi;
 /** The labels of the one-line form "NAME REASON: … LOCATION: … STATUS: …". */
 const INLINE_LABEL = /\s+(REASON|LOCATION|STATUS)\s*:\s*/i;
 
-/**
- * Parses a parade-state message without a model.
- *
- * @param rawText The message, as stored.
- * @param today The receipt date, `yyyy-MM-dd`, used to resolve two-digit years.
- * @returns The extraction and, when unsure, the reasons; `problems` empty means trust it.
- */
+/** Parses a parade-state message without a model. */
 export function parseParadeState(rawText: string, today: string): DeterministicResult {
   const text = cleanText(rawText).replace(/[–—]/g, '-');
   const lines = text.split('\n').map((line) => line.trim());
@@ -127,13 +121,7 @@ export function parseParadeState(rawText: string, today: string): DeterministicR
   };
 }
 
-/**
- * Reads company, date, time and session from the lines above the first block.
- *
- * @param head The header lines, upper-cased.
- * @param today The receipt date, `yyyy-MM-dd`.
- * @returns The header fields, and a problem for each one missing or invalid.
- */
+/** Reads company, date, time and session from the lines above the first block. */
 function readHeader(
   head: string,
   today: string,
@@ -169,11 +157,7 @@ class BodyParser {
    */
   constructor(private readonly paradeDate: string) {}
 
-  /**
-   * Consumes one line.
-   *
-   * @param line One trimmed line.
-   */
+  /** Consumes one line. */
   line(line: string): void {
     if (SEPARATOR_OR_BLANK.test(line)) return;
 
@@ -200,22 +184,14 @@ class BodyParser {
     }
   }
 
-  /**
-   * Final whole-message checks.
-   *
-   * @returns Every problem found.
-   */
+  /** Final whole-message checks. */
   finish(): string[] {
     this.flushSubForm();
     if (this.units[0]?.unit_label !== 'Company') this.problems.push('The first strength block is not COMPANY.');
     return this.problems;
   }
 
-  /**
-   * Parses one personnel line under the current block and section.
-   *
-   * @param line The personnel line.
-   */
+  /** Parses one personnel line under the current block and section. */
   private entry(line: string): void {
     const parsed = parseEntry(line, this.paradeDate, {
       unit_label: this.unit!.unit_label,
@@ -225,12 +201,7 @@ class BodyParser {
     this.problems.push(...parsed.problems);
   }
 
-  /**
-   * Collects one line of the "S/N: / R/N: / REASON:" sub-form.
-   *
-   * @param label S/N, R/N (or R & N) or REASON, as written.
-   * @param value Everything after the colon.
-   */
+  /** Collects one line of the "S/N: / R/N: / REASON:" sub-form. */
   private subFormLine(label: string, value: string): void {
     const key = label.toUpperCase();
     if (key === 'S/N') {
@@ -256,12 +227,7 @@ class BodyParser {
     this.entry(`${index}${form.who}${form.reason ? ` - ${form.reason}` : ''}`);
   }
 
-  /**
-   * Starts a strength block ("PL 1: 37/39").
-   *
-   * @param label The block label as written.
-   * @param figures Its present/strength.
-   */
+  /** Starts a strength block ("PL 1: 37/39"). */
   private openBlock(label: string, figures: string): void {
     const clean = label.toUpperCase().replace(/\s+/g, ' ');
     const total = fraction(figures)!;
@@ -281,13 +247,7 @@ class BodyParser {
     this.section = null;
   }
 
-  /**
-   * Records a rank tier ("OFFICER: 2/4") on the current block.
-   *
-   * @param name The tier as written.
-   * @param figures Its present/strength.
-   * @param line The whole line, for the problem message.
-   */
+  /** Records a rank tier ("OFFICER: 2/4") on the current block. */
   private tier(name: string, figures: string, line: string): void {
     const kind = /^OFF/i.test(name) ? 'officer' : /^WO/i.test(name) ? 'wospec' : 'enlistee';
     const value = fraction(figures);
@@ -299,13 +259,7 @@ class BodyParser {
     this.unit![`${kind}_strength`] = value.strength;
   }
 
-  /**
-   * Opens one of the six sections and records the count its header claims.
-   *
-   * @param name The section as written.
-   * @param count The stated count, or '' when none.
-   * @param line The whole line, for the problem message.
-   */
+  /** Opens one of the six sections and records the count its header claims. */
   private openSection(name: string, count: string, line: string): void {
     if (!this.unit) {
       this.problems.push(`Section header outside any strength block: "${line}"`);
@@ -320,13 +274,8 @@ class BodyParser {
 }
 
 /**
- * Parses one personnel line. Two authorisations with their own dates, joined by a comma,
- * become two entries; several activities sharing one date range stay one entry (template R1).
- *
- * @param line The line as written.
- * @param paradeDate The parade date, `yyyy-MM-dd`, used to resolve years.
- * @param where The block and section the line sits under.
- * @returns The entries, and the problems that make the line untrustworthy.
+ * Parses one personnel line. Two authorisations with their own dates, joined by a comma, become two entries;
+ * several activities sharing one date range stay one entry (template R1).
  */
 export function parseEntry(
   line: string,
@@ -390,11 +339,8 @@ export function parseEntry(
 }
 
 /**
- * Rewrites the one-line form "NAME REASON: Chest pain LOCATION: NTFGH STATUS: 5D MC (dates)"
- * into the template's "NAME - 5D MC (dates) (Chest pain)".
- *
- * @param rest The line after its index, 4D and rank.
- * @returns The rewritten line and the stated location, or null when the line has no STATUS label.
+ * Rewrites the one-line form "NAME REASON: Chest pain LOCATION: NTFGH STATUS: 5D MC (dates)" into the
+ * template's "NAME - 5D MC (dates) (Chest pain)".
  */
 function readInlineLabels(rest: string): { line: string; location: string | null } | null {
   const parts = rest.split(INLINE_LABEL);
@@ -406,11 +352,8 @@ function readInlineLabels(rest: string): { line: string; location: string | null
 }
 
 /**
- * Splits a status into authorisations: on a top-level comma only when every piece carries
- * its own bracketed dates, as in "5D MC (130926-170926), 2D MC (170926-180926)".
- *
- * @param status Everything after the name.
- * @returns One string per authorisation.
+ * Splits a status into authorisations: on a top-level comma only when every piece carries its own bracketed
+ * dates, as in "5D MC (130926-170926), 2D MC (170926-180926)".
  */
 function authorisations(status: string): string[] {
   const pieces: string[] = [];
@@ -429,15 +372,7 @@ function authorisations(status: string): string[] {
   return pieces.length > 1 && pieces.every(dated) ? pieces : [status];
 }
 
-/**
- * Parses one authorisation: "[PERM] [nD] DUTY (detail) (dates) [- reason]".
- *
- * @param text The authorisation text.
- * @param paradeDate The parade date, `yyyy-MM-dd`.
- * @param section The reason category it sits under.
- * @param flag Records a problem against the line.
- * @returns The duty fields.
- */
+/** Parses one authorisation: "[PERM] [nD] DUTY (detail) (dates) [- reason]". */
 function parseDuty(text: string, paradeDate: string, section: string, flag: (why: string) => void): Duty {
   const duty: Duty = {
     duty_type: null,
@@ -503,15 +438,9 @@ function parseDuty(text: string, paradeDate: string, section: string, flag: (why
 }
 
 /**
- * Reads dates written without brackets. A trailing date form ("OFF IN LIEU 210926") is taken
- * off the duty; under OTHERS, a lone date inside the free text ("coming back 150926 morning")
- * is read but the text is kept as written.
- *
- * @param bare The duty text, brackets already removed.
- * @param paradeDate The parade date, `yyyy-MM-dd`.
- * @param duty The duty being filled in.
- * @param section The reason category it sits under.
- * @returns The duty text left once the dates are taken.
+ * Reads dates written without brackets. A trailing date form ("OFF IN LIEU 210926") is taken off the duty;
+ * under OTHERS, a lone date inside the free text ("coming back 150926 morning") is read but the text is kept
+ * as written.
  */
 function takeBareDates(bare: string, paradeDate: string, duty: Duty, section: string): string {
   const split = DETAIL_THEN_DATES.exec(bare);
@@ -526,15 +455,7 @@ function takeBareDates(bare: string, paradeDate: string, duty: Duty, section: st
   return bare;
 }
 
-/**
- * Reads one bracket's content into the duty: dates, a report-sick token, or a detail.
- *
- * @param inner The text inside the brackets.
- * @param paradeDate The parade date, `yyyy-MM-dd`.
- * @param duty The duty being filled in.
- * @param details Collected free-text details.
- * @param flag Records a problem against the line.
- */
+/** Reads one bracket's content into the duty: dates, a report-sick token, or a detail. */
 function readBracket(
   inner: string,
   paradeDate: string,
@@ -567,11 +488,8 @@ function readBracket(
 }
 
 /**
- * Rewrites the date spellings filers use into the template's: "27/09/26" becomes "270926"
- * and "270926 to 290926" becomes "270926-290926".
- *
- * @param text Bracket content.
- * @returns The content with its dates in template form.
+ * Rewrites the date spellings filers use into the template's: "27/09/26" becomes "270926" and "270926 to
+ * 290926" becomes "270926-290926".
  */
 function normaliseDates(text: string): string {
   return text
@@ -579,13 +497,7 @@ function normaliseDates(text: string): string {
     .replace(TO_RANGE, '$1-');
 }
 
-/**
- * Reads a bracketed date form from the template.
- *
- * @param text The bracket content.
- * @param paradeDate The parade date, `yyyy-MM-dd`.
- * @returns The date fields, or null when the text is not one of the date forms.
- */
+/** Reads a bracketed date form from the template. */
 function readDates(text: string, paradeDate: string): Partial<Duty> | null {
   const match = DATE_GROUP.exec(text.trim());
   if (!match) return null;
@@ -610,34 +522,20 @@ function readDates(text: string, paradeDate: string): Partial<Duty> | null {
   return validDates(result) && (!startTime || result.start_time) ? result : null;
 }
 
-/**
- * Splits "DDMMYY [HHMM|TBC]" into its day and time.
- *
- * @param stamp One date stamp.
- * @returns The day, and the time or undefined when none (or "TBC"/"TBA") is given.
- */
+/** Splits "DDMMYY [HHMM|TBC]" into its day and time. */
 function splitStamp(stamp: string): [string, string | undefined] {
   const [day, time] = stamp.split(/\s+/);
   return [day!, time && !UNKNOWN_TIME.test(time) ? time : undefined];
 }
 
-/**
- * Checks that every date a result sets actually parsed.
- *
- * @param result Parsed date fields.
- * @returns False when a stated date was impossible (e.g. month 13).
- */
+/** Checks that every date a result sets actually parsed. */
 function validDates(result: Partial<Duty>): boolean {
   return (['start_date', 'end_date'] as const).every((key) => !(key in result) || result[key] !== null);
 }
 
 /**
- * Converts DDMMYY to `yyyy-MM-dd`, taking the century-and-decade nearest the reference date,
- * so a mistyped year digit ("190936" for "190926") lands in the right year.
- *
- * @param ddmmyy Six digits.
- * @param reference A `yyyy-MM-dd` date the value should be near.
- * @returns The ISO date, or null when the day or month is impossible.
+ * Converts DDMMYY to `yyyy-MM-dd`, taking the century-and-decade nearest the reference date, so a mistyped
+ * year digit ("190936" for "190926") lands in the right year.
  */
 export function toIsoDate(ddmmyy: string, reference: string): string | null {
   const day = Number(ddmmyy.slice(0, 2));
@@ -651,24 +549,14 @@ export function toIsoDate(ddmmyy: string, reference: string): string | null {
   return date.toISOString().slice(0, 10);
 }
 
-/**
- * Converts HHMM to `HH:MM`.
- *
- * @param hhmm Four digits.
- * @returns The time, or null when it is not a real time of day.
- */
+/** Converts HHMM to `HH:MM`. */
 function toTime(hhmm: string): string | null {
   const hours = Number(hhmm.slice(0, 2));
   const minutes = Number(hhmm.slice(2, 4));
   return hours < 24 && minutes < 60 ? `${hhmm.slice(0, 2)}:${hhmm.slice(2, 4)}` : null;
 }
 
-/**
- * Reads "62/66", a bare "0", or the "<P>/<S>" placeholder.
- *
- * @param text The figure as written.
- * @returns Present and strength (null when not stated), or null when unreadable.
- */
+/** Reads "62/66", a bare "0", or the "<P>/<S>" placeholder. */
 function fraction(text: string): { present: number | null; strength: number | null } | null {
   const value = text.trim();
   if (/^<P>\s*\/\s*<S>$/i.test(value) || value === '') return { present: null, strength: null };
@@ -678,14 +566,7 @@ function fraction(text: string): { present: number | null; strength: number | nu
   return null;
 }
 
-/**
- * Builds a command-team member from "CDO: 2LT TAN", "PDS SIG: -" or "PDS 1: <RANK> <NAME>".
- *
- * @param role CDO, CDS, COS or PDS.
- * @param label The sub-unit after PDS, if any.
- * @param holder Everything after the colon.
- * @returns The member; unfilled or dashed appointments are vacant.
- */
+/** Builds a command-team member from "CDO: 2LT TAN", "PDS SIG: -" or "PDS 1: <RANK> <NAME>". */
 function commandMember(role: string, label: string, holder: string): ExtractedCommandMember {
   const unit_label = role === 'PDS' ? label.trim().toUpperCase() || null : null;
   const who = holder.trim();
@@ -702,13 +583,7 @@ function commandMember(role: string, label: string, holder: string): ExtractedCo
   };
 }
 
-/**
- * Builds a rejected extraction.
- *
- * @param reason Why, in one sentence.
- * @param session The session, when the rejection is because of it.
- * @returns The extraction.
- */
+/** Builds a rejected extraction. */
 function rejection(reason: string, session: string | null = null): Extraction {
   return {
     rejected: true,
@@ -723,12 +598,7 @@ function rejection(reason: string, session: string | null = null): Extraction {
   };
 }
 
-/**
- * Wraps an extraction the parser is sure of.
- *
- * @param extraction The extraction.
- * @returns It, with no problems.
- */
+/** Wraps an extraction the parser is sure of. */
 function sure(extraction: Extraction): DeterministicResult {
   return { extraction, problems: [] };
 }

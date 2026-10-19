@@ -1,11 +1,6 @@
 /**
- * The parade intake route: who may call what, how bodies are checked, and what each answer
- * means for the database.
- *
- * Refusals run offline against a store that fails the test if touched, which proves nothing was
- * read or written. Everything that reaches the store runs the real pipeline against the Neon test
- * branch, and is checked by what the route answers and what the tables then hold.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The parade intake route: who may call what, how bodies are checked, and what each answer means for the
+ * database. NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { handle, type Deps } from '../../../backend/api/parade.ts';
@@ -36,13 +31,7 @@ const UNTOUCHABLE: Deps = {
 const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
 const SESSION = issueSession(DASHBOARD_PASSWORD, SESSION_TTL_MS, NOW);
 
-/**
- * Builds a request.
- *
- * @param method The HTTP method.
- * @param options Token, session cookie, origin, query string and JSON (or raw) body.
- * @returns The request.
- */
+/** Builds a request. */
 function request(
   method: string,
   options: { token?: string; session?: string; origin?: string; query?: string; body?: unknown } = {}
@@ -131,25 +120,14 @@ describe.skipIf(!hasTestDb)('requests that reach the pipeline', () => {
     deps = paradeDeps(db, { now: () => new Date(`${SPEC.date}T00:30:00Z`) });
   }, DB_TIMEOUT_MS);
 
-  /**
-   * Sends a request and reads the JSON answer.
-   *
-   * @param incoming The request.
-   * @returns Status, body and headers.
-   */
+  /** Sends a request and reads the JSON answer. */
   async function send(incoming: Request) {
     const response = await handle(incoming, deps);
     // Typed loosely: each test asserts the shape it expects.
     return { status: response.status, body: (await response.json()) as any, headers: response.headers };
   }
 
-  /**
-   * Relays a message as the WhatsApp bridge does.
-   *
-   * @param waMessageId The WhatsApp id.
-   * @param body The text.
-   * @returns The answer.
-   */
+  /** Relays a message as the WhatsApp bridge does. */
   function relay(waMessageId: string, body: string) {
     return send(request('POST', { token: INGEST_SECRET, body: { waMessageId, body } }));
   }

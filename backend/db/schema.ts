@@ -1,11 +1,6 @@
 /**
- * Drizzle schema for the Neon database: the source of truth for tables, enums and migrations.
- *
- * Three write paths: `lib/pipeline.ts` (WhatsApp parade states), `api/reportsick.ts` (report
- * sick) and `api/sft.ts` (self-regulated fitness training).
- * `settings` holds the Settings page's sections, written only by `api/settings.ts`.
- * The dashboard reads everything through `api/dashboard.ts`.
- * NRIC is deliberately absent; identity is `name_key`. Do not add NRIC columns.
+ * The Drizzle schema: the source of truth for tables and migrations. One write path per table
+ * (see docs/architecture_patterns.md). NRIC is deliberately absent; identity is `name_key`.
  */
 import { sql } from 'drizzle-orm';
 import {

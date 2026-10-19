@@ -1,10 +1,6 @@
 /**
- * The single parade-state write path. `ingestMessage` stores a message and parses it in the
- * same call; `editMessage` and `deleteMessage` are how the dashboard corrects one afterwards.
- *
- * Parsing is `lib/parser/deterministic.ts` first: about a millisecond, no model. A message it
- * is unsure of goes to the OpenAI fallback in `lib/parser/llm.ts` when one is configured; if
- * there is none, or it fails, the message is stored with the reasons for a person to correct.
+ * The single parade-state write path: store and parse a message, edit or delete one. The rule-based
+ * parser runs first; a message it doubts goes to the model, or is stored with reasons for a person.
  */
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import {
@@ -68,16 +64,7 @@ export type IngestOutcome =
   | { status: 'not_found'; id: number };
 
 
-/**
- * Stores a relayed message, idempotently.
- *
- * The `wa_message_id` unique constraint settles a duplicate delivery in one statement rather
- * than by a lock. `stored` reports only whether this call inserted the row.
- *
- * @param db A read-write database handle.
- * @param message The relayed message.
- * @returns What became of it, and the row id either way.
- */
+/** Stores a relayed message; the `wa_message_id` unique constraint settles a duplicate in one statement. */
 async function recordMessage(
   db: Db,
   message: { waMessageId: string; body: string },
@@ -116,13 +103,8 @@ async function recordMessage(
 }
 
 /**
- * Parses message text without touching the database: the rules first, the model when the
- * rules are unsure and a model is configured. Times the whole parse.
- *
- * @param body The message text.
- * @param today The receipt date, `yyyy-MM-dd`, that two-digit years resolve against.
- * @param model The model fallback, or null to leave doubtful messages for review.
- * @returns The extraction and its key, or why there is none, with its timing.
+ * Parses message text without touching the database: the rules first, the model when the rules are unsure and
+ * a model is configured. Times the whole parse.
  */
 export async function parseBody(body: string, today: string, model: ModelParser | null = null): Promise<Parsed> {
   const started = performance.now();
@@ -130,14 +112,7 @@ export async function parseBody(body: string, today: string, model: ModelParser 
   return { ...parsed, parseMs: Math.round(performance.now() - started) };
 }
 
-/**
- * `parseBody` without the timing.
- *
- * @param body The message text.
- * @param today The receipt date, `yyyy-MM-dd`.
- * @param model The model fallback, or null.
- * @returns The parse outcome and the parser that settled it.
- */
+/** `parseBody` without the timing. */
 async function parseUntimed(body: string, today: string, model: ModelParser | null): Promise<Untimed> {
   const rules = parseParadeState(body, today);
   if (rules.problems.length === 0) return settleExtraction(rules.extraction, PARSER_NAME);
@@ -150,13 +125,7 @@ async function parseUntimed(body: string, today: string, model: ModelParser | nu
   }
 }
 
-/**
- * Validates an extraction and keys it.
- *
- * @param extraction What a parser returned.
- * @param parser Which parser returned it, recorded on the submission.
- * @returns The parse outcome.
- */
+/** Validates an extraction and keys it. */
 function settleExtraction(extraction: Extraction, parser: string): Untimed {
   const reason = validate(extraction);
   if (reason !== '') {
@@ -171,17 +140,8 @@ function settleExtraction(extraction: Extraction, parser: string): Untimed {
 }
 
 /**
- * Stores a message and parses it straight away.
- *
- * A message already parsed is left alone, so a resend cannot replace a newer parade state
- * with an older one. A message stored earlier but not parsed (a crash, or a parser that has
- * since learnt a new rule) is parsed again, which is free.
- *
- * @param db A read-write database handle.
- * @param message The message and its idempotency key.
- * @param now The current time; injected in tests.
- * @param model The model fallback, or null for rules only.
- * @returns What became of it.
+ * Stores a message and parses it straight away. One already parsed is left alone, so a resend cannot
+ * replace a newer parade state; one that failed is parsed again.
  */
 export async function ingestMessage(
   db: Db,
@@ -197,17 +157,8 @@ export async function ingestMessage(
 }
 
 /**
- * Replaces a stored message's text and everything derived from it.
- *
- * The new text is parsed before anything is written, and a text that does not parse
- * changes nothing: the old rows stay until a correct text replaces them. When the new text
- * names a different company, date or session, the submission under the old key is removed.
- *
- * @param db A read-write database handle.
- * @param id The `raw_messages` id.
- * @param body The corrected text.
- * @param model The model fallback, or null for rules only.
- * @returns What became of it.
+ * Replaces a stored message's text and everything derived from it. The new text is parsed first, and
+ * one that does not parse changes nothing.
  */
 export async function editMessage(
   db: Db,
@@ -228,13 +179,7 @@ export async function editMessage(
   return write(db, id, parsed, text);
 }
 
-/**
- * Deletes a stored message and the submission parsed from it.
- *
- * @param db A read-write database handle.
- * @param id The `raw_messages` id.
- * @returns False when there was no such message.
- */
+/** Deletes a stored message and the submission parsed from it. */
 export async function deleteMessage(db: Db, id: number): Promise<boolean> {
   const [row] = await db
     .select({ paradeResponseId: rawMessages.paradeResponseId })
@@ -252,15 +197,7 @@ export async function deleteMessage(db: Db, id: number): Promise<boolean> {
   return true;
 }
 
-/**
- * Lists every stored message, newest first, without its text or its reasons.
- *
- * The stored reasons quote the lines the parser doubted, so they leave the database only with
- * the message itself (`getMessage`); the list says what happened and how many lines to fix.
- *
- * @param db A database handle.
- * @returns One summary per message.
- */
+/** Lists every stored message, newest first, without its text or its reasons (they can quote a personnel line). */
 export async function listMessages(db: Db): Promise<MessageSummary[]> {
   const rows = await db
     .select({
@@ -279,13 +216,7 @@ export async function listMessages(db: Db): Promise<MessageSummary[]> {
   }));
 }
 
-/**
- * Reads one stored message's text and why it produced no rows, for editing.
- *
- * @param db A database handle.
- * @param id The `raw_messages` id.
- * @returns The id, text and stored error, or null when there is no such message.
- */
+/** Reads one stored message's text and why it produced no rows, for editing. */
 export async function getMessage(
   db: Db,
   id: number,
@@ -297,29 +228,14 @@ export async function getMessage(
   return row ?? null;
 }
 
-/**
- * Writes a parse result against a stored message: rows when it parsed, the reason when not.
- *
- * @param db A read-write database handle.
- * @param id The `raw_messages` id.
- * @param parsed How its text parsed.
- * @returns What became of it.
- */
+/** Writes a parse result against a stored message: rows when it parsed, the reason when not. */
 async function settle(db: Db, id: number, parsed: Parsed): Promise<IngestOutcome> {
   if (parsed.status === 'parsed') return write(db, id, parsed);
   await markFailed(db, id, failureText(parsed), { parser: parsed.parser, parseMs: parsed.parseMs });
   return withId(id, parsed);
 }
 
-/**
- * Builds a parsed message's rows and writes them.
- *
- * @param db A read-write database handle.
- * @param id The `raw_messages` id.
- * @param parsed A successful parse.
- * @param body Replacement text for the message, when editing.
- * @returns The `parsed` outcome with row counts.
- */
+/** Builds a parsed message's rows and writes them. */
 async function write(
   db: Db,
   id: number,
@@ -345,22 +261,8 @@ async function write(
 }
 
 /**
- * Replaces a submission and everything under it, atomically.
- *
- * One `db.batch`, because neon-http has no interactive transactions: every statement must
- * be known before the first is sent, and none may depend on an earlier `RETURNING`. That is
- * the whole reason `parade_response_id` is a computable natural key.
- *
- * The first statement is the orphan sweep: if this message previously parsed to a different
- * key (a corrected date, say), that earlier submission is removed too. Deleting a parent is
- * enough to clear its children -- they cascade.
- *
- * @param db A read-write database handle.
- * @param messageId The raw message being parsed.
- * @param key The submission key.
- * @param rows The rows to write.
- * @param timing How the message was parsed.
- * @param body Replacement text for the message, when editing; the text is left alone otherwise.
+ * Replaces a submission and everything under it in one `db.batch` (neon-http has no transactions, hence the
+ * computable key); the first statement removes the submission under a message's old key.
  */
 async function writeSubmission(
   db: Db,
@@ -411,14 +313,7 @@ async function writeSubmission(
   await db.batch(statements as never);
 }
 
-/**
- * Records why a message produced no rows, so it is not retried and the list can show why.
- *
- * @param db A read-write database handle.
- * @param messageId The message.
- * @param reason The reason, written verbatim for whoever corrects it.
- * @param timing How the message was parsed.
- */
+/** Records why a message produced no rows, so it is not retried and the list can show why. */
 async function markFailed(db: Db, messageId: number, reason: string, timing: Timing): Promise<void> {
   await db
     .update(rawMessages)
@@ -426,33 +321,17 @@ async function markFailed(db: Db, messageId: number, reason: string, timing: Tim
     .where(eq(rawMessages.id, messageId));
 }
 
-/**
- * The `raw_messages.error` text for a parse that produced no rows.
- *
- * @param parsed An unsuccessful parse.
- * @returns The text.
- */
+/** The `raw_messages.error` text for a parse that produced no rows. */
 function failureText(parsed: Exclude<Parsed, { status: 'parsed' }>): string {
   return parsed.status === 'needs_review' ? needsReviewError(parsed.problems) : parsed.reason;
 }
 
-/**
- * Attaches a message id to an unsuccessful parse.
- *
- * @param id The `raw_messages` id.
- * @param parsed An unsuccessful parse.
- * @returns The outcome.
- */
+/** Attaches a message id to an unsuccessful parse. */
 function withId(id: number, parsed: Exclude<Parsed, { status: 'parsed' }>): IngestOutcome {
   return { id, ...parsed };
 }
 
-/**
- * The UTC calendar day of a time, as `yyyy-MM-dd`.
- *
- * @param time The time.
- * @returns The day.
- */
+/** The UTC calendar day of a time, as `yyyy-MM-dd`. */
 function isoDay(time: Date): string {
   return time.toISOString().slice(0, 10);
 }

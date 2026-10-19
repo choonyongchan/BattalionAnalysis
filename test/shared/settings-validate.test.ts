@@ -1,9 +1,4 @@
-/**
- * Settings validation: what a person can save, and the sentence they read when they cannot.
- *
- * Every default must validate clean, or an untouched deployment would refuse its own settings.
- * The rest pins one refusal per rule, by the field path the Settings page shows it beside.
- */
+/** Settings validation: what a person can save, and the sentence they read when they cannot. */
 
 import { describe, expect, test } from 'bun:test';
 import { DEFAULTS, SECTIONS, defaultOf, isSection, type SectionName } from '../../shared/settings/defaults.ts';

@@ -54,23 +54,13 @@ const PARSERS: Partial<Record<Column, Parser>> = {
 /** Enum columns whose unparseable answers are reported, since a renamed option nulls them. */
 const REPORTED = new Set<Column>(['reportSickType', 'outcome']);
 
-/**
- * Reads an answer's text, joining a checkbox answer's selections with `; `.
- *
- * @param answer The answer entry.
- * @returns The answer text, or '' when there is none.
- */
+/** Reads an answer's text, joining a checkbox answer's selections with `; `. */
 export function answerText(answer: FormSgAnswer): string {
   if (answer.answerArray?.length) return answer.answerArray.filter(Boolean).join('; ');
   return (answer.answer ?? '').trim();
 }
 
-/**
- * Maps a decrypted submission to an insert-shaped row.
- *
- * @param decrypted The submission, already decrypted and signature-checked.
- * @returns The row, unmapped question titles, and unrecognised answers.
- */
+/** Maps a decrypted submission to an insert-shaped row. */
 export function mapSubmission(decrypted: DecryptedSubmission): MappedSubmission {
   const answers = new Map<Column, string>();
   const unmapped: string[] = [];

@@ -1,10 +1,4 @@
-/**
- * Tests for the listener's reconnect decision helpers.
- *
- * The socket lifecycle itself needs a live WhatsApp connection, so it is not
- * covered here; these are the pure functions that decide whether a disconnect
- * is fatal and how long to wait before the next attempt.
- */
+/** Tests for the listener's reconnect decision helpers. */
 
 import { describe, expect, test } from 'bun:test';
 import { DisconnectReason } from '@whiskeysockets/baileys';

@@ -1,8 +1,7 @@
 /**
- * FormSG end to end without a database: dummy submissions are encrypted with the real SDK,
- * decrypted by `decryptSubmission` and mapped by `mapSubmission`, and the row must say what the
- * soldier answered -- and never the NRIC FormSG attaches.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * FormSG end to end without a database: dummy submissions are encrypted with the real SDK, decrypted by
+ * `decryptSubmission` and mapped by `mapSubmission`, and the row must say what the soldier answered -- and
+ * never the NRIC FormSG attaches. NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { describe, expect, test } from 'bun:test';
 import { decryptSubmission, type Decryptors, type WebhookData } from '../../../backend/lib/formsg/decrypt.ts';
@@ -12,23 +11,12 @@ import { expectedRow, FAKE_NRIC, FORM_KEYS, SICK_SPECS, testSdk as sdk, webhookR
 /** The real SDK, as the route hands it to `decryptSubmission`. */
 const testSdk = sdk as unknown as Decryptors;
 
-/**
- * The `data` object of a webhook request's body.
- *
- * @param request The request.
- * @returns The payload FormSG sends.
- */
+/** The `data` object of a webhook request's body. */
 async function payloadOf(request: Request): Promise<WebhookData> {
   return ((await request.json()) as { data: WebhookData }).data;
 }
 
-/**
- * Decrypts and maps the payload a real webhook for `spec` would carry.
- *
- * @param spec The submission.
- * @param options Passed to `webhookRequest`.
- * @returns The mapped submission.
- */
+/** Decrypts and maps the payload a real webhook for `spec` would carry. */
 async function roundTrip(spec: SickSpec, options: Parameters<typeof webhookRequest>[1] = {}) {
   const data = await payloadOf(webhookRequest(spec, options));
   return mapSubmission(decryptSubmission(data, FORM_KEYS.secretKey, testSdk));

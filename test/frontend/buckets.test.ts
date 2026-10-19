@@ -1,10 +1,4 @@
-/**
- * Tests for the Daily / Weekly / Monthly / Rotational time grouping.
- *
- * The cases worth having are the ones that would silently misfile a date on a chart
- * axis: a Sunday landing in the wrong week, a month boundary crossing a year, and a
- * rotational grouping that still draws a chart when no rotation schedule exists at all.
- */
+/** Tests for the Daily / Weekly / Monthly / Rotational time grouping. */
 
 import { describe, expect, test } from 'bun:test';
 import { GRANULARITIES, bucketOf } from '../../frontend/src/model/buckets.ts';

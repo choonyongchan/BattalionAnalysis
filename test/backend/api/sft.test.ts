@@ -1,11 +1,6 @@
 /**
- * The SFT route: the FormSG webhook, fed genuinely encrypted and signed payloads from the real
- * SDK, and the Deposit page's corrections and deletes.
- *
- * The verify/decrypt/refuse logic is shared with report sick (`lib/formsg/webhook.ts`) and is
- * covered in depth by `reportsick.test.ts`; this file proves the SFT route is wired to its own
- * key, URI and table, and that only the dashboard may list, correct or delete a record.
- * NAMES ARE SYNTHETIC.
+ * The SFT route: the FormSG webhook, fed genuinely encrypted and signed payloads from the real SDK, and the
+ * Deposit page's corrections and deletes. NAMES ARE SYNTHETIC.
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -48,12 +43,7 @@ const UNTOUCHABLE_RECORDS = new Proxy({} as SftStore, {
 const NOW = Date.parse('2026-09-20T04:00:00.000Z');
 const SESSION = issueSession(DASHBOARD_PASSWORD, SESSION_TTL_MS, NOW);
 
-/**
- * The route's dependencies, configured as production configures them.
- *
- * @param overrides Values to change for one test.
- * @returns The deps.
- */
+/** The route's dependencies, configured as production configures them. */
 function deps(overrides: Partial<Deps> = {}): Deps {
   return {
     db: UNTOUCHABLE_DB,
@@ -67,13 +57,7 @@ function deps(overrides: Partial<Deps> = {}): Deps {
   };
 }
 
-/**
- * Builds a dashboard request to the route.
- *
- * @param method The HTTP method.
- * @param options Token, session cookie, origin, query string and JSON (or raw) body.
- * @returns The request.
- */
+/** Builds a dashboard request to the route. */
 function dashboardRequest(
   method: string,
   options: { token?: string; session?: string; origin?: string; query?: string; body?: unknown } = {},
@@ -221,14 +205,7 @@ describe.skipIf(!hasTestDb)('corrections and deletes, against the database', () 
     for (const spec of SFT_SPECS) expect((await handle(sftWebhookRequest(spec), sftDeps(db))).status).toBe(200);
   }, DB_TIMEOUT_MS);
 
-  /**
-   * Calls the route as a script would, with the password as a bearer token.
-   *
-   * @param method The HTTP method.
-   * @param query The query string.
-   * @param body The JSON body, if any.
-   * @returns The response.
-   */
+  /** Calls the route as a script would, with the password as a bearer token. */
   function call(method: string, query = '', body?: unknown): Promise<Response> {
     return handle(dashboardRequest(method, { token: DASHBOARD_PASSWORD, query, body }), { ...sftDeps(db), now: () => NOW });
   }

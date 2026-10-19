@@ -1,10 +1,4 @@
-/**
- * Tests for the report-sick Sankey.
- *
- * Parade state to FormSG is count-only: nothing is matched by name or 4D, so the cases
- * worth having there are the imbalances. From FormSG on, each submission is followed by its
- * own type, outcome and Status answers.
- */
+/** Tests for the report-sick Sankey. */
 
 import { describe, expect, test } from 'bun:test';
 import type { PersonnelRow } from '../../shared/dashboard.ts';

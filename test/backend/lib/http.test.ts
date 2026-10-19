@@ -28,12 +28,7 @@ describe('methodNotAllowed', () => {
 });
 
 describe('readJson', () => {
-  /**
-   * Builds a POST with a raw body.
-   *
-   * @param body The body text.
-   * @returns The request.
-   */
+  /** Builds a POST with a raw body. */
   function withBody(body: string): Request {
     return new Request('https://example.test/api', { method: 'POST', body });
   }
@@ -69,12 +64,7 @@ describe('readJson', () => {
 describe('serverError', () => {
   const MARKER = 'TAN AH KOW 3203 S0000000Z';
 
-  /**
-   * Runs `serverError` and returns the line it logged.
-   *
-   * @param error What the route threw.
-   * @returns The log line and the response.
-   */
+  /** Runs `serverError` and returns the line it logged. */
   function logged(error: unknown): { line: string; response: Response } {
     const log = spyOn(console, 'error').mockImplementation(() => {});
     try {

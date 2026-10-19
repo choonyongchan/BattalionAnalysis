@@ -12,13 +12,7 @@ const URL = 'https://example.vercel.app/api/settings';
 const NOW = Date.UTC(2026, 8, 24, 2, 0, 0);
 const UNIT = { name: '41 SAR', pageTitle: '41 SAR Personnel', logo: '' };
 
-/**
- * Deps over a store that records calls, or throws when `untouchable`.
- *
- * @param overrides Fields to replace.
- * @param untouchable Whether any store call should fail the test.
- * @returns The deps and the recorded calls.
- */
+/** Deps over a store that records calls, or throws when `untouchable`. */
 function setup(overrides: Partial<Deps> = {}, untouchable = false) {
   const calls: unknown[][] = [];
   const touch = (name: string, ...args: unknown[]) => {
@@ -38,13 +32,7 @@ function setup(overrides: Partial<Deps> = {}, untouchable = false) {
   return { deps, calls };
 }
 
-/**
- * A request from the dashboard's own page, carrying the given cookies.
- *
- * @param method The HTTP method.
- * @param options The query string, JSON body, cookies, and fetch-site header.
- * @returns The request.
- */
+/** A request from the dashboard's own page, carrying the given cookies. */
 function request(
   method: string,
   options: { query?: string; body?: unknown; edit?: boolean; read?: boolean; site?: string } = {},

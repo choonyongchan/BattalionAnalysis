@@ -1,11 +1,4 @@
-/**
- * Deposit: the one page that writes.
- *
- * A toggle picks what is being worked on: parade states (deposit one WhatsApp missed, or
- * correct or delete one already stored, through `/api/parade`) or SFT records (correct or
- * delete one FormSG sent, through `/api/sft`). Each lives in its own panel under
- * `pages/deposit/`.
- */
+/** Deposit, the one page that writes: a toggle between the parade-state and SFT panels in `pages/deposit/`. */
 
 import { useState } from 'preact/hooks';
 import { Segmented } from '../components/Segmented.tsx';

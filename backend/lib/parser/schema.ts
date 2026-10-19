@@ -1,18 +1,6 @@
 /**
- * The Structured Outputs JSON Schema the model must answer with.
- *
- * Every enum here is read from `db/schema.ts` rather than retyped, so a value the model is
- * allowed to emit is by construction a value the database will accept. The old system kept
- * three hand-maintained copies of this vocabulary in sync with a test; this removes the
- * copies instead of testing them.
- *
- * OpenAI strict mode has three rules that are easy to break and fail at request time, not
- * at review time:
- *   1. every property must appear in `required` -- optionality is expressed by allowing
- *      null in the type, never by omitting the key;
- *   2. every object must set `additionalProperties: false`;
- *   3. nullability is `type: [t, 'null']`, never a `nullable` flag.
- * `test/lib/parser-schema.test.ts` walks the whole tree asserting all three.
+ * The Structured Outputs schema the model must answer with; its enums come from `shared/domain.ts`.
+ * OpenAI strict mode: every property required (nullable instead of optional), no extra properties.
  */
 import {
   COMPANIES,
@@ -29,15 +17,7 @@ const nullableStr = { type: ['string', 'null'] } as const;
 /** A property that is an integer or explicitly absent. */
 const nullableInt = { type: ['integer', 'null'] } as const;
 
-/**
- * Builds the response schema.
- *
- * A function rather than a constant so the enum arrays are read at call time, which keeps
- * the "one source of truth" property honest if the schema module is ever imported before
- * the database schema module finishes evaluating.
- *
- * @returns The `json_schema` value for an OpenAI `response_format`.
- */
+/** Builds the response schema. */
 export function buildResponseSchema() {
   return {
     name: 'parade_state',

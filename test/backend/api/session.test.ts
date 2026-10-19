@@ -12,23 +12,12 @@ const EDIT_PASSWORD = 'a-long-settings-password';
 const URL = 'https://example.vercel.app/api/session';
 const NOW = Date.UTC(2026, 8, 23, 8, 0, 0);
 
-/**
- * Builds deps with the clock held.
- *
- * @param overrides Fields to replace.
- * @returns The deps.
- */
+/** Builds deps with the clock held. */
 function setup(overrides: Partial<Deps> = {}): Deps {
   return { dashboardPassword: PASSWORD, settingsPassword: EDIT_PASSWORD, now: () => NOW, ...overrides };
 }
 
-/**
- * Builds a login request.
- *
- * @param body The JSON body, already serialised or an object.
- * @param method The HTTP method.
- * @returns The request.
- */
+/** Builds a login request. */
 function login(body: unknown, method = 'POST'): Request {
   return new Request(URL, {
     method,
@@ -37,12 +26,7 @@ function login(body: unknown, method = 'POST'): Request {
   });
 }
 
-/**
- * Reads the session token out of a response's `Set-Cookie`.
- *
- * @param response The response.
- * @returns The token, or ''.
- */
+/** Reads the session token out of a response's `Set-Cookie`. */
 function tokenOf(response: Response): string {
   const header = response.headers.get('set-cookie') ?? '';
   return /dashboard_session=([^;]*)/.exec(header)?.[1] ?? '';
@@ -109,22 +93,12 @@ describe('api/session', () => {
   });
 });
 
-/**
- * Every `Set-Cookie` a response carries.
- *
- * @param response The response.
- * @returns The header values.
- */
+/** Every `Set-Cookie` a response carries. */
 function cookiesOf(response: Response): string[] {
   return response.headers.getSetCookie();
 }
 
-/**
- * A response's `canEdit` field.
- *
- * @param response The response.
- * @returns The field's value.
- */
+/** A response's `canEdit` field. */
 async function canEditOf(response: Response): Promise<boolean> {
   return ((await response.json()) as { canEdit: boolean }).canEdit;
 }

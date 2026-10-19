@@ -1,12 +1,6 @@
 /**
- * Status: the same shape as Report Sick and MC/MA, over the 10 normalised buckets
- * `statusBuckets.js` folds 403 free-text reasons into. Status is present-but-restricted,
- * never absence — the trend reads it as a rate the same way it reads MC, which is a rate
- * of restriction, not a rate of loss.
- *
- * Unlike the other medical pages, the range sections count every Status in force during
- * the range, not only those begun in it: a status runs for weeks, so a start-date filter
- * would drop most of the soldiers the trend shows on the same days.
+ * Status & Restrictions: present-but-restricted, never absence. Range sections count every status in force
+ * during the range, not only those begun in it, since a status runs for weeks.
  */
 
 import { useMemo } from 'preact/hooks';

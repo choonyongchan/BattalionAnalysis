@@ -36,16 +36,7 @@ interface BuildContext {
   model: string | null;
 }
 
-/**
- * Checks an extraction is structurally usable before any row is built.
- *
- * Returns a human-readable reason rather than throwing, because the reason is written
- * verbatim into `raw_messages.error` and read by whoever investigates. Structural only --
- * it never judges whether the numbers are self-consistent.
- *
- * @param extraction What the model returned.
- * @returns An empty string when the extraction is usable, else the reason it is not.
- */
+/** Checks an extraction is structurally usable before any row is built. */
 export function validate(extraction: Extraction): string {
   if (extraction.rejected) {
     return extraction.rejection_reason || 'Message was rejected without a stated reason.';
@@ -88,13 +79,7 @@ export function validate(extraction: Extraction): string {
   return '';
 }
 
-/**
- * Builds every row for one submission.
- *
- * @param extraction A validated extraction.
- * @param context The submission key and provenance for the rows.
- * @returns Insert-shaped objects for each table.
- */
+/** Builds every row for one submission. */
 export function buildRows(extraction: Extraction, context: BuildContext): BuiltRows {
   const key = context.paradeResponseId;
 
@@ -189,25 +174,14 @@ export function buildRows(extraction: Extraction, context: BuildContext): BuiltR
 /** Placeholders a filer writes to mean "nothing here". */
 const BLANK_PLACEHOLDERS = new Set(['', '-', '--', '–', '—', 'NIL', 'N/A', 'NA']);
 
-/**
- * Treats a placeholder dash as an absent value.
- *
- * @param value A field as the model returned it.
- * @returns The trimmed value, or null when it carries no information.
- */
+/** Treats a placeholder dash as an absent value. */
 function blankToNull(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   return BLANK_PLACEHOLDERS.has(trimmed.toUpperCase()) ? null : trimmed;
 }
 
-/**
- * Days between two ISO dates, unsigned.
- *
- * @param a An ISO date.
- * @param b An ISO date.
- * @returns The absolute difference in whole days, or 0 if either cannot be parsed.
- */
+/** Days between two ISO dates, unsigned. */
 function driftDays(a: string, b: string): number {
   const first = Date.parse(`${a}T00:00:00Z`);
   const second = Date.parse(`${b}T00:00:00Z`);

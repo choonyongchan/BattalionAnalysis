@@ -1,11 +1,4 @@
-/**
- * Tests for folding 177 free-text clinic strings into canonical names.
- *
- * The risk worth covering is the fold hiding real places: six different strings all name
- * Changi General Hospital, and one is a plain typo of Ng Teng Fong General Hospital, so
- * they must collapse without a curated allowlist swallowing a clinic the lexicon has not
- * met yet — an unrecognised place must survive rather than becoming "Other".
- */
+/** Tests for folding 177 free-text clinic strings into canonical names. */
 
 import { describe, expect, test } from 'bun:test';
 import {

@@ -1,9 +1,6 @@
 /**
- * The FormSG webhook shared by every form: verify the signature, decrypt, map, insert.
- *
- * Each form's route (`api/reportsick.ts`, `api/sft.ts`) supplies its own table, mapper, key and
- * post URI. The post URI must byte-match the URL registered in FormSG, because the signature
- * covers it. FormSG retries any non-2xx, so a payload that can never succeed answers 4xx.
+ * The FormSG webhook every form shares: verify, decrypt, map, refuse NRIC shapes, insert. The post URI must
+ * byte-match FormSG's (the signature covers it); FormSG retries any non-2xx, so a hopeless payload is 4xx.
  */
 import { json, methodNotAllowed, readJson, serverError } from '../http.ts';
 import { DecryptError, decryptSubmission, type WebhookData } from './decrypt.ts';
@@ -35,27 +32,13 @@ export interface FormSpec {
 /** Anything shaped like an NRIC or FIN; the same shape `test/repo-hygiene.test.ts` checks. */
 const NRIC_SHAPE = /\b[STFGM]\d{7}[A-Z]\b/i;
 
-/**
- * Finds a column holding an NRIC-shaped value, e.g. one typed into a free-text answer.
- *
- * @param row The row about to be inserted.
- * @returns The offending column name, or null when the row is clean.
- */
+/** Finds a column holding an NRIC-shaped value, e.g. one typed into a free-text answer. */
 export function nricColumn(row: Record<string, unknown>): string | null {
   const hit = Object.entries(row).find(([, v]) => typeof v === 'string' && NRIC_SHAPE.test(v));
   return hit ? hit[0] : null;
 }
 
-/**
- * Checks the `X-FormSG-Signature` header.
- *
- * Only a literal `true` passes: a throw or any other return value is a rejection.
- *
- * @param deps The SDK and the registered post URI.
- * @param signature The header value.
- * @param tag The log prefix.
- * @returns Whether the signature is valid.
- */
+/** Checks the `X-FormSG-Signature` header. */
 function isAuthentic(deps: Deps, signature: string, tag: string): boolean {
   try {
     if (deps.sdk.webhooks.authenticate(signature, deps.postUri!) === true) return true;
@@ -67,14 +50,7 @@ function isAuthentic(deps: Deps, signature: string, tag: string): boolean {
   return false;
 }
 
-/**
- * Decrypts and maps a verified body.
- *
- * @param data The webhook's `data` object.
- * @param deps The key and SDK.
- * @param form The form's mapper and log prefix.
- * @returns The mapped submission, or the response to answer with.
- */
+/** Decrypts and maps a verified body. */
 function mapBody(data: WebhookData, deps: Deps, form: FormSpec): MappedSubmission | Response {
   try {
     // ponytail: decryptSubmission rejects a missing data object as a DecryptError, which becomes a 400.
@@ -86,15 +62,7 @@ function mapBody(data: WebhookData, deps: Deps, form: FormSpec): MappedSubmissio
   }
 }
 
-/**
- * Verifies, decrypts and stores one submission.
- *
- * @param request The incoming request.
- * @param deps Database handle, secrets and the SDK.
- * @param form The form being received.
- * @returns 200 when stored or already known; 4xx for payloads that can never succeed; 5xx
- *   for failures worth retrying.
- */
+/** Verifies, decrypts and stores one submission. */
 export async function handleWebhook(request: Request, deps: Deps, form: FormSpec): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(['POST']);
   if (!deps.secretKey) return json(503, { error: `${form.secretKeyVar} is not configured.` });

@@ -1,24 +1,9 @@
 /**
- * The extraction prompt.
- *
- * The model only sees what `deterministic.ts` was unsure of, so the prompt is written for
- * near-template messages with filing slips, and it follows the same rules as that parser
- * (`parade_state_template_new.md`) so both yield the same rows. Allowed values (companies,
- * sections, report-sick types, roles) are enforced by the response schema and not repeated here.
- *
- * NAMES IN THE EXAMPLES ARE SYNTHETIC. This file is committed; no real soldier's name,
- * 4D number or diagnosis may appear in it.
+ * The extraction prompt for messages the rule-based parser doubted; it follows the same template rules.
+ * NAMES IN THE EXAMPLES ARE SYNTHETIC: no real name, 4D or diagnosis may appear here.
  */
 
-/**
- * Builds the complete prompt for one message.
- *
- * @param rawText The parade-state message, already passed through `cleanText`.
- * @param today The date the message was received, as `yyyy-MM-dd`. Used only to resolve
- *   two-digit years and to reject implausible dates; the parade's own `DATE:` header always
- *   wins over it.
- * @returns The prompt text.
- */
+/** Builds the complete prompt for one message. */
 export function buildPrompt(rawText: string, today: string): string {
   return `Extract a 40 SAR first parade state (a WhatsApp message) into the schema.
 Record only what the message states. Never invent a unit, person or appointment; return null for anything not stated. Do not merge or summarise entries.

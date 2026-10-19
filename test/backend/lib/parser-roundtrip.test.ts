@@ -1,8 +1,6 @@
 /**
- * The rule-based parser, checked against dummy parade states: whatever a message says in the
- * standard template must come back exactly as stated, and a message the rules cannot read with
- * certainty must say so rather than guess. Expectations are read off the spec, not the parser.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The rule-based parser over dummy parade states: what the template says comes back exactly, and doubt is
+ * reported, never guessed. NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { describe, expect, test } from 'bun:test';
 import { parseParadeState } from '../../../backend/lib/parser/deterministic.ts';
@@ -23,12 +21,7 @@ const CASES: Array<[string, ParadeSpec]> = [
   ...Array.from({ length: 40 }, (_, seed): [string, ParadeSpec] => [`generated #${seed}`, randomSpec(seed)]),
 ];
 
-/**
- * Reads a rendered spec the way the pipeline does, with the parade date as "today".
- *
- * @param spec The parade state.
- * @returns The parser's result.
- */
+/** Reads a rendered spec the way the pipeline does, with the parade date as "today". */
 function read(spec: ParadeSpec) {
   return parseParadeState(renderParadeState(spec), spec.date);
 }

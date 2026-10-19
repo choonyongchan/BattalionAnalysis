@@ -1,10 +1,4 @@
-/**
- * Tests for the dashboard's date-range filtering helpers.
- *
- * The cases worth having are the ones that would silently show the wrong slice: an
- * open bound read as a closed one, an episode that straddles the window's edge, and a
- * preset that miscounts across a month boundary.
- */
+/** Tests for the dashboard's date-range filtering helpers. */
 
 import { describe, expect, test } from 'bun:test';
 import {

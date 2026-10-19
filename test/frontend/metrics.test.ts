@@ -1,11 +1,4 @@
-/**
- * Tests for the numbers the dashboard puts on screen.
- *
- * The two that matter most are structural rather than arithmetic: a battalion total says
- * how many companies it covers, and a soldier listed at both FPS and LPS is one soldier.
- * Every case here builds its own rows, so the figures asserted are the figures those
- * rows imply.
- */
+/** Tests for the numbers the dashboard puts on screen. */
 
 import { describe, expect, test } from 'bun:test';
 import {

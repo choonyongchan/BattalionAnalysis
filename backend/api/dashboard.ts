@@ -26,17 +26,8 @@ export interface Deps {
 }
 
 /**
- * Whether the caller may read.
- *
- * Two ways in, one secret behind both. The dashboard sends a session cookie issued by
- * `api/session.ts`, which is what keeps the password out of the page; a script or a test
- * sends the password itself as a bearer token. A read is safe cross-site — it changes
- * nothing and `SameSite=Strict` keeps the cookie at home — so there is no origin check
- * here, unlike the write route.
- *
- * @param request The incoming request.
- * @param deps The configured password and the clock.
- * @returns Whether the request is authorised.
+ * Whether the caller may read: a session cookie, or the password as a bearer token. No origin check:
+ * a read changes nothing, and `SameSite=Strict` keeps the cookie at home.
  */
 function authorised(request: Request, deps: Deps): boolean {
   const now = (deps.now ?? (() => new Date()))().getTime();
@@ -45,15 +36,7 @@ function authorised(request: Request, deps: Deps): boolean {
   return Boolean(token && deps.dashboardPassword && sameSecret(token, deps.dashboardPassword));
 }
 
-/**
- * Routes one request.
- *
- * Fails closed: with no password or no read-only connection configured it refuses everything.
- *
- * @param request The incoming request.
- * @param deps The reader and the configured password.
- * @returns The response.
- */
+/** Routes one request. */
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method !== 'GET') return methodNotAllowed(['GET']);
   if (!deps.dashboardPassword || !deps.hasDatabase) {
@@ -73,13 +56,8 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 }
 
 /**
- * The Vercel entry point.
- *
- * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
- * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   const db = () => getDb('DASHBOARD_DATABASE_URL');

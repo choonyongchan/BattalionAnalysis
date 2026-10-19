@@ -1,8 +1,6 @@
 /**
- * Named dummy parade states, and a seeded generator of many more, for data-driven tests.
- *
- * NAMES ARE SYNTHETIC: every name is a phonetic-alphabet word plus a common surname, and every
- * 4D is a made-up number.
+ * Named dummy parade states, and a seeded generator of many more, for data-driven tests. NAMES ARE SYNTHETIC:
+ * every name is a phonetic-alphabet word plus a common surname, and every
  */
 import type { CommandSpec, EntrySpec, ParadeSpec, Tier, UnitSpec } from './paradeState.ts';
 import { shiftIso } from './paradeState.ts';
@@ -13,12 +11,7 @@ export const COMPANY_NAMES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Hercule
 const GIVEN = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO', 'FOXTROT', 'GOLF', 'HOTEL', 'INDIA', 'JULIET', 'KILO', 'LIMA'];
 const SURNAMES = ['TAN', 'LIM', 'ONG', 'NG', 'KOH', 'LEE', 'CHUA', 'WEE', 'GOH', 'TEO'];
 
-/**
- * A small seeded PRNG (mulberry32), so a failing generated case can be reproduced by its seed.
- *
- * @param seed Any 32-bit integer.
- * @returns A function returning floats in [0, 1).
- */
+/** A small seeded PRNG (mulberry32), so a failing generated case can be reproduced by its seed. */
 export function prng(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -30,25 +23,12 @@ export function prng(seed: number): () => number {
   };
 }
 
-/**
- * A present/strength pair.
- *
- * @param present Present.
- * @param strength Strength.
- * @returns The tier.
- */
+/** A present/strength pair. */
 export function tier(present: number, strength: number): Tier {
   return { present, strength };
 }
 
-/**
- * A unit with no entries.
- *
- * @param label The block label.
- * @param enlistee Enlistee present/strength; officers and wospecs are fixed small numbers.
- * @param entries Entry lines to file under it.
- * @returns The unit.
- */
+/** A unit with no entries. */
 export function unit(label: string, enlistee: Tier, entries: EntrySpec[] = []): UnitSpec {
   return { label, officer: tier(1, 1), wospec: tier(2, 2), enlistee, entries };
 }
@@ -148,37 +128,17 @@ export const DOUBTFUL_EDITS: Array<{ name: string; edit: (text: string) => strin
   { name: 'a line outside any section', edit: (text) => text.replace('HQ: ', 'stray words here\nHQ: ') },
 ];
 
-/**
- * Picks one element.
- *
- * @param random The PRNG.
- * @param items The choices.
- * @returns One of them.
- */
+/** Picks one element. */
 function pick<T>(random: () => number, items: readonly T[]): T {
   return items[Math.floor(random() * items.length)]!;
 }
 
-/**
- * A whole number in `[low, high]`.
- *
- * @param random The PRNG.
- * @param low Lowest value.
- * @param high Highest value.
- * @returns The number.
- */
+/** A whole number in `[low, high]`. */
 function between(random: () => number, low: number, high: number): number {
   return low + Math.floor(random() * (high - low + 1));
 }
 
-/**
- * One random entry for a section, dated around the parade date.
- *
- * @param random The PRNG.
- * @param date The parade date.
- * @param fourD The soldier's 4D.
- * @returns The entry.
- */
+/** One random entry for a section, dated around the parade date. */
 function randomEntry(random: () => number, date: string, fourD: string): EntrySpec {
   const person = { fourD, rank: pick(random, ['REC', 'PTE', 'LCP', 'CPL']), name: `${pick(random, GIVEN)} ${pick(random, SURNAMES)}` };
   const span = (days: number, startOffset: number) => ({ days, from: shiftIso(date, startOffset), to: shiftIso(date, startOffset + days - 1) });
@@ -200,13 +160,7 @@ function randomEntry(random: () => number, date: string, fourD: string): EntrySp
   }
 }
 
-/**
- * A random but valid parade state, reproducible from its seed.
- *
- * @param seed The seed.
- * @param overrides Fields to fix, such as the company or date.
- * @returns The parade state.
- */
+/** A random but valid parade state, reproducible from its seed. */
 export function randomSpec(seed: number, overrides: Partial<ParadeSpec> = {}): ParadeSpec {
   const random = prng(seed);
   const date = overrides.date ?? shiftIso('2026-09-01', between(random, 0, 20));

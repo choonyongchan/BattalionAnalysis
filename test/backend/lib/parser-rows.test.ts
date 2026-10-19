@@ -1,20 +1,9 @@
-/**
- * Validation and row building.
- *
- * The shapes exercised here are taken from the real new-format corpus -- including the ways
- * it deviates from the format spec -- with synthetic names. A parade state is a report a
- * person typed at 0700; the rules being tested are mostly about not "improving" it.
- */
+/** Validation and row building. */
 import { describe, expect, test } from 'bun:test';
 import { buildRows, validate } from '../../../backend/lib/parser/rows.ts';
 import type { Extraction, ExtractedPerson } from '../../../backend/lib/parser/extraction.ts';
 
-/**
- * Builds a minimal valid extraction, overridden per test.
- *
- * @param overrides Fields to replace.
- * @returns An extraction suitable for validate/buildRows.
- */
+/** Builds a minimal valid extraction, overridden per test. */
 function extraction(overrides: Partial<Extraction> = {}): Extraction {
   return {
     rejected: false,
@@ -43,12 +32,7 @@ function extraction(overrides: Partial<Extraction> = {}): Extraction {
   };
 }
 
-/**
- * Builds a personnel entry with sensible defaults.
- *
- * @param overrides Fields to replace.
- * @returns A personnel entry.
- */
+/** Builds a personnel entry with sensible defaults. */
 function person(overrides: Partial<ExtractedPerson> = {}): ExtractedPerson {
   return {
     unit_label: 'PL 1',

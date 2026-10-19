@@ -1,21 +1,6 @@
 /**
- * The dashboard's session: what a browser holds instead of the password.
- *
- * The password used to live in the page — first in memory, then in `localStorage` so a
- * refresh did not ask again. Anything that could run script in the page, and anyone at an
- * unlocked browser, could read it, and that one password also authorises writes through
- * `/api/parade`. A session token fixes that: the browser holds a signed, expiring token in
- * an `HttpOnly` cookie it cannot read, and the password is sent exactly once, to
- * `api/session.ts`.
- *
- * The token carries nothing but its own expiry — there are no accounts to name, and the
- * dashboard deliberately has no per-person identity (`docs/dashboard.md`). It is signed
- * with a key derived from the password, which is what makes a rotation end every open
- * session: change the password and every token signed with the old one stops verifying.
- * The derivation is keyed by `SESSION_SECRET`, a random server-only value, so a stolen
- * cookie cannot be used to guess the password offline. There is no server-side session
- * store, because `neon-http` gives the routes no place to keep one and a signature needs
- * none.
+ * The dashboard's signed, expiring session cookies: the browser holds a token it cannot read, never the
+ * password. Keys derive from the password and `SESSION_SECRET`, so rotating either ends every session.
  */
 import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
 import { bearerToken, sameSecret } from './http.ts';
@@ -32,26 +17,14 @@ export const SETTINGS_COOKIE = 'settings_session';
 /** The token format, so a later change can be told apart rather than guessed at. */
 const VERSION = 'v1';
 
-/**
- * Whether sessions can be issued at all: `SESSION_SECRET` is set.
- *
- * @returns True when configured.
- */
+/** Whether sessions can be issued at all: `SESSION_SECRET` is set. */
 export function sessionsConfigured(): boolean {
   return Boolean(process.env.SESSION_SECRET);
 }
 
 /**
- * Signs the payload with a key derived from the password and `SESSION_SECRET`.
- *
- * Signing with the password alone made every cookie an offline password-guessing oracle:
- * the payload is in the clear, so a guess could be checked against the signature at full
- * speed. Keying the derivation with a server-only secret closes that.
- *
- * @param secret The password in force.
- * @param payload The token's signed part, `v1.<expiry>`.
- * @returns The signature, base64url.
- * @throws {Error} When `SESSION_SECRET` is unset; callers check `sessionsConfigured` first.
+ * Signs the payload with a key derived from the password and `SESSION_SECRET`; the password alone would make
+ * every cookie an offline password-guessing oracle.
  */
 function sign(secret: string, payload: string): string {
   const pepper = process.env.SESSION_SECRET;
@@ -60,31 +33,13 @@ function sign(secret: string, payload: string): string {
   return createHmac('sha256', key).update(payload).digest('base64url');
 }
 
-/**
- * Issues a session token that expires `ttlMs` from now.
- *
- * @param secret The `DASHBOARD_PASSWORD` in force.
- * @param ttlMs How long the session should last, in milliseconds.
- * @param now Milliseconds since the epoch; passed in so tests hold the clock.
- * @returns The token, `v1.<expiry>.<signature>`.
- */
+/** Issues a session token that expires `ttlMs` from now. */
 export function issueSession(secret: string, ttlMs: number, now: number): string {
   const payload = `${VERSION}.${now + ttlMs}`;
   return `${payload}.${sign(secret, payload)}`;
 }
 
-/**
- * Checks a session token: right signature, and not yet expired.
- *
- * Fails closed on everything — an unset password, a malformed token, an unknown version —
- * and compares signatures in constant time, so a wrong token cannot be tuned into a right
- * one by timing the answers.
- *
- * @param secret The `DASHBOARD_PASSWORD` in force, or '' when none is configured.
- * @param token The token from the cookie, or null.
- * @param now Milliseconds since the epoch.
- * @returns Whether the token is valid right now.
- */
+/** Checks a session token: right signature (compared in constant time) and not yet expired; fails closed on anything else. */
 export function verifySession(secret: string, token: string | null, now: number): boolean {
   if (!secret || !token || !sessionsConfigured()) return false;
   const parts = token.split('.');
@@ -100,41 +55,18 @@ export function verifySession(secret: string, token: string | null, now: number)
   return timingSafeEqual(digest(signature), digest(sign(secret, `${version}.${expiry}`)));
 }
 
-/**
- * Builds the `Set-Cookie` header carrying a session.
- *
- * `HttpOnly` keeps the token out of reach of any script on the page, `Secure` keeps it off
- * plaintext connections (browsers exempt `localhost`, so local development still works),
- * and `SameSite=Strict` means another site cannot make the browser spend it — which is
- * what stops a cross-site request writing through `/api/parade`.
- *
- * @param token The token to set.
- * @param ttlMs How long the cookie should live, in milliseconds.
- * @param name The cookie's name; defaults to the dashboard session.
- * @returns The header value.
- */
+/** The `Set-Cookie` header carrying a session: `HttpOnly` (no script reads it), `Secure`, `SameSite=Strict`. */
 export function sessionCookie(token: string, ttlMs: number, name: string = SESSION_COOKIE): string {
   const maxAge = Math.floor(ttlMs / 1000);
   return `${name}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
 }
 
-/**
- * Builds the `Set-Cookie` header that deletes the session.
- *
- * @param name The cookie's name; defaults to the dashboard session.
- * @returns The header value.
- */
+/** Builds the `Set-Cookie` header that deletes the session. */
 export function clearSessionCookie(name: string = SESSION_COOKIE): string {
   return `${name}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
 }
 
-/**
- * Reads one cookie from a request.
- *
- * @param request The incoming request.
- * @param name The cookie's name.
- * @returns Its value, or null when the request carries no such cookie.
- */
+/** Reads one cookie from a request. */
 export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get('cookie');
   if (!header) return null;
@@ -147,36 +79,14 @@ export function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-/**
- * Whether a request carries a valid session.
- *
- * @param request The incoming request.
- * @param secret The `DASHBOARD_PASSWORD` in force, or undefined when none is configured.
- * @param now Milliseconds since the epoch.
- * @returns Whether the session cookie verifies.
- */
+/** Whether a request carries a valid session. */
 export function hasSession(request: Request, secret: string | undefined, now: number): boolean {
   return verifySession(secret ?? '', readCookie(request, SESSION_COOKIE), now);
 }
 
 /**
- * Whether a state-changing request came from the dashboard itself.
- *
- * `SameSite=Strict` already stops another site spending the cookie, but it is one browser
- * setting between a forged form and a deposit, so this is checked as well.
- *
- * `Sec-Fetch-Site` is the browser's own verdict on where the request came from, computed
- * before it is sent and not settable by page script, so it is read first. It is also the
- * only one of the two that survives a proxy: `request.url` behind Vercel's router, or a
- * local dev proxy, is not the URL the browser typed, so comparing `Origin` against it
- * refuses honest requests. The fallback compares `Origin` against the `Host` the request
- * was addressed to, which is the public host in both places.
- *
- * A request carrying neither header is refused on the cookie path: browsers send at least
- * one on a write, and a caller that is not a browser has the bearer path.
- *
- * @param request The incoming request.
- * @returns Whether the request came from this deployment's own pages.
+ * Whether a state-changing request came from the dashboard itself: `Sec-Fetch-Site` first (the browser's own
+ * verdict, and it survives a proxy), else `Origin` against `Host`; neither header means no.
  */
 export function isSameOrigin(request: Request): boolean {
   const site = request.headers.get('sec-fetch-site');
@@ -191,19 +101,7 @@ export function isSameOrigin(request: Request): boolean {
   }
 }
 
-/**
- * Whether a request is the dashboard, allowed to read or change what `/api/parade` and
- * `/api/sft` manage.
- *
- * A session cookie counts on a read, or on a write from this deployment's own origin (see
- * `isSameOrigin`). A script or a test has no cookie and sends the password as a bearer token.
- * An unset password matches nothing, so a deployment missing it fails closed.
- *
- * @param request The incoming request.
- * @param password The `DASHBOARD_PASSWORD` in force, or undefined when none is configured.
- * @param now Milliseconds since the epoch.
- * @returns Whether the request may act as the dashboard.
- */
+/** Whether a request is the dashboard, allowed to read or change what `/api/parade` and `/api/sft` manage. */
 export function isDashboardCaller(request: Request, password: string | undefined, now: number): boolean {
   if (hasSession(request, password, now)) return request.method === 'GET' || isSameOrigin(request);
   const token = bearerToken(request);
@@ -213,13 +111,6 @@ export function isDashboardCaller(request: Request, password: string | undefined
 /**
  * The secret that grants editing: `SETTINGS_PASSWORD`, unless it is unset or the same as
  * `DASHBOARD_PASSWORD`.
- *
- * Equal passwords would make the read-only password read-write without anyone meaning to, so
- * that configuration grants nobody editing (fail closed).
- *
- * @param dashboardPassword The `DASHBOARD_PASSWORD` in force.
- * @param settingsPassword The `SETTINGS_PASSWORD` in force.
- * @returns The settings password, or undefined when editing is off.
  */
 export function editSecret(
   dashboardPassword: string | undefined,
@@ -228,17 +119,7 @@ export function editSecret(
   return settingsPassword && settingsPassword !== dashboardPassword ? settingsPassword : undefined;
 }
 
-/**
- * Whether a request carries a valid editing session.
- *
- * The token is signed with `SETTINGS_PASSWORD`, so rotating it ends every edit session while
- * leaving read sessions alone.
- *
- * @param request The incoming request.
- * @param secret The result of `editSecret`, or undefined when editing is off.
- * @param now Milliseconds since the epoch.
- * @returns Whether the settings cookie verifies.
- */
+/** Whether a request carries a valid editing session. */
 export function hasSettingsSession(request: Request, secret: string | undefined, now: number): boolean {
   return verifySession(secret ?? '', readCookie(request, SETTINGS_COOKIE), now);
 }

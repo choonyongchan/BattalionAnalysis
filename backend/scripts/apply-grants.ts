@@ -1,21 +1,12 @@
 /**
- * Applies a `db/grants*.sql` file over the Neon HTTP driver, for machines without psql.
- *
- * Generates a fresh hex password for `:'password'`, runs each `--> statement-breakpoint`
- * chunk, and writes the role's connection string to `.env.<role>` (gitignored) rather than
- * the terminal, where it would sit in scrollback. Re-running rotates the password.
- *
- * Usage:  bun --env-file=.env.local backend/scripts/apply-grants.ts backend/db/grants-<name>.sql
+ * Applies a `db/grants*.sql` file over the Neon HTTP driver with a fresh password, writing the role's URL
+ * to `.env.<role>` (never the terminal). Usage: `bun --env-file=.env.local backend/scripts/apply-grants.ts <file>`
  */
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { neon } from '@neondatabase/serverless';
 
-/**
- * Runs the grants file named on the command line.
- *
- * @throws {Error} If `DATABASE_URL` or the file argument is missing, or a statement fails.
- */
+/** Runs the grants file named on the command line. */
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
   const file = process.argv[2];

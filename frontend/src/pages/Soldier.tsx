@@ -1,15 +1,6 @@
 /**
- * "Type 4D or name to search for soldier" — one soldier's whole record.
- *
- * Absences read newest-first, because the question this page answers is "how has this
- * soldier been lately". The 'Others' table reads the opposite way, oldest-first, because
- * it is a narrative of attachments and duties rather than a history of absence — both
- * orderings come straight from `soldier.js`'s `soldierReport` and are not re-sorted here.
- *
- * The page is one search bar and nothing else to set, like a web search engine: centred
- * on its own until a soldier is picked, then pinned above that soldier's report. It
- * searches the whole battalion rather than following the company selector, since a
- * soldier found by 4D or name already says which company they are in.
+ * One soldier's whole record, found by 4D or name across the battalion (it ignores the company selector).
+ * Absences read newest first; "Others" entries read oldest first, as a narrative.
  */
 
 import { useMemo, useState } from 'preact/hooks';

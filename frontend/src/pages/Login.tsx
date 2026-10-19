@@ -1,16 +1,6 @@
 /**
- * The screen in front of everything else.
- *
- * One headline and one field. There is no explanation above the field because there is
- * nothing to decide — a commander either has the password or does not — so the note about
- * where the check happens sits at the foot, out of the way of the one thing to do.
- *
- * The field is cleared as soon as its value is captured. A typed password left sitting in
- * an input is one screenshot or one shoulder away from being shared.
- *
- * The wait after the field is submitted is usually a second or two, but a cold start
- * wakes both the Vercel function and the Neon database, so the loading state is still
- * given a shape rather than a frozen button.
+ * The login screen: one field, cleared as soon as it is read (a password left in an input is one screenshot
+ * from being shared), and a progress bar for a cold start.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks';

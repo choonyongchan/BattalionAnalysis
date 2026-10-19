@@ -1,11 +1,6 @@
 /**
- * The whole API on http://localhost:3001 over the test branch, filled with synthetic data, so
- * `bun run dev` shows a working dashboard with no production access.
- *
- * Every name is synthetic. The test branch is emptied first, exactly as the test suite does.
- *
- * Usage: `bun run dev:api` (env from `.env.test`), then `bun run dev` and log in with
- * `DASHBOARD_PASSWORD` or `SETTINGS_PASSWORD` from `test/support/app.ts`.
+ * The whole API on http://localhost:3001 over the test branch, filled with synthetic data, so `bun run dev`
+ * shows a working dashboard with no production access.
  */
 import { ingestMessage } from '../../backend/lib/pipeline.ts';
 import { handle as handleReportSick } from '../../backend/api/reportsick.ts';

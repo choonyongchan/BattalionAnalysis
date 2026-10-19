@@ -20,12 +20,7 @@ const EXTRACTION = {
   personnel: [],
 };
 
-/**
- * Builds a fake `fetch` that answers each call with the next reply in turn.
- *
- * @param replies Responses to hand out, or errors to throw, in order.
- * @returns The fake and the request bodies it received.
- */
+/** Builds a fake `fetch` that answers each call with the next reply in turn. */
 function fakeFetch(...replies: Array<Response | Error>) {
   const bodies: Array<Record<string, unknown>> = [];
   const impl = (async (_url: string, init: RequestInit) => {
@@ -37,13 +32,7 @@ function fakeFetch(...replies: Array<Response | Error>) {
   return { impl, bodies };
 }
 
-/**
- * A chat-completions reply carrying `content`.
- *
- * @param content The message content.
- * @param finish_reason The finish reason.
- * @returns The response.
- */
+/** A chat-completions reply carrying `content`. */
 function completion(content: string, finish_reason = 'stop'): Response {
   return Response.json({ choices: [{ message: { content }, finish_reason }] });
 }

@@ -1,10 +1,6 @@
 /**
- * Corrections to stored SFT records, made from the Deposit page through `api/sft.ts`.
- *
- * FormSG is the only way a record is created (`lib/formsg/webhook.ts`); these are how a clerk
- * lists, corrects and deletes one afterwards. The columns the webhook derives on insert
- * (`nameKey`, `company`/`unitCoy`, `sftDate`) are derived here the same way, so a corrected
- * row is indistinguishable from one FormSG sent with the right answers.
+ * Lists, corrects and deletes stored SFT records for the Deposit page; a correction re-derives
+ * `nameKey`, `company`/`unitCoy` and `sftDate` exactly as the webhook does on insert.
  */
 import { desc, eq } from 'drizzle-orm';
 import { sftFormsg } from '../db/schema.ts';
@@ -48,37 +44,21 @@ const LISTED = {
   windowConfirmed: sftFormsg.windowConfirmed,
 };
 
-/**
- * Lists every SFT record, newest first.
- *
- * @param db A database handle.
- * @returns One record per submission.
- */
+/** Lists every SFT record, newest first. */
 export async function listSftRecords(db: Db): Promise<unknown[]> {
   return db.select(LISTED).from(sftFormsg).orderBy(desc(sftFormsg.timestamp));
 }
 
 /**
- * The `unit_coy` a corrected company is stored under: the soldier's own answer when it
- * already names that company, else the company itself, so the two never disagree.
- *
- * @param current The stored `unit_coy`.
- * @param company The corrected company, or null.
- * @returns The `unit_coy` to store.
+ * The `unit_coy` a corrected company is stored under: the soldier's own answer when it already names that
+ * company, else the company itself, so the two never disagree.
  */
 function unitCoyFor(current: string | null, company: Company | null): string | null {
   if (companyFromUnitCoy(current) === company) return current;
   return company;
 }
 
-/**
- * Replaces a record's answers with a clerk's correction.
- *
- * @param db A database handle.
- * @param id The record's `response_id`.
- * @param edit The validated correction.
- * @returns The updated record, or null when there is no such record.
- */
+/** Replaces a record's answers with a clerk's correction. */
 export async function updateSftRecord(db: Db, id: string, edit: SftEdit): Promise<unknown | null> {
   const [current] = await db.select({ unitCoy: sftFormsg.unitCoy }).from(sftFormsg).where(eq(sftFormsg.responseId, id));
   if (!current) return null;
@@ -95,13 +75,7 @@ export async function updateSftRecord(db: Db, id: string, edit: SftEdit): Promis
   return row ?? null;
 }
 
-/**
- * Deletes a record.
- *
- * @param db A database handle.
- * @param id The record's `response_id`.
- * @returns Whether a record was deleted.
- */
+/** Deletes a record. */
 export async function deleteSftRecord(db: Db, id: string): Promise<boolean> {
   const deleted = await db.delete(sftFormsg).where(eq(sftFormsg.responseId, id)).returning({ id: sftFormsg.responseId });
   return deleted.length > 0;

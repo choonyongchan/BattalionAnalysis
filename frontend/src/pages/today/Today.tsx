@@ -1,14 +1,6 @@
 /**
- * Today: who has filed this morning and today's numbers. Trends over a range live on the
- * Trends page.
- *
- * `selectedDate` names one parade — the filing chips, the tile row and the absence ring
- * describe that single day. `company` narrows every panel on the page to one company, or
- * `ALL` for the whole battalion — applied once, upstream, by `scopeDataset`.
- *
- * The selected parade also anchors the one forward-looking section: presence by rank tier,
- * then the list of who is due back when, from the dates each absence states
- * (`model/projection.js`), and who has just come off MC or Light Duty (`model/recentReturns.js`).
+ * Today: who has filed and the numbers for one parade (`selectedDate`), then who is due back and who has just
+ * returned. Trends over a range are on the Trends page.
  */
 
 import { useEffect, useMemo, useRef } from 'preact/hooks';

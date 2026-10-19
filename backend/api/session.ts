@@ -1,18 +1,6 @@
 /**
- * The dashboard's login route: the one place either password is ever sent.
- *
- *   POST   { password }   → `Set-Cookie` carrying a signed, expiring session; the settings
- *                            password also sets a second cookie that opens editing
- *   DELETE                → clears both
- *
- * The browser then holds an `HttpOnly` cookie it cannot read instead of the password
- * (`lib/session.ts` explains why). Nothing is stored server-side: each token carries its own
- * expiry and is signed with the password it corresponds to, so rotating either password ends
- * every open session of that kind on its next request.
- *
- * There is no lockout here, exactly as there is none on the other routes — the defence is
- * the length of the passphrase (`docs/dashboard.md`). The answer to a wrong password is a
- * bare 401 that says nothing about how wrong it was, and the comparison is constant-time.
+ * The login route, the only place a password is sent: POST `{ password }` sets the session cookie (the
+ * settings password also sets the edit cookie); DELETE clears both. No lockout, so passwords must be long.
  */
 import { getDb } from '../db/index.ts';
 import { methodNotAllowed, noStore, readJson, sameSecret } from '../lib/http.ts';
@@ -38,15 +26,7 @@ export interface Deps {
   now?: () => number;
 }
 
-/**
- * How long a new session should last.
- *
- * A failed or nonsensical settings read must not stop anyone logging in, so it falls back to
- * the default.
- *
- * @param deps The configured reader.
- * @returns Milliseconds.
- */
+/** How long a new session should last. */
 async function sessionTtl(deps: Deps): Promise<number> {
   if (!deps.sessionTtlMs) return SESSION_TTL_MS;
   try {
@@ -57,17 +37,7 @@ async function sessionTtl(deps: Deps): Promise<number> {
   }
 }
 
-/**
- * Routes one request.
- *
- * Fails closed: with no dashboard password configured it refuses every login, including an
- * empty one, and it never grants editing to a settings password that is unset or equal to the
- * dashboard password.
- *
- * @param request The incoming request.
- * @param deps The configured passwords, TTL source and the clock.
- * @returns The response.
- */
+/** Routes one request. */
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method === 'DELETE') {
     const response = noStore(200, { ok: true });
@@ -100,13 +70,8 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 }
 
 /**
- * The Vercel entry point.
- *
- * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
- * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   const hasDatabase = Boolean(process.env.DASHBOARD_DATABASE_URL);

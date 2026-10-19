@@ -1,9 +1,6 @@
 /**
- * Spans of time on a date axis, one lane per kind: a soldier's MC and leave as bars, so the
- * gaps between episodes and their lengths read at a glance, which a table of dates hides.
- *
- * Each lane takes one step of the sequential ramp: the lanes are kinds, not companies, so no
- * company colour is spent on them. The table twin lists every span with its dates.
+ * Date spans on lanes, one lane per kind (a soldier's MC and leave), so gaps and lengths read at a glance.
+ * Lanes are kinds, not companies, so they take the sequential ramp.
  */
 
 import { Plot } from './Plot.tsx';

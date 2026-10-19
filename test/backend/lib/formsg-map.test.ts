@@ -1,13 +1,4 @@
-/**
- * FormSG field resolution and row mapping.
- *
- * Every question title and every categorical value used here is copied from a real export
- * of 2,376 responses. The point of that is not realism for its own sake: the mapping is
- * matched against these exact strings at runtime, so a test written from memory would pass
- * while production silently dropped the field.
- *
- * Names are synthetic. No real submission content appears in this file.
- */
+/** FormSG field resolution and row mapping. */
 import { describe, expect, test } from 'bun:test';
 import {
   resolveField,
@@ -140,12 +131,7 @@ describe('value parsing', () => {
   });
 });
 
-/**
- * Builds a decrypted submission from question/answer pairs.
- *
- * @param answers Question title to answer text.
- * @returns A submission shaped as the webhook delivers it.
- */
+/** Builds a decrypted submission from question/answer pairs. */
 function submission(answers: Record<string, string>): DecryptedSubmission {
   return {
     submissionId: '6800000000000000000000a1',

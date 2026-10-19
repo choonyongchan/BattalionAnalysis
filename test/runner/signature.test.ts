@@ -1,10 +1,4 @@
-/**
- * Tests for the parade-state signature matcher.
- *
- * The positive cases in the "first parade gate" block are well-formed parade states
- * built around one header under test. The negative cases are the chatter, and the
- * last parade states, that must never reach the database.
- */
+/** Tests for the parade-state signature matcher. */
 
 import { describe, expect, test } from 'bun:test';
 import { isParadeState } from '../../runner/src/signature.ts';

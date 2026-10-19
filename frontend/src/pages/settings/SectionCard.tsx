@@ -1,11 +1,6 @@
 /**
- * One settings section as a card: what it is set to, and, for an editor, a form to change it.
- *
- * The form checks the draft with the same validator the server runs, so a mistake is shown
- * beside its field before anything is sent. A save names the version the form opened on;
- * if someone else saved in between, the server refuses and the card says so rather than
- * overwriting their change. After a save or reset the dashboard re-reads, which is how every
- * page picks up the new value.
+ * One settings section: its value, and for an editor a form validated by the server's own code. A save names
+ * the version it opened on, so a concurrent save is refused rather than overwritten.
  */
 
 import type { ComponentType } from 'preact';

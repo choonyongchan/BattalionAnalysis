@@ -1,9 +1,4 @@
-/**
- * Tests for resolving a platoon from the sub-header a soldier's line sits under.
- *
- * The sub-header is checked against the soldier's own company: Cougar has a `8`, Archer
- * does not. The 4D is read but, while `USE_FOURD_PLATOON` is off, never decides a platoon.
- */
+/** Tests for resolving a platoon from the sub-header a soldier's line sits under. */
 
 import { describe, expect, test } from 'bun:test';
 import { platoonCoverage, platoonOf, toPositionCells } from '../../frontend/src/model/platoon.ts';

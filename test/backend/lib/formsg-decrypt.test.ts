@@ -1,10 +1,4 @@
-/**
- * Webhook payload decryption and crypto-version dispatch.
- *
- * The version is detected from the payload rather than configured, so these tests are the
- * specification for that detection: which decryptor runs, what it is handed, and -- most
- * importantly -- what it is NOT handed.
- */
+/** Webhook payload decryption and crypto-version dispatch. */
 import { describe, expect, test } from 'bun:test';
 import { DecryptError, decryptSubmission, type Decryptors } from '../../../backend/lib/formsg/decrypt.ts';
 
@@ -14,13 +8,7 @@ interface Calls {
   v3: unknown[];
 }
 
-/**
- * Builds stub decryptors that record their arguments.
- *
- * @param v2Result What `crypto.decrypt` should return.
- * @param v3Result What `cryptoV3.decrypt` should return.
- * @returns The decryptors and the call log.
- */
+/** Builds stub decryptors that record their arguments. */
 function stubs(v2Result: unknown, v3Result: unknown): { decryptors: Decryptors; calls: Calls } {
   const calls: Calls = { v2: [], v3: [] };
   return {

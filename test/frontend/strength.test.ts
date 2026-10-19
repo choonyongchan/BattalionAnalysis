@@ -1,9 +1,4 @@
-/**
- * Tests for the daily strength picture: totals, rank tiers, and the two trend series.
- *
- * The case worth having throughout is the gap: only 5 of 45 real parade days carry all
- * six companies, so count trends explicitly report zero when a company did not file.
- */
+/** Tests for the daily strength picture: totals, rank tiers, and the two trend series. */
 
 import { describe, expect, test } from 'bun:test';
 import type { PersonnelRow, StrengthRow } from '../../shared/dashboard.ts';

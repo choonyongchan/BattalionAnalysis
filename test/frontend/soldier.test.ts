@@ -1,10 +1,4 @@
-/**
- * Tests for the soldier index, the per-soldier report, and fuzzy search.
- *
- * The two orderings in `soldierReport` are asserted explicitly because they are opposite
- * on purpose: absences read newest-first as history, 'Others' rows read oldest-first as a
- * narrative, and swapping either silently would not fail loudly anywhere else.
- */
+/** Tests for the soldier index, the per-soldier report, and fuzzy search. */
 
 import { describe, expect, test } from 'bun:test';
 import type { PersonnelRow } from '../../shared/dashboard.ts';

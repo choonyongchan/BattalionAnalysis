@@ -1,11 +1,4 @@
-/**
- * Tests for FormSG's structured clinical pick-list and its free-text reason field.
- *
- * The case worth having is the collision the pick-list invites: an `Others: <text>`
- * answer must land in the 'Other' bucket even when its text happens to name a symptom
- * that has its own clean bucket ("Others: Cough" is not URTI), because the soldier chose
- * not to pick the URTI option and the chart should say so.
- */
+/** Tests for FormSG's structured clinical pick-list and its free-text reason field. */
 
 import { describe, expect, test } from 'bun:test';
 import type { Episode } from '../../frontend/src/model/episodes.ts';

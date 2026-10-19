@@ -1,20 +1,7 @@
 /**
- * Applies pending Drizzle migrations over the Neon HTTP driver.
- *
- * `drizzle-kit migrate` drives its own websocket connection, which stalls against this
- * Neon endpoint from Windows. The HTTP driver is the one the application itself uses and
- * works fine, so migrations go through it instead.
- *
- * This is not a reimplementation of Drizzle's migrator -- it reproduces exactly the
- * bookkeeping `drizzle-kit migrate` does, so the two stay interchangeable:
- *   - statements are split on the `--> statement-breakpoint` marker drizzle-kit writes;
- *   - applied migrations are recorded in `drizzle.__drizzle_migrations`, keyed by the
- *     SHA-256 of the migration file (with LF line endings), which is how drizzle-kit decides
- *     what is pending.
- *
- * Re-runnable: a migration already recorded is skipped.
- *
- * Usage:  bun --env-file=.env.local scripts/apply-migrations.ts
+ * Applies pending Drizzle migrations over the Neon HTTP driver (drizzle-kit's websocket stalls from
+ * Windows), with drizzle-kit's own bookkeeping so the two stay interchangeable. Re-runnable.
+ * Usage: `bun --env-file=.env.local backend/scripts/apply-migrations.ts`
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -37,21 +24,12 @@ export interface Migration extends JournalEntry {
   hash: string;
 }
 
-/**
- * The SHA-256 of a text, hex-encoded.
- *
- * @param text The text to hash.
- * @returns The hex digest.
- */
+/** The SHA-256 of a text, hex-encoded. */
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
 
-/**
- * Reads every migration in journal order.
- *
- * @returns The migrations.
- */
+/** Reads every migration in journal order. */
 export function readMigrations(): Migration[] {
   const journal = JSON.parse(
     readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
@@ -64,12 +42,7 @@ export function readMigrations(): Migration[] {
   });
 }
 
-/**
- * Creates drizzle-kit's bookkeeping table if it is missing.
- *
- * @param sql A Neon query function.
- * @returns Nothing.
- */
+/** Creates drizzle-kit's bookkeeping table if it is missing. */
 export async function ensureMigrationsTable(sql: NeonQueryFunction<false, false>): Promise<void> {
   await sql`create schema if not exists drizzle`;
   await sql`
@@ -80,15 +53,7 @@ export async function ensureMigrationsTable(sql: NeonQueryFunction<false, false>
     )`;
 }
 
-/**
- * Applies every migration that has not been recorded yet.
- *
- * @param url The connection string of the database to migrate.
- * @param log Where progress goes; the test suite passes a no-op.
- * @param deps Replaced in tests: the query function (default: `neon(url)`) and the
- *   migrations to apply (default: `readMigrations()`).
- * @returns Nothing; a failure throws.
- */
+/** Applies every migration that has not been recorded yet. */
 export async function applyMigrations(
   url: string,
   log: (line: string) => void = console.log,
@@ -128,11 +93,7 @@ export async function applyMigrations(
   }
 }
 
-/**
- * Migrates the database named by `DATABASE_URL`.
- *
- * @returns Nothing; progress is logged and a failure throws.
- */
+/** Migrates the database named by `DATABASE_URL`. */
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set.');

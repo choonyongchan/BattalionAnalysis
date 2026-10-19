@@ -1,11 +1,6 @@
 /**
- * Report sick: the parade-state and FormSG picture of who is reporting sick.
- *
- * The sections shared with MC/MA and Status come from `shared/` (category, trends, grids,
- * rankings); this file
- * adds what is unique to report sick: the FormSG side of every panel, the type split, the
- * free-text reasons, and when soldiers file, none of which the other two categories have a
- * source for.
+ * Report Sick: the shared category sections, plus what only FormSG has: the type split, free-text reasons,
+ * filing times and the outbreak watch.
  */
 
 import { useState } from 'preact/hooks';

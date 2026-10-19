@@ -1,11 +1,6 @@
 /**
- * The write path: how a text parses, and what ingest, edit and delete leave in the database.
- *
- * `parseBody` needs no database. Everything else runs against the Neon test branch
- * (`TEST_DATABASE_URL`, see `test/support/db.ts`) and is checked by reading the tables back, so
- * a test holds for any implementation that leaves the same rows behind. Only the OpenAI fallback
- * is faked: it is a paid external API.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The write path: how a text parses, and what ingest, edit and delete leave in the database. NAMES ARE
+ * SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -40,12 +35,7 @@ const CHILD_TABLES = {
   sectionCounts: 'section_counts',
 } as const;
 
-/**
- * Builds a fake model fallback that answers with `answer`, or fails when it is an Error.
- *
- * @param answer The extraction to return, or the error to throw.
- * @returns The fake and the texts it was asked to read.
- */
+/** Builds a fake model fallback that answers with `answer`, or fails when it is an Error. */
 function fakeModel(answer: Extraction | Error) {
   const calls: string[] = [];
   const model: ModelParser = {
@@ -62,12 +52,7 @@ function fakeModel(answer: Extraction | Error) {
 /** What the model would read the doubtful message as: the good message's extraction. */
 const MODEL_READING = parseParadeState(GOOD, FULL.date).extraction;
 
-/**
- * The receipt time a spec's message arrives at: the morning of its parade date.
- *
- * @param spec The parade state.
- * @returns The time.
- */
+/** The receipt time a spec's message arrives at: the morning of its parade date. */
 function arrival(spec: Pick<ParadeSpec, 'date'>): Date {
   return new Date(`${spec.date}T00:30:00Z`);
 }
@@ -123,22 +108,13 @@ describe.skipIf(!hasTestDb)('against the test database', () => {
     db = await resetTestDb();
   }, DB_TIMEOUT_MS);
 
-  /**
-   * Reads the stored message row.
-   *
-   * @param id The `raw_messages` id.
-   * @returns The row.
-   */
+  /** Reads the stored message row. */
   async function message(id: number) {
     const [row] = await db.select().from(rawMessages).where(eq(rawMessages.id, id));
     return row;
   }
 
-  /**
-   * Asserts that exactly the spec's rows exist under its key.
-   *
-   * @param spec The parade state.
-   */
+  /** Asserts that exactly the spec's rows exist under its key. */
   async function expectRowsOf(spec: ParadeSpec) {
     const key = expectedKey(spec);
     expect(await countRows(db, 'parade_submissions', key)).toBe(1);

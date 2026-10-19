@@ -1,9 +1,6 @@
 /**
- * How the battalion has moved over the range: strength, report sick from both sources,
- * MC/MA, Status, and how report sick flows from the parade state through FormSG.
- *
- * Moved off the Today page so that page answers only "what is the battalion today". Every
- * chart here follows the company and date-range controls.
+ * Trends over the range: strength, report sick from both sources, MC/MA, Status, and the report-sick flow.
+ * Every chart follows the company and date controls.
  */
 
 import { useMemo } from 'preact/hooks';

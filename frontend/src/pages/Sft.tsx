@@ -1,10 +1,6 @@
 /**
- * Self-Regulated Fitness Training: who is training on their own time, where, doing what, and
- * in how big a group.
- *
- * Read from the SFT FormSG form (`sft_formsg`), one row per session filed. The company and
- * date bar work as on every other page; "today" ignores the range, since it answers a
- * different question — who is out training now.
+ * Self-Regulated Fitness Training: who trains, where, doing what and in how big a group, from the SFT form.
+ * "Today" ignores the range: it answers who is out training now.
  */
 
 import { useMemo } from 'preact/hooks';

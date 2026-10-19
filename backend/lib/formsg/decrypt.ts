@@ -37,14 +37,7 @@ export class DecryptError extends Error {
   }
 }
 
-/**
- * Flattens one v3 answer into the `{answer, answerArray}` shape the mapper reads.
- *
- * Anything other than a string or string array is stringified, so it stays visible.
- *
- * @param answer The raw v3 answer.
- * @returns The answer in webhook shape.
- */
+/** Flattens one v3 answer into the `{answer, answerArray}` shape the mapper reads. */
 function flattenV3Answer(answer: unknown): Pick<FormSgAnswer, 'answer' | 'answerArray'> {
   if (answer === null || answer === undefined) return { answer: '' };
   if (typeof answer === 'string') return { answer };
@@ -56,15 +49,7 @@ function flattenV3Answer(answer: unknown): Pick<FormSgAnswer, 'answer' | 'answer
   return { answer: JSON.stringify(answer) };
 }
 
-/**
- * Decrypts a webhook payload into answers.
- *
- * @param data The webhook's `data` object.
- * @param formSecretKey The form's base-64 secret key.
- * @param decryptors The SDK's `crypto` and `cryptoV3`.
- * @returns The submission, with `verified` deliberately absent.
- * @throws {DecryptError} If the payload is malformed or decryption fails.
- */
+/** Decrypts a webhook payload into answers. */
 export function decryptSubmission(
   data: WebhookData,
   formSecretKey: string,

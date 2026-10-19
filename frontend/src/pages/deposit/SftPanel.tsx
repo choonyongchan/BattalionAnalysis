@@ -1,11 +1,6 @@
 /**
- * Deposit → SFT: correct or delete an SFT record.
- *
- * FormSG is the only way an SFT record is created, so there is nothing to deposit here: a
- * clerk picks a stored record, corrects any answer in it, or deletes it. It talks to
- * `/api/sft`, which checks a correction with the same `model/sftEdit.js#validateSftEdit` this
- * panel runs first. The SFT page reads the same table; a change here refreshes it at once, and
- * the list reloads with every background refresh so a record FormSG sends meanwhile appears.
+ * Deposit → SFT: correct or delete a stored SFT record through `/api/sft`, checked first with the same
+ * `validateSftEdit` the server runs. FormSG is the only way a record is created.
  */
 
 import { useRef, useState } from 'preact/hooks';

@@ -1,12 +1,6 @@
 /**
- * The product's workflows end to end, over HTTP, against the Neon test branch.
- *
- * The app's three routes run on a local port (`test/support/app.ts`). Each workflow is driven by
- * the code a person's action actually runs -- the WhatsApp bridge's handler and relay, the
- * dashboard's `frontend/src/data/` calls, a real signed FormSG webhook -- and is checked by what the
- * dashboard then shows, computed by `frontend/src/model/` from what `frontend/src/data/feed.ts` loads.
- * The expected numbers are counted off the dummy data, not the code.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * The product's workflows end to end, over HTTP, against the Neon test branch. NAMES ARE SYNTHETIC: no real
+ * soldier's name or 4D number may appear here.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Db } from '../../backend/db/index.ts';
@@ -38,24 +32,14 @@ const E2E_TIMEOUT_MS = DB_TIMEOUT_MS * 4;
 const page = { deposit: depositMessage, list: listMessages, get: getMessage, edit: editMessage, remove: deleteMessage };
 
 /**
- * Unlocks the dashboard the way the login screen does: the password once, for a session
- * cookie the jar in `withOrigin` then carries like a browser.
- *
- * @param origin The running app.
- * @param password The password to send; defaults to the right one.
- * @returns Nothing.
+ * Unlocks the dashboard the way the login screen does: the password once, for a session cookie the jar in
+ * `withOrigin` then carries like a browser.
  */
 async function unlock(origin: string, password = DASHBOARD_PASSWORD): Promise<void> {
   await withOrigin(origin, () => startSession(password));
 }
 
-/**
- * What the dashboard should show for one parade, counted off the specs filed for it.
- *
- * @param specs The parade states filed that day.
- * @returns Present and accountable strength, the companies that filed, and how many distinct
- *   soldiers each section names.
- */
+/** What the dashboard should show for one parade, counted off the specs filed for it. */
 function expectedDashboard(specs: ParadeSpec[]) {
   const soldiers = new Map<Section, Set<string>>();
   for (const entry of specs.flatMap(allEntries)) {
@@ -71,13 +55,7 @@ function expectedDashboard(specs: ParadeSpec[]) {
   };
 }
 
-/**
- * Reads the dashboard as a viewer would, and computes the headline numbers for one parade.
- *
- * @param origin The running app.
- * @param date The parade date.
- * @returns The loaded records and the computed figures.
- */
+/** Reads the dashboard as a viewer would, and computes the headline numbers for one parade. */
 async function dashboardOn(origin: string, date: string) {
   const data = await withOrigin(origin, () => loadAll());
   const strength = battalionStrength(data.strength, date, 'FPS');
@@ -93,11 +71,7 @@ async function dashboardOn(origin: string, date: string) {
   };
 }
 
-/**
- * A logger that keeps what the bridge logs, so a test can read it.
- *
- * @returns The logger and what it recorded.
- */
+/** A logger that keeps what the bridge logs, so a test can read it. */
 function recordingLogger() {
   const records: Array<{ level: string; fields: Record<string, unknown>; message: string }> = [];
   const at = (level: string) => (fields: Record<string, unknown>, message: string) => {
@@ -106,14 +80,7 @@ function recordingLogger() {
   return { logger: { debug: at('debug'), info: at('info'), warn: at('warn'), error: at('error') }, records };
 }
 
-/**
- * A Baileys `messages.upsert` envelope.
- *
- * @param id The WhatsApp message id.
- * @param text The message text.
- * @param options Which chat it is in, and whether the bridge itself sent it.
- * @returns The envelope.
- */
+/** A Baileys `messages.upsert` envelope. */
 function envelope(id: string, text: string, options: { remoteJid?: string; fromMe?: boolean } = {}) {
   return {
     key: { id, remoteJid: options.remoteJid ?? GROUP, fromMe: options.fromMe ?? false },

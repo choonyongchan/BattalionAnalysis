@@ -18,14 +18,7 @@ export type Column =
   | `status${1 | 2 | 3 | 4 | 5}Days`
   | 'discard';
 
-/**
- * Normalises a question title or option for comparison.
- *
- * Underscore runs collapse too, so the blank in the symptoms question can be any length.
- *
- * @param title A question title or answer option.
- * @returns Lower-cased, with underscore and whitespace runs each collapsed to one.
- */
+/** Normalises a question title or option for comparison. */
 export function normaliseTitle(title: string): string {
   return title.toLowerCase().replace(/_+/g, '_').replace(/\s+/g, ' ').trim();
 }
@@ -58,12 +51,7 @@ const TITLE_MAP: Record<string, Column | 'status' | 'statusDays'> = Object.fromE
 /** The `#3` in `Status Given #3`. */
 const REPEAT_SUFFIX = /\s*#(\d+)\s*$/;
 
-/**
- * Identifies which column an answer belongs to.
- *
- * @param answer The `question` from a webhook response entry.
- * @returns The column, or null when the answer is not recognised.
- */
+/** Identifies which column an answer belongs to. */
 export function resolveField(answer: { question?: string }): Column | null {
   if (!answer.question) return null;
 
@@ -89,23 +77,13 @@ const REPORT_SICK_TYPES: Record<string, string> = {
   ffi: 'FFI',
 };
 
-/**
- * Maps a report-sick answer to the enum value.
- *
- * @param answer The raw answer text.
- * @returns The enum value, or null when unrecognised.
- */
+/** Maps a report-sick answer to the enum value. */
 export function toReportSickType(answer: string | null | undefined): string | null {
   if (!answer) return null;
   return REPORT_SICK_TYPES[normaliseTitle(answer)] ?? null;
 }
 
-/**
- * Maps an outcome answer to the enum value, by prefix since the option text gets edited.
- *
- * @param answer The raw answer text.
- * @returns The enum value, or null when unrecognised.
- */
+/** Maps an outcome answer to the enum value, by prefix since the option text gets edited. */
 export function toOutcome(answer: string | null | undefined): string | null {
   if (!answer) return null;
   const value = normaliseTitle(answer);
@@ -119,12 +97,7 @@ export function toOutcome(answer: string | null | undefined): string | null {
 /** The prefix FormSG uses when a respondent picks "Others" and types their own text. */
 const OTHERS_PREFIX = /^others:\s*/i;
 
-/**
- * Splits a pick-list answer into its option and any free text.
- *
- * @param answer The raw answer.
- * @returns `option` is the chosen option, or `Others`; `otherText` is the typed text.
- */
+/** Splits a pick-list answer into its option and any free text. */
 export function splitOtherOption(answer: string | null | undefined): {
   option: string | null;
   otherText: string | null;
@@ -136,12 +109,7 @@ export function splitOtherOption(answer: string | null | undefined): {
   return { option: answer.trim(), otherText: null };
 }
 
-/**
- * Parses a `Yes`/`No` answer.
- *
- * @param answer The raw answer.
- * @returns true, false, or null when unanswered or unrecognised.
- */
+/** Parses a `Yes`/`No` answer. */
 export function toBoolean(answer: string | null | undefined): boolean | null {
   const value = answer?.trim().toLowerCase();
   if (value === 'yes') return true;
@@ -149,23 +117,13 @@ export function toBoolean(answer: string | null | undefined): boolean | null {
   return null;
 }
 
-/**
- * Parses a whole number from a text answer such as "3 days".
- *
- * @param answer The raw answer.
- * @returns The number, or null when the answer holds none.
- */
+/** Parses a whole number from a text answer such as "3 days". */
 export function toSmallInt(answer: string | null | undefined): number | null {
   const match = answer ? /-?\d+/.exec(answer) : null;
   return match ? Number(match[0]) : null;
 }
 
-/**
- * Parses an `HHMM` or `HH:MM` time answer.
- *
- * @param answer The raw answer, e.g. "1400".
- * @returns `HH:MM`, or null when the answer is not a valid time.
- */
+/** Parses an `HHMM` or `HH:MM` time answer. */
 export function toTime(answer: string | null | undefined): string | null {
   const digits = answer?.replace(/\D/g, '') ?? '';
   if (digits.length !== 4) return null;
@@ -173,13 +131,7 @@ export function toTime(answer: string | null | undefined): string | null {
   return Number(hours) <= 23 && Number(minutes) <= 59 ? `${hours}:${minutes}` : null;
 }
 
-/**
- * Gives the Singapore-local calendar date of an instant.
- *
- * @param iso An ISO 8601 timestamp with an offset.
- * @returns `YYYY-MM-DD` in Singapore time.
- * @throws {RangeError} If `iso` is not a valid timestamp.
- */
+/** Gives the Singapore-local calendar date of an instant. */
 export function toSgtDate(iso: string): string {
   return new Date(Date.parse(iso) + SGT_OFFSET_MS).toISOString().slice(0, 10);
 }

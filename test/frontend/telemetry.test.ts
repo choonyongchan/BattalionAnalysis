@@ -1,9 +1,4 @@
-/**
- * Tests for the URL rewrite that keys analytics by page.
- *
- * The dashboard routes on the hash, so without the rewrite every page would count as `/`,
- * and a query in the hash would leave the browser.
- */
+/** Tests for the URL rewrite that keys analytics by page. */
 
 import { describe, expect, test } from 'bun:test';
 import { routeUrl } from '../../frontend/src/app/telemetry.ts';

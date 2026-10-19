@@ -4,14 +4,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 /** The JSON content type, written once so a typo cannot make one route answer as text. */
 const JSON_TYPE = 'application/json; charset=utf-8';
 
-/**
- * Builds a JSON response.
- *
- * @param status The HTTP status code.
- * @param body Anything JSON-serialisable.
- * @param headers Extra headers to merge in, such as `Retry-After`.
- * @returns The response.
- */
+/** Builds a JSON response. */
 export function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -24,15 +17,7 @@ export function noStore(status: number, body: unknown, headers: Record<string, s
   return json(status, body, { 'Cache-Control': 'no-store', ...headers });
 }
 
-/**
- * Rejects a request whose method the route does not implement.
- *
- * `Allow` is not decoration: it is what makes a 405 actionable to whoever is integrating,
- * and FormSG's own webhook tester reads it.
- *
- * @param allowed The methods this route does implement.
- * @returns A 405 naming them.
- */
+/** Rejects a request whose method the route does not implement. */
 export function methodNotAllowed(allowed: string[]): Response {
   return json(405, { error: `Method not allowed. Use ${allowed.join(' or ')}.` }, {
     Allow: allowed.join(', '),
@@ -49,16 +34,7 @@ const MAX_BODY_CHARS = 256 * 1024;
 /** A parsed body, or the response explaining why it could not be parsed. */
 type ParsedBody<T> = { ok: true; body: T } | { ok: false; response: Response };
 
-/**
- * Parses a JSON request body.
- *
- * A malformed body is a 400, not an exception. The distinction matters at the intake routes:
- * an unhandled throw becomes a 500, and a 500 tells the bridge to retry forever a request
- * that will never succeed.
- *
- * @param request The incoming request.
- * @returns The parsed body, or the 400 to return.
- */
+/** Parses a JSON request body; a malformed one is a 400, since a 500 would make the relay retry forever. */
 export async function readJson<T = unknown>(request: Request): Promise<ParsedBody<T>> {
   let text: string;
   try {
@@ -79,17 +55,7 @@ export async function readJson<T = unknown>(request: Request): Promise<ParsedBod
   }
 }
 
-/**
- * Turns an unexpected throw into a 500 without putting its message on the wire.
- *
- * The message goes to the server log, where an operator can read it; the client gets a
- * reference and nothing else. Parser and database errors quote the input they failed on, and
- * for this application that input is personnel data.
- *
- * @param error Whatever was thrown.
- * @param context A short label naming the route, for the log line.
- * @returns A 500 carrying a reference but no detail.
- */
+/** Turns an unexpected throw into a 500 without putting its message on the wire. */
 export function serverError(error: unknown, context: string): Response {
   const reference = Math.random().toString(36).slice(2, 10);
   console.error(`[${context}] ${reference}: ${describeError(error)}`);
@@ -100,16 +66,8 @@ export function serverError(error: unknown, context: string): Response {
 const CODE_ERRORS = new Set(['TypeError', 'ReferenceError', 'RangeError', 'SyntaxError']);
 
 /**
- * Renders one thrown value without any text that could quote personnel data.
- *
- * Drizzle's `DrizzleQueryError` message is `Failed query: <sql>\nparams: <params>`, and the
- * params are the bodies, names, 4D numbers and diagnoses being written. Postgres and parser
- * messages can quote input too ("invalid input syntax: \"...\""). So only a programming
- * error keeps its stack; anything else is logged as its name, plus the driver's error code
- * when it has one (e.g. Postgres `23505`), which is enough to say what kind of thing broke.
- *
- * @param error One link of the cause chain.
- * @returns A log-safe rendering.
+ * Renders one thrown value without text that could quote personnel data (a Drizzle error's message
+ * carries the query's params): a programming error keeps its stack, anything else only its name and code.
  */
 function describeOne(error: unknown): string {
   if (!(error instanceof Error)) return typeof error;
@@ -118,16 +76,7 @@ function describeOne(error: unknown): string {
   return typeof code === 'string' ? `${error.name} (${code})` : error.name;
 }
 
-/**
- * Renders a thrown value for the log, followed by its `cause` chain.
- *
- * Drizzle keeps the driver's error, the one that says why a query failed, in `cause`, so the
- * chain is what carries the useful code. It is cut at a few links in case a cause refers
- * back to itself.
- *
- * @param error Whatever was thrown.
- * @returns Each link of the chain, rendered by `describeOne`.
- */
+/** Renders a thrown value for the log, followed by its `cause` chain. */
 function describeError(error: unknown): string {
   const parts: string[] = [];
   let current: unknown = error;
@@ -138,24 +87,13 @@ function describeError(error: unknown): string {
   return parts.join(' <- ');
 }
 
-/**
- * Compares two secrets in constant time, whatever their lengths.
- *
- * @param given What the caller sent.
- * @param expected The configured secret.
- * @returns Whether they match.
- */
+/** Compares two secrets in constant time, whatever their lengths. */
 export function sameSecret(given: string, expected: string): boolean {
   const digest = (value: string) => createHash('sha256').update(value).digest();
   return timingSafeEqual(digest(given), digest(expected));
 }
 
-/**
- * Reads the token from an `Authorization: Bearer <token>` header.
- *
- * @param request The incoming request.
- * @returns The token, or null when the header is absent or not a bearer token.
- */
+/** Reads the token from an `Authorization: Bearer <token>` header. */
 export function bearerToken(request: Request): string | null {
   return /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? null;
 }

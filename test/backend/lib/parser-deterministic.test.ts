@@ -9,13 +9,7 @@ import { validate } from '../../../backend/lib/parser/rows.ts';
 const TODAY = '2026-09-18';
 const WHERE = { unit_label: 'PL 1', reason_category: 'Status' };
 
-/**
- * Parses one line and returns its single entry.
- *
- * @param line The personnel line.
- * @param section The section it sits under.
- * @returns The entry and the problems.
- */
+/** Parses one line and returns its single entry. */
 function one(line: string, section = 'Status') {
   const { entries, problems } = parseEntry(line, TODAY, { ...WHERE, reason_category: section });
   expect(entries).toHaveLength(1);

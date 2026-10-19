@@ -1,10 +1,4 @@
-/**
- * Tests for the recently-back list.
- *
- * The cases worth having: MC is listed one and two days after its end and Light Duty one,
- * only MC and Light Duty count, an MC extended on a later parade reads its extended end, and
- * a soldier still listed on the parade itself is not back.
- */
+/** Tests for the recently-back list. */
 
 import { describe, expect, test } from 'bun:test';
 import type { PersonnelRow } from '../../shared/dashboard.ts';

@@ -13,12 +13,7 @@ const URL = 'https://example.vercel.app/api/dashboard';
 const DATA: DashboardData = { strength: [], personnel: [], roster: [], formSg: [], submissions: [], sft: [], sectionCounts: [] };
 const SETTINGS = resolveSettings([]);
 
-/**
- * Builds deps over a reader that counts its calls.
- *
- * @param overrides Fields to replace.
- * @returns The deps and a call counter.
- */
+/** Builds deps over a reader that counts its calls. */
 function setup(overrides: Partial<Deps> = {}) {
   const calls = { load: 0 };
   const deps: Deps = {
@@ -32,23 +27,12 @@ function setup(overrides: Partial<Deps> = {}) {
   return { deps, calls };
 }
 
-/**
- * Builds a request.
- *
- * @param method The HTTP method.
- * @param token The bearer token, if any.
- * @returns The request.
- */
+/** Builds a request. */
 function request(method = 'GET', token?: string): Request {
   return new Request(URL, { method, headers: token ? { Authorization: `Bearer ${token}` } : {} });
 }
 
-/**
- * Builds a request carrying a session cookie.
- *
- * @param token The session token.
- * @returns The request.
- */
+/** Builds a request carrying a session cookie. */
 function withSession(token: string): Request {
   return new Request(URL, { headers: { cookie: `${SESSION_COOKIE}=${token}` } });
 }
@@ -136,12 +120,7 @@ describe('api/dashboard', () => {
 describe('api/dashboard, editing', () => {
   const NOW = new Date('2026-09-22T01:00:00Z');
 
-  /**
-   * A response's `canEdit` field.
-   *
-   * @param response The response.
-   * @returns The field's value.
-   */
+  /** A response's `canEdit` field. */
   async function canEditOf(response: Response): Promise<boolean> {
     return ((await response.json()) as { canEdit: boolean }).canEdit;
   }

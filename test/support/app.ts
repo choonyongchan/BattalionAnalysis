@@ -32,13 +32,7 @@ export const SETTINGS_PASSWORD = 'settings-test-password-long-enough';
 /** The relay secret the tests configure. */
 export const INGEST_SECRET = 'relay-test-secret-long-enough';
 
-/**
- * The parade route's dependencies over a real database, as `api/parade.ts#route` builds them.
- *
- * @param db The database.
- * @param options The clock to stamp arrivals with, and the model fallback.
- * @returns The deps.
- */
+/** The parade route's dependencies over a real database, as `api/parade.ts#route` builds them. */
 export function paradeDeps(db: Db, options: { now?: () => Date; model?: ModelParser | null } = {}): ParadeDeps {
   const now = options.now ?? (() => new Date());
   const model = options.model ?? null;
@@ -55,12 +49,7 @@ export function paradeDeps(db: Db, options: { now?: () => Date; model?: ModelPar
   };
 }
 
-/**
- * The SFT route's dependencies over a real database, as `api/sft.ts#route` builds them.
- *
- * @param db The database.
- * @returns The deps.
- */
+/** The SFT route's dependencies over a real database, as `api/sft.ts#route` builds them. */
 export function sftDeps(db: Db): SftDeps {
   return {
     db,
@@ -83,12 +72,8 @@ export interface RunningApp {
 }
 
 /**
- * Serves `/api/parade`, `/api/dashboard`, `/api/session`, `/api/settings`, `/api/reportsick` and
- * `/api/sft` over HTTP on a free local port.
- *
- * @param db The database every route uses.
- * @param options Passed to `paradeDeps`; `port` fixes the port (default: any free one).
- * @returns The origin and a stop function.
+ * Serves `/api/parade`, `/api/dashboard`, `/api/session`, `/api/settings`, `/api/reportsick` and `/api/sft`
+ * over HTTP on a free local port.
  */
 export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] & { port?: number } = {}): RunningApp {
   const server = Bun.serve({
@@ -138,13 +123,7 @@ export function startApp(db: Db, options: Parameters<typeof paradeDeps>[1] & { p
  */
 const JARS = new Map<string, Map<string, string>>();
 
-/**
- * Stores what a response set, honouring `Max-Age=0` as a delete (that is what Lock sends).
- *
- * @param jar The origin's jar.
- * @param response The response to read `Set-Cookie` from.
- * @returns Nothing.
- */
+/** Stores what a response set, honouring `Max-Age=0` as a delete (that is what Lock sends). */
 function keepCookies(jar: Map<string, string>, response: Response): void {
   for (const header of response.headers.getSetCookie()) {
     const [pair, ...attributes] = header.split(';');
@@ -159,25 +138,16 @@ function keepCookies(jar: Map<string, string>, response: Response): void {
   }
 }
 
-/**
- * Forgets an origin's cookies, as closing the browser would.
- *
- * @param origin The app's origin.
- * @returns Nothing.
- */
+/** Forgets an origin's cookies, as closing the browser would. */
 export function forgetCookies(origin: string): void {
   JARS.delete(origin);
 }
 
 /**
- * Points the browser code's same-origin `/api/...` calls at a running app, for the duration of
- * `run`. Only the URL is rewritten: the request reaches the real server and its real answer
- * comes back. Cookies the app sets are kept and sent back, as a browser would, and the
- * `Origin` header a browser would send is added — the intake refuses a cookie without one.
- *
- * @param origin The app's origin.
- * @param run The code that calls `fetch('/api/...')`.
- * @returns Whatever `run` returns.
+ * Points the browser code's same-origin `/api/...` calls at a running app, for the duration of `run`. Only
+ * the URL is rewritten: the request reaches the real server and its real answer comes back. Cookies the app
+ * sets are kept and sent back, as a browser would, and the `Origin` header a browser would send is added —
+ * the intake refuses a cookie without one.
  */
 export async function withOrigin<T>(origin: string, run: () => Promise<T>): Promise<T> {
   const original = globalThis.fetch;

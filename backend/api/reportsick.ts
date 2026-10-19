@@ -1,8 +1,6 @@
 /**
- * The FormSG report-sick webhook: one row into `report_sick_formsg` per submission.
- *
- * The verify → decrypt → map → insert flow is `lib/formsg/webhook.ts`, shared with `api/sft.ts`.
- * `FORMSG_POST_URI` must byte-match the URL registered in FormSG (`…/api/reportsick`).
+ * The FormSG report-sick webhook: one `report_sick_formsg` row per submission, through `lib/formsg/webhook.ts`.
+ * `FORMSG_POST_URI` must byte-match the URL registered in FormSG.
  */
 import { getDb } from '../db/index.ts';
 import { reportSickFormsg } from '../db/schema.ts';
@@ -21,25 +19,14 @@ const FORM: FormSpec = {
   postUriVar: 'FORMSG_POST_URI',
 };
 
-/**
- * Verifies, decrypts and stores one report-sick submission.
- *
- * @param request The incoming request.
- * @param deps Database handle, secrets and the SDK.
- * @returns The webhook's response.
- */
+/** Verifies, decrypts and stores one report-sick submission. */
 export function handle(request: Request, deps: Deps): Promise<Response> {
   return handleWebhook(request, deps, FORM);
 }
 
 /**
- * The Vercel entry point.
- *
- * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
- * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   return handle(request, {

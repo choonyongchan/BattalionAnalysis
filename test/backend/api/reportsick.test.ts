@@ -1,15 +1,6 @@
 /**
  * The report-sick webhook, fed genuinely encrypted and signed payloads from the real SDK
- * (`test/support/formsg.ts`).
- *
- * The privacy assertions are the point of this file. FormSG hands over identity two ways -- as a
- * `SingPass Validated NRIC` answer and as verified content beside the responses -- and neither
- * may reach a row. Status codes are checked deliberately, because FormSG retries a non-2xx: a
- * payload that can never succeed must answer 4xx.
- *
- * Rejections run offline with a database that throws if touched, which proves nothing was
- * written. Stores run against the Neon test branch and are checked by reading the row back.
- * NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
+ * (`test/support/formsg.ts`). NAMES ARE SYNTHETIC: no real soldier's name or 4D number may appear here.
  */
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -29,22 +20,13 @@ const UNTOUCHABLE_DB = new Proxy(
   },
 );
 
-/**
- * The route's dependencies, configured as production configures them.
- *
- * @param overrides Values to change for one test.
- * @returns The deps.
- */
+/** The route's dependencies, configured as production configures them. */
 function deps(overrides: Partial<Deps> = {}): Deps {
   return { db: UNTOUCHABLE_DB, secretKey: FORM_KEYS.secretKey, postUri: POST_URI, sdk: testSdk, ...overrides };
 }
 
 /**
- * The real SDK with its signature check replaced, for the two SDK-drift cases no real
- * signature can produce.
- *
- * @param authenticate What `authenticate` returns.
- * @returns The SDK.
+ * The real SDK with its signature check replaced, for the two SDK-drift cases no real signature can produce.
  */
 function sdkWhoseAuthenticateReturns(authenticate: unknown): Deps['sdk'] {
   return { ...testSdk, webhooks: { authenticate: () => authenticate as boolean } };
@@ -88,12 +70,7 @@ describe.skipIf(!hasTestDb)('submissions that are stored', () => {
     db = await resetTestDb();
   }, DB_TIMEOUT_MS);
 
-  /**
-   * Reads one stored submission.
-   *
-   * @param responseId The FormSG submission id.
-   * @returns The row, or undefined.
-   */
+  /** Reads one stored submission. */
   async function stored(responseId: string) {
     const [row] = await db.select().from(reportSickFormsg).where(eq(reportSickFormsg.responseId, responseId));
     return row;

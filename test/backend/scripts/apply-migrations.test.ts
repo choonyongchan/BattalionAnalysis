@@ -6,12 +6,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, spyOn, test } from 'bun:test';
 import { applyMigrations, readMigrations, type Migration } from '../../../backend/scripts/apply-migrations.ts';
 
-/**
- * The hex SHA-256 of a text.
- *
- * @param text The text to hash.
- * @returns The hex digest.
- */
+/** The hex SHA-256 of a text. */
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
@@ -27,25 +22,13 @@ describe('readMigrations', () => {
   });
 });
 
-/**
- * A migration named `tag`, built from its statements the way drizzle-kit writes them.
- *
- * @param tag The journal tag.
- * @param statements The SQL statements.
- * @returns The migration.
- */
+/** A migration named `tag`, built from its statements the way drizzle-kit writes them. */
 function migration(tag: string, statements: string[]): Migration {
   const text = statements.join('\n--> statement-breakpoint\n') + '\n';
   return { idx: 0, when: 1_700_000_000_000, tag, text, hash: sha256(text) };
 }
 
-/**
- * A stand-in for `neon(url)` that answers the bookkeeping queries and records the rest.
- *
- * @param recorded The hashes `drizzle.__drizzle_migrations` already holds.
- * @param failOn A statement that throws when run.
- * @returns The query function, the statements it ran and the bookkeeping rows it inserted.
- */
+/** A stand-in for `neon(url)` that answers the bookkeeping queries and records the rest. */
 function fakeSql(recorded: string[], failOn?: string) {
   const queries: string[] = [];
   const inserts: unknown[][] = [];

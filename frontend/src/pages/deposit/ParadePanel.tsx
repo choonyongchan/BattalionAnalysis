@@ -1,12 +1,6 @@
 /**
- * Deposit → Parade State: deposit a parade state WhatsApp missed, and correct or delete any
- * already stored.
- *
- * It talks to `/api/parade` on Vercel, which parses with the same rule-based parser the
- * WhatsApp relay's messages go through, so a deposited parade state is indistinguishable from
- * a relayed one except for its source. The charts read the same tables through
- * `/api/dashboard`; a change here refreshes them at once, and the list below reloads with
- * every background refresh so a message the relay stores meanwhile appears.
+ * Deposit → Parade State: deposit a parade state WhatsApp missed, or correct or delete a stored one, through
+ * `/api/parade` (the same parser the relay uses).
  */
 
 import type { RefObject } from 'preact';

@@ -1,16 +1,6 @@
 /**
- * The sections Report Sick, MC/MA and Status are built from.
- *
- * The three pages ask the same four questions — is it trending, which company, which
- * platoon, who most often — so they share these sections rather than each drawing its own.
- * Each page lists the sections it shows, in order; there are no on/off flags to decode.
- *
- * `useCategory` supplies what every section reads: the company-scoped data and the active
- * date range. Every section that is range-bound takes that `range`, so none of them can
- * outlive the range control.
- *
- * This file composes `model/` functions; it computes nothing of its own that a test
- * elsewhere does not already own.
+ * The sections Report Sick, MC/MA and Status share: `useCategory` gives the company-scoped data and the date
+ * range every section reads. Composition only; the numbers come from `model/`.
  */
 
 import { useMemo } from 'preact/hooks';

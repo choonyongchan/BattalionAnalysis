@@ -1,9 +1,6 @@
 /**
- * Two measures of one thing, one dot each: for a pattern that a ranking of either measure
- * alone would hide, such as many short MCs against a few long ones.
- *
- * A dot that is a company's member takes that company's colour, as on every other chart.
- * Dots are translucent so soldiers sharing a value still show as a darker dot.
+ * Two measures, one dot each (MCs against days lost), for a pattern a ranking hides. A dot wears its
+ * company's colour and is translucent, so shared values show darker.
  */
 
 import { Plot } from './Plot.tsx';

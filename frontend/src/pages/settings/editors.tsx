@@ -1,9 +1,6 @@
 /**
- * The view and the form for each Phase 1 section.
- *
- * Every editor takes `{ draft, setDraft, errors }`: the value being edited, a setter taking the
- * next whole value, and the field errors to show beside each input. Numbers are read from
- * inputs as numbers, so the validator sees what the server will.
+ * The view and the form for each settings section; every editor takes `{ draft, setDraft, errors }` and reads
+ * number inputs as numbers, so the validator sees what the server will.
  */
 
 import { Banner, EmptyState } from '../../components/Card.tsx';

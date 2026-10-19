@@ -1,10 +1,4 @@
-/**
- * Tests for ISO date arithmetic.
- *
- * These run in UTC deliberately. A viewer west of Singapore must read a parade state
- * dated the 22nd as the 22nd, and the only way that holds is if none of this arithmetic
- * touches local time.
- */
+/** Tests for ISO date arithmetic. */
 
 import { describe, expect, test } from 'bun:test';
 import {

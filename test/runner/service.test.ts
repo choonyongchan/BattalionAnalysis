@@ -1,9 +1,4 @@
-/**
- * Tests for the PowerShell behind `bun run runner:service`.
- *
- * Registering a real scheduled task needs elevation, so it is exercised by hand
- * (see runner/README.md); these cover the generated scripts.
- */
+/** Tests for the PowerShell behind `bun run runner:service`. */
 
 import { describe, expect, test } from 'bun:test';
 import { installScript, scripts } from '../../runner/scripts/service.ts';

@@ -1,10 +1,6 @@
 /**
- * What this dashboard is set up for. How much of the battalion it covers is on Filing & Accuracy.
- *
- * Every viewer sees every setting; a viewer holding the settings password can also change
- * one, section by section, from the Basic and Advanced tabs below. Each section's card says
- * when it is still the default. Settings are no longer maintained by SQL: holidays and
- * rotations are edited under Settings → Calendar, alongside Unit, Thresholds and Session.
+ * Settings: everyone reads every section; the settings password unlocks editing, section by section, under
+ * the Basic and Advanced tabs.
  */
 
 import { useState } from 'preact/hooks';

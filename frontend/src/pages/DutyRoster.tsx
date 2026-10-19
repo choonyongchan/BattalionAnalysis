@@ -1,24 +1,6 @@
 /**
- * Duty Roster: who is on duty today, from the CDO down.
- *
- * A single-date view rather than a range — the question this page answers is "who is in
- * the chair right now", not a trend. The company comes from the page-wide selector, and
- * the date sits in the same bar beside it.
- *
- * Drawn as a structured roster — one card per company, the chain of command indented
- * beneath its CDO — rather than a node-and-link tree. Every company has the same shape —
- * CDO, CDS, COS, then a PDS for Coy HQ and each of its platoons — so a tree's lines say nothing a reader does not already know,
- * while its nodes squeeze a rank and a forty-character name into a label. Cards read as
- * a list, side by side, and a gap in one company's chain stands out against the others.
- *
- * Coverage in the real data is poor, and the page says so: Archer and Stallion file a
- * roster most days, Hercules files only COS, Cougar files almost nothing, and Braves none
- * at all. The battalion view shows all five regardless, because a company that filed
- * nothing is the finding, not a reason to hide it.
- *
- * A role filed as `-` reads "Vacant" in the warning colour, distinct from one not filed at
- * all, and the coverage line lists every vacant chair — including any PDS the company's
- * sub-unit list in `COMPANY_SUBUNITS` has no slot for.
+ * Duty Roster: who is on duty on one parade, a card per company with its chain of command. A company that
+ * filed nothing still shows (that absence is the finding); a role filed as `-` reads Vacant.
  */
 
 import { useMemo, useState } from 'preact/hooks';

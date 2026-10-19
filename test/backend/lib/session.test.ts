@@ -1,10 +1,4 @@
-/**
- * The dashboard's session token.
- *
- * The token is what a browser holds instead of the password, so the tests that matter are
- * the refusals: an expired token, a tampered one, and one signed with the password that
- * has since been rotated. Each of those is someone keeping access they should have lost.
- */
+/** The dashboard's session token. */
 import { describe, expect, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import {
@@ -104,12 +98,7 @@ describe('the cookie the session is carried in', () => {
 });
 
 describe('isSameOrigin, the check behind every cookie-authorised write', () => {
-  /**
-   * Builds a request with the headers a browser would set.
-   *
-   * @param headers The headers to set.
-   * @returns The request.
-   */
+  /** Builds a request with the headers a browser would set. */
   function from(headers: Record<string, string>): Request {
     return new Request('https://internal.host.invalid/api/parade', { method: 'POST', headers });
   }

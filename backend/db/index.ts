@@ -12,14 +12,7 @@ export type Db = ReturnType<typeof drizzle<typeof schema>>;
 /** One handle per connection-string variable, so the owner and read-only roles never mix. */
 const handles = new Map<string, Db>();
 
-/**
- * Returns the memoised Drizzle handle for a connection-string environment variable.
- *
- * @param envVar The variable holding the connection string: `DATABASE_URL` (owner) or
- *   `DASHBOARD_DATABASE_URL` (the read-only `dashboard_read` role).
- * @returns The handle.
- * @throws {Error} If the variable is unset.
- */
+/** Returns the memoised Drizzle handle for a connection-string environment variable. */
 export function getDb(envVar = 'DATABASE_URL'): Db {
   const url = process.env[envVar];
   if (!url) throw new Error(`${envVar} is not set. Copy .env.example to .env.local.`);

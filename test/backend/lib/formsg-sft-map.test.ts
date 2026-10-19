@@ -5,13 +5,7 @@ import { describe, expect, test } from 'bun:test';
 import { mapSftSubmission, resolveSftField } from '../../../backend/lib/formsg/sft.ts';
 import { expectedSftRow, SFT_SPECS, sftResponsesOf } from '../../support/formsg.ts';
 
-/**
- * Wraps answers as a decrypted submission.
- *
- * @param spec The submission spec.
- * @param responses The answers.
- * @returns The submission.
- */
+/** Wraps answers as a decrypted submission. */
 function decrypted(spec: (typeof SFT_SPECS)[number], responses = sftResponsesOf(spec)) {
   return { submissionId: spec.submissionId, submittedAt: spec.created, responses };
 }

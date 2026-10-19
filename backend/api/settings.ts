@@ -1,20 +1,7 @@
 /**
- * The Settings page's write route.
- *
- *   PUT    { section, value, version }     save one section
- *   DELETE ?section=<name>&version=<n>     reset one section to its default
- *
- * Only someone who logged in with `SETTINGS_PASSWORD` holds the `settings_session` cookie
- * this checks; the dashboard password alone reads settings (through `/api/dashboard`) but
- * cannot change them. Like the parade intake, a cookie-authorised write must also come from
- * this deployment's own pages.
- *
- * The value is validated with the same code the page ran (`src/model/settings/validate.js`),
- * so a hand-crafted request cannot store what the form would refuse. `version` is the one the
- * page edited: a save from a page opened before someone else's save answers 409 rather than
- * undoing it.
- *
- * Every refusal happens before the store is touched. Nothing here logs a value.
+ * The Settings write route: PUT `{ section, value, version }` saves one section, DELETE
+ * `?section=&version=` resets it. Needs the settings session and a same-origin request; the value is
+ * validated by the page's own code, and a stale `version` answers 409. Nothing here logs a value.
  */
 import { getDb } from '../db/index.ts';
 import { methodNotAllowed, noStore, readJson, serverError } from '../lib/http.ts';
@@ -42,39 +29,20 @@ export interface Deps {
 const MAX_VERSION = 2147483647;
 
 /**
- * Whether a value is a version a caller could have seen: a whole number the `version` column
- * can hold, 0 to 2147483647 (`int4`'s range; the column starts at 0).
- *
- * Rejecting an out-of-range version here, rather than letting it reach the database, matters
- * for more than correctness: an oversized value made Postgres reject the query, and that
- * failure used to reach the log with the query's own params attached.
- *
- * @param value The candidate.
- * @returns True when usable.
+ * Whether a value is a version the `int4` column can hold; checked here because an oversized one made
+ * Postgres fail, and that failure once reached the log with the query's params.
  */
 function isVersion(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_VERSION;
 }
 
-/**
- * Answers a save or reset outcome.
- *
- * @param outcome What the store did.
- * @param warnings Validation warnings to pass back.
- * @returns The response.
- */
+/** Answers a save or reset outcome. */
 function outcomeResponse(outcome: SaveOutcome, warnings: unknown[] = []): Response {
   if (outcome.status === 'conflict') return noStore(409, { ok: false, error: 'conflict' });
   return noStore(200, { ok: true, version: outcome.version, warnings });
 }
 
-/**
- * Handles PUT: validate, then save.
- *
- * @param request The incoming request.
- * @param deps The store.
- * @returns The response.
- */
+/** Handles PUT: validate, then save. */
 async function put(request: Request, deps: Deps): Promise<Response> {
   const parsed = await readJson<{ section?: unknown; value?: unknown; version?: unknown }>(request);
   if (!parsed.ok) return parsed.response;
@@ -96,13 +64,7 @@ async function put(request: Request, deps: Deps): Promise<Response> {
   return outcomeResponse(await deps.store.save(section, checked.value, version), checked.warnings);
 }
 
-/**
- * Handles DELETE: reset one section to its default.
- *
- * @param request The incoming request.
- * @param deps The store.
- * @returns The response.
- */
+/** Handles DELETE: reset one section to its default. */
 async function remove(request: Request, deps: Deps): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const section = params.get('section') ?? '';
@@ -114,15 +76,7 @@ async function remove(request: Request, deps: Deps): Promise<Response> {
   return outcomeResponse(await deps.store.reset(section, parsedVersion));
 }
 
-/**
- * Routes one request.
- *
- * Fails closed: with no dashboard password, or no distinct settings password, nobody may edit.
- *
- * @param request The incoming request.
- * @param deps The store and the configured passwords.
- * @returns The response.
- */
+/** Routes one request. */
 export async function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method !== 'PUT' && request.method !== 'DELETE') return methodNotAllowed(['PUT', 'DELETE']);
   const secret = editSecret(deps.dashboardPassword, deps.settingsPassword);
@@ -138,13 +92,8 @@ export async function handle(request: Request, deps: Deps): Promise<Response> {
 }
 
 /**
- * The Vercel entry point.
- *
- * Exported per HTTP method, not as `default`: Vercel runs a default-exported function as a
- * Node `(req, res)` handler, which never sends the returned `Response`, so the request hangs.
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   return handle(request, {

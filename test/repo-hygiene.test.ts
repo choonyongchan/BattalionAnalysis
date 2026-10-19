@@ -1,11 +1,4 @@
-/**
- * Repository hygiene checks that are cheap to run and expensive to discover late.
- *
- * Both of these guard failures that are SILENT. A source file with a NUL byte is treated
- * by git as binary, so its diffs and history vanish without any error; that happened twice
- * while this migration was being written. A committed NRIC cannot be removed from history
- * in practice.
- */
+/** Repository hygiene checks that are cheap to run and expensive to discover late. */
 import { describe, expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -13,14 +6,7 @@ import { join } from 'node:path';
 
 const REPO_ROOT = join(import.meta.dir, '..');
 
-/**
- * Lists the repository's tracked files.
- *
- * Uses git rather than a directory walk so that ignored files -- which is where the real
- * personnel data lives -- are never read.
- *
- * @returns Tracked paths, relative to the repository root.
- */
+/** Lists the repository's tracked files. */
 function trackedFiles(): string[] {
   const result = spawnSync('git', ['ls-files'], { cwd: REPO_ROOT, encoding: 'utf8' });
   if (result.status !== 0) return [];

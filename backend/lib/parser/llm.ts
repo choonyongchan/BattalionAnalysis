@@ -1,10 +1,6 @@
 /**
- * The model fallback: reads a parade state the rule-based parser in `deterministic.ts` was
- * unsure of, through OpenAI's chat-completions endpoint with Structured Outputs.
- *
- * Raw `fetch` rather than the `openai` SDK: the call is one POST with a JSON body, and the SDK
- * would add a dependency and a mocking surface. `fetchImpl` is injectable so tests run
- * without a network.
+ * The model fallback for messages the rule-based parser doubted: one OpenAI chat-completions POST with
+ * Structured Outputs, through raw `fetch` (injectable for tests).
  */
 import type { Extraction } from './extraction.ts';
 import { buildPrompt } from './prompt.ts';
@@ -18,12 +14,7 @@ export const DEFAULT_MODEL = 'gpt-6-luna';
 /** Anything shaped like an NRIC or FIN, as `lib/formsg/webhook.ts` refuses to store. */
 const NRIC_SHAPES = /\b[STFGM]\d{7}[A-Z]\b/gi;
 
-/**
- * Replaces every NRIC-shaped token before text is sent to the model provider.
- *
- * @param text The message text.
- * @returns The same text with each NRIC shape replaced by `[NRIC]`.
- */
+/** Replaces every NRIC-shaped token before text is sent to the model provider. */
 export function maskNrics(text: string): string {
   return text.replace(NRIC_SHAPES, '[NRIC]');
 }
@@ -75,24 +66,12 @@ export class OpenAiParser {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  /**
-   * Builds a parser from the environment.
-   *
-   * @param env The environment; `OPENAI_API_KEY` is required, `OPENAI_MODEL` optional.
-   * @returns The parser, or null when no API key is configured.
-   */
+  /** Builds a parser from the environment. */
   static fromEnv(env: Record<string, string | undefined> = process.env): OpenAiParser | null {
     return env.OPENAI_API_KEY ? new OpenAiParser({ apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL }) : null;
   }
 
-  /**
-   * Extracts a parade state from message text.
-   *
-   * @param text The message, already passed through `cleanText`.
-   * @param today The receipt date, `yyyy-MM-dd`, for resolving two-digit years.
-   * @returns The extraction, which may be a rejection (`rejected: true`).
-   * @throws {LlmParseError} When every attempt fails.
-   */
+  /** Extracts a parade state from message text. */
   async parse(text: string, today: string): Promise<Extraction> {
     // No column stores an NRIC, so the model never needs one; `store: false` keeps the
     // completion out of OpenAI's stored-completions log.
@@ -114,13 +93,7 @@ export class OpenAiParser {
     throw last instanceof LlmParseError ? last : new LlmParseError(String(last));
   }
 
-  /**
-   * Makes one request and reads the reply.
-   *
-   * @param body The serialised request body.
-   * @returns The extraction.
-   * @throws {LlmParseError} On any transport, status or shape failure.
-   */
+  /** Makes one request and reads the reply. */
   private async callOnce(body: string): Promise<Extraction> {
     let response: Response;
     try {
@@ -143,13 +116,7 @@ export class OpenAiParser {
   }
 }
 
-/**
- * Checks what Structured Outputs cannot guarantee: that a whole JSON answer came back.
- *
- * @param choice The first choice of the reply.
- * @returns The extraction.
- * @throws {LlmParseError} When the reply is empty, refused, truncated, not JSON or missing an array.
- */
+/** Checks what Structured Outputs cannot guarantee: that a whole JSON answer came back. */
 function readExtraction(
   choice: { message?: { content?: string; refusal?: string }; finish_reason?: string } | undefined,
 ): Extraction {
@@ -169,12 +136,7 @@ function readExtraction(
   return parsed;
 }
 
-/**
- * Reads a failed response's body without letting a decode failure mask the real error.
- *
- * @param response The failed response.
- * @returns The body text, or a placeholder when it cannot be read.
- */
+/** Reads a failed response's body without letting a decode failure mask the real error. */
 async function safeText(response: Response): Promise<string> {
   try {
     return await response.text();

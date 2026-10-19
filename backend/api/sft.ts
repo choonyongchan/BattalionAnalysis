@@ -1,16 +1,6 @@
 /**
- * The FormSG Self-Regulated Fitness Training webhook, and the Deposit page's corrections.
- *
- *   POST                 store one FormSG submission     FormSG signature
- *   GET                  list every SFT record           dashboard password
- *   PUT    ?id=<id>      correct one record's answers    dashboard password
- *   DELETE ?id=<id>      delete one record               dashboard password
- *
- * The verify → decrypt → map → insert flow is `lib/formsg/webhook.ts`, shared with
- * `api/reportsick.ts`. SFT is its own form with its own key; `FORMSG_SFT_POST_URI` must
- * byte-match the URL registered in FormSG (`…/api/sft`). FormSG is the only way a record is
- * created: the dashboard may correct or delete one, never add one. Its calls are authorised
- * as `api/parade.ts` authorises them (`lib/session.ts#isDashboardCaller`).
+ * The SFT FormSG webhook (POST) and the Deposit page's corrections: GET lists, PUT and DELETE (`?id=`)
+ * correct or remove one record. FormSG is the only way a record is created.
  */
 import { getDb } from '../db/index.ts';
 import { sftFormsg } from '../db/schema.ts';
@@ -52,25 +42,13 @@ const METHODS = ['GET', 'POST', 'PUT', 'DELETE'];
 /** Longer than any FormSG submission id; anything bigger is not one. */
 const MAX_ID_CHARS = 100;
 
-/**
- * Reads the `?id=` query parameter, a FormSG submission id.
- *
- * @param request The incoming request.
- * @returns The trimmed id, or null when absent, blank or too long.
- */
+/** Reads the `?id=` query parameter, a FormSG submission id. */
 function idOf(request: Request): string | null {
   const id = new URL(request.url).searchParams.get('id')?.trim();
   return id && id.length <= MAX_ID_CHARS ? id : null;
 }
 
-/**
- * Handles PUT: check a correction as the page did, then write it.
- *
- * @param request The incoming request.
- * @param deps The store and the clock.
- * @param id The record's id.
- * @returns 200 with the corrected record, 404, or 422 with what to fix.
- */
+/** Handles PUT: check a correction as the page did, then write it. */
 async function correct(request: Request, deps: Deps, id: string): Promise<Response> {
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
@@ -82,13 +60,7 @@ async function correct(request: Request, deps: Deps, id: string): Promise<Respon
   return record ? noStore(200, { status: 'updated', record }) : noStore(404, { error: 'No such SFT record.' });
 }
 
-/**
- * Handles the dashboard's methods.
- *
- * @param request The incoming request.
- * @param deps The store, the password and the clock.
- * @returns The response.
- */
+/** Handles the dashboard's methods. */
 async function manage(request: Request, deps: Deps): Promise<Response> {
   if (!deps.dashboardPassword) return noStore(503, { error: 'DASHBOARD_PASSWORD is not configured.' });
   if (!isDashboardCaller(request, deps.dashboardPassword, (deps.now ?? Date.now)())) {
@@ -105,13 +77,7 @@ async function manage(request: Request, deps: Deps): Promise<Response> {
   }
 }
 
-/**
- * Routes one request: FormSG's POST, or one of the dashboard's calls.
- *
- * @param request The incoming request.
- * @param deps Database handle, secrets, the SDK and the record store.
- * @returns The response.
- */
+/** Routes one request: FormSG's POST, or one of the dashboard's calls. */
 export function handle(request: Request, deps: Deps): Promise<Response> {
   if (request.method === 'POST') return handleWebhook(request, deps, FORM);
   if (!METHODS.includes(request.method)) return Promise.resolve(methodNotAllowed(METHODS));
@@ -119,10 +85,8 @@ export function handle(request: Request, deps: Deps): Promise<Response> {
 }
 
 /**
- * The Vercel entry point, exported per method (see `api/reportsick.ts`).
- *
- * @param request The incoming request.
- * @returns The response.
+ * The Vercel entry point, exported per method: a default export runs as a Node `(req, res)` handler
+ * that never sends the returned `Response`, so the request hangs.
  */
 function route(request: Request): Promise<Response> {
   const db = getDb();

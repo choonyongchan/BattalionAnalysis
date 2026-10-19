@@ -1,10 +1,4 @@
-/**
- * Tests for the return-to-duty list.
- *
- * The cases worth having: only MC and leave are listed, a soldier comes back the day after
- * his stated end date, a soldier listed twice is one soldier back only when both absences
- * end, and an absence with no end date is listed last with no day back.
- */
+/** Tests for the return-to-duty list. */
 
 import { describe, expect, test } from 'bun:test';
 import type { PersonnelRow } from '../../shared/dashboard.ts';

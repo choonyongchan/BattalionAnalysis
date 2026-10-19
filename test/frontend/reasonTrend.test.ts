@@ -1,11 +1,4 @@
-/**
- * Tests for tracking the top reasons across time buckets.
- *
- * The case worth having is the fold: once a label drops out of the top N it must not
- * vanish, or a chart would silently undercount its own total. It joins "Other" instead,
- * and "Other" is absent entirely when nothing was folded — a legend entry with a
- * permanent zero is worse than no entry.
- */
+/** Tests for tracking the top reasons across time buckets. */
 
 import { describe, expect, test } from 'bun:test';
 import { OTHER_LABEL, topLabelsOverTime } from '../../frontend/src/model/reasonTrend.ts';
