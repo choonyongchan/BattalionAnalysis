@@ -160,7 +160,10 @@ function attachHandlers({
 /** Removes a socket's listeners and ends it; a throw here never masks the disconnect reason. */
 function teardownSocket(socket: WASocket, logger: Logger): void {
   try {
-    socket.ev.removeAllListeners(undefined as never);
+    // Name each event: Node treats an explicit `undefined` as an event name and removes nothing.
+    for (const event of ['creds.update', 'messages.upsert', 'connection.update'] as const) {
+      socket.ev.removeAllListeners(event);
+    }
   } catch (err) {
     logger.warn({ err: (err as Error).message }, 'failed to remove socket listeners');
   }
