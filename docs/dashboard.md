@@ -11,6 +11,7 @@ The pages, in the order a commander reads them:
 | **Today** | Who has filed a parade state this morning, and when? How many do I have, how many turned up, and why is the rest missing? What are the other duties? Who cannot do what? Are my officers there? How many will I have over the next two weeks, and who is back when? |
 | **Duty Roster** | Who is on duty today, from the CDO down, and which chairs were filed vacant? Is duty spread fairly, and was anyone rostered while on MC or leave? |
 | **Report Sick** · **MC / MA** · **Status & Restrictions** | Is it getting worse? Which company? Which platoon? Who, most often? Plus: is something spreading (Report Sick); when do MCs start, who has many short MCs against few long ones, how long do MCs run (MC / MA); who did SFT while restricted (Status & Restrictions). |
+| **Report Sick Compliance** | Did every soldier the parade state lists as reporting sick file the FormSG that day? Names are matched per day (4D first, then a typo-tolerant name match, `model/compliance.ts`); lists who did not, and who filed without being listed. |
 | **Trends** | How have strength, report sick (both sources), MC / MA and Status moved over the range, and how does report sick flow into FormSG outcomes? |
 | **SFT** | How many soldiers have done self-regulated fitness training, and how many today? Which company? Where, doing what, and in how big a group? |
 | **Soldier** | How often has this soldier been out, and how long was each episode? |

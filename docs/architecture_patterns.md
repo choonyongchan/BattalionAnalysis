@@ -131,7 +131,7 @@ Layers, dependency direction strictly downward:
 
 | Layer | Holds | May import |
 |---|---|---|
-| `pages/` | one file per page, routed by `app/routes.ts` (Today, Duty Roster, Report Sick, MC / MA, Status & Restrictions, Trends, SFT, Soldier, Filing & Accuracy, Deposit, Settings; `ROUTE_ALIASES` keeps old hashes working); `pages/today/` for Today's cards; `pages/shared/` for the range-bound pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
+| `pages/` | one file per page, routed by `app/routes.ts` (Today, Duty Roster, Report Sick, Report Sick Compliance, MC / MA, Status & Restrictions, Trends, SFT, Soldier, Filing & Accuracy, Deposit, Settings; `ROUTE_ALIASES` keeps old hashes working); `pages/today/` for Today's cards; `pages/shared/` for the range-bound pages; `pages/deposit/` for the Deposit page's Parade State and SFT panels | everything below |
 | `components/`, `charts/` | reusable panels, ECharts wrappers | `model/`, `theme/` |
 | `app/` | shell, router, signals (`state.ts`, with `loadedData()` for pages), session lifecycle and the background refresh (`auth.ts`), Vercel Web Analytics and Speed Insights (`telemetry.ts`: one page view per hash route, each URL rewritten to the route path so nothing but a page name is sent) | `data/`, `theme/` |
 | `data/` | the `/api/dashboard` fetch (`feed.ts`, which builds the `Dataset` every page reads); login (`session.ts`), settings writes (`settings.ts`) and the Deposit page's `/api/parade` and `/api/sft` calls (`parade.ts`, `sft.ts`), all through `api.ts#send`, carrying the session cookie and raising `ApiError` | `model/` |

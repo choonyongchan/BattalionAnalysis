@@ -21,6 +21,7 @@ import { Today } from '../pages/today/Today.tsx';
 import { Trends } from '../pages/Trends.tsx';
 import { Filing } from '../pages/Filing.tsx';
 import { ReportSick } from '../pages/ReportSick.tsx';
+import { Compliance } from '../pages/Compliance.tsx';
 import { McMa } from '../pages/McMa.tsx';
 import { Status } from '../pages/Status.tsx';
 import { Sft } from '../pages/Sft.tsx';
@@ -58,6 +59,13 @@ export const ROUTES: PageRoute[] = [
     path: '/report-sick',
     component: ReportSick,
     label: 'Report Sick',
+    group: 'Medical',
+    icon: ReportSickIcon,
+  },
+  {
+    path: '/report-sick-compliance',
+    component: Compliance,
+    label: 'Report Sick Compliance',
     group: 'Medical',
     icon: ReportSickIcon,
   },
